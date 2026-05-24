@@ -1,0 +1,50 @@
+{
+  "model": "FedGNN",
+  "dataset": "steam",
+  "hparams": {
+    "embed_dim": 64,
+    "n_gnn_layers": 2,
+    "n_rounds": 2,
+    "clients_per_round": 2,
+    "local_epochs": 1,
+    "warmup_rounds": 0,
+    "max_neigh": 20,
+    "pseudo_m": 2,
+    "lr_item": 0.1,
+    "lr_gnn": 0.001,
+    "weight_decay": 1e-06,
+    "eval_every": 1,
+    "top_k": 10
+  },
+  "best_hr": 9.343,
+  "best_ndcg": 4.08,
+  "best_round": 2,
+  "timing": {
+    "total_wall_seconds": 71.7,
+    "total_wall_minutes": 1.19,
+    "avg_round_seconds": 6.529,
+    "n_rounds": 2
+  },
+  "fedpcl_target": {
+    "HR@10": 80.36,
+    "NDCG@10": 65.55
+  },
+  "log": [
+    {
+      "round": 1,
+      "loss": 0.86561,
+      "HR@10": 9.316,
+      "NDCG@10": 4.07,
+      "graph_expanded": true,
+      "round_time_s": 13.04
+    },
+    {
+      "round": 2,
+      "loss": 0.93078,
+      "HR@10": 9.343,
+      "NDCG@10": 4.08,
+      "graph_expanded": true,
+      "round_time_s": 0.02
+    }
+  ]
+}

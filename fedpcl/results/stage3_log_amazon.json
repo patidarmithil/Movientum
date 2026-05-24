@@ -1,0 +1,79 @@
+{
+  "dataset": "amazon",
+  "hparams": {
+    "embed_dim": 64,
+    "n_gnn_layers": 2,
+    "n_rounds": 60,
+    "clients_per_round": 128,
+    "local_epochs": 10,
+    "n_clusters": 5,
+    "mu1": 0.5,
+    "mu2": 0.5,
+    "cluster_every": 10,
+    "lr_item": 0.1,
+    "lr_user": 0.001,
+    "weight_decay": 1e-06,
+    "eval_every": 10,
+    "top_k": 10
+  },
+  "best_hr": 11.104,
+  "best_ndcg": 5.427,
+  "best_round": 60,
+  "timing": {
+    "total_wall_seconds": 183.8,
+    "total_wall_minutes": 3.06,
+    "avg_round_seconds": 2.869,
+    "n_rounds": 60
+  },
+  "log": [
+    {
+      "round": 1,
+      "loss": 0.62341,
+      "HR@10": 8.91,
+      "NDCG@10": 4.173,
+      "round_time_s": 2.08
+    },
+    {
+      "round": 10,
+      "loss": 0.60574,
+      "HR@10": 9.441,
+      "NDCG@10": 4.418,
+      "round_time_s": 6.59
+    },
+    {
+      "round": 20,
+      "loss": 0.59837,
+      "HR@10": 9.375,
+      "NDCG@10": 4.305,
+      "round_time_s": 2.54
+    },
+    {
+      "round": 30,
+      "loss": 0.57807,
+      "HR@10": 9.973,
+      "NDCG@10": 4.572,
+      "round_time_s": 2.58
+    },
+    {
+      "round": 40,
+      "loss": 0.5608,
+      "HR@10": 10.173,
+      "NDCG@10": 4.671,
+      "round_time_s": 2.68
+    },
+    {
+      "round": 50,
+      "loss": 0.55003,
+      "HR@10": 10.505,
+      "NDCG@10": 5.05,
+      "round_time_s": 2.61
+    },
+    {
+      "round": 60,
+      "loss": 0.54476,
+      "HR@10": 11.104,
+      "NDCG@10": 5.427,
+      "round_time_s": 2.32
+    }
+  ]
+}
