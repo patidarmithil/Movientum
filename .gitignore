@@ -1,0 +1,11 @@
+# Python cache
+__pycache__/
+
+# Dataset files
+ratings.dat
+movies.dat
+steam-200k.csv
+u.data
+u.item
+amazon_preprocessed.csv
+Electronics.csv

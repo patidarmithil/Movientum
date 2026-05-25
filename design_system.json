@@ -1,0 +1,391 @@
+{
+  "designSystem": {
+    "name": "Moctale",
+    "type": "Entertainment Discovery Platform",
+    "version": "beta",
+
+    "foundations": {
+      "colorPalette": {
+        "background": {
+          "base": "#0d0d0d",
+          "surface": "#1a1a1a",
+          "card": "#1e1e1e",
+          "cardHover": "#252525",
+          "overlay": "#111111"
+        },
+        "brand": {
+          "primary": "#7c3aed",
+          "primaryLight": "#9f5ff5",
+          "gradient": "linear-gradient(135deg, #3b0764 0%, #1a0533 50%, #0d0d0d 100%)"
+        },
+        "accent": {
+          "green": "#22c55e",
+          "greenMuted": "#16a34a",
+          "purple": "#a855f7",
+          "purpleMuted": "#7c3aed",
+          "orange": "#f97316",
+          "red": "#ef4444",
+          "yellow": "#eab308"
+        },
+        "text": {
+          "primary": "#ffffff",
+          "secondary": "#a1a1aa",
+          "muted": "#71717a",
+          "label": "#d4d4d8"
+        },
+        "border": {
+          "default": "#27272a",
+          "subtle": "#1f1f1f"
+        },
+        "ratingColors": {
+          "skip": "#ef4444",
+          "timepass": "#eab308",
+          "goForIt": "#22c55e",
+          "perfection": "#a855f7"
+        }
+      },
+
+      "typography": {
+        "fontFamily": {
+          "primary": "system-ui, -apple-system, sans-serif"
+        },
+        "scale": {
+          "xs": "11px",
+          "sm": "13px",
+          "base": "14px",
+          "md": "16px",
+          "lg": "18px",
+          "xl": "20px",
+          "2xl": "24px",
+          "3xl": "32px"
+        },
+        "weight": {
+          "normal": 400,
+          "medium": 500,
+          "semibold": 600,
+          "bold": 700,
+          "extrabold": 800
+        },
+        "lineHeight": {
+          "tight": 1.2,
+          "normal": 1.5,
+          "relaxed": 1.7
+        }
+      },
+
+      "spacing": {
+        "base": 4,
+        "scale": [0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96]
+      },
+
+      "borderRadius": {
+        "sm": "6px",
+        "md": "10px",
+        "lg": "14px",
+        "xl": "18px",
+        "full": "9999px"
+      },
+
+      "shadows": {
+        "card": "0 2px 8px rgba(0,0,0,0.4)",
+        "cardHover": "0 8px 24px rgba(0,0,0,0.6)",
+        "modal": "0 16px 48px rgba(0,0,0,0.8)"
+      }
+    },
+
+    "layout": {
+      "maxWidth": "1440px",
+      "structure": "three-column",
+      "columns": {
+        "left": { "width": "none", "role": "main-content" },
+        "center": { "width": "flex-1", "role": "content-feed" },
+        "right": { "width": "300-340px", "role": "sidebar-rankings" }
+      },
+      "navHeight": "56px",
+      "contentPadding": "24px 32px",
+      "gridGap": "16px"
+    },
+
+    "navigation": {
+      "style": "top-bar-fixed",
+      "background": "#0d0d0d",
+      "borderBottom": "1px solid #1f1f1f",
+      "logo": {
+        "style": "wordmark + icon",
+        "hasBetaBadge": true,
+        "betaBadgeStyle": "small uppercase letter near logo"
+      },
+      "items": [
+        { "label": "Explore", "icon": "compass", "hasActiveIndicator": true, "indicatorColor": "#7c3aed" },
+        { "label": "Calendar", "icon": "calendar" },
+        { "label": "Cups/Watch", "icon": "cup" },
+        { "label": "Bookmarks", "icon": "bookmark" },
+        { "label": "Grid/Browse", "icon": "grid" },
+        { "label": "Notifications", "icon": "bell" },
+        { "label": "Search", "icon": "search" },
+        { "label": "Profile", "icon": "avatar-circle" }
+      ],
+      "layout": "logo-left, items-center, avatar-right"
+    },
+
+    "components": {
+      "contentCard": {
+        "variants": ["poster", "list-item", "hero"],
+        "posterCard": {
+          "aspectRatio": "2/3",
+          "borderRadius": "10px",
+          "overflow": "hidden",
+          "imageStyle": "cover fill",
+          "hoverEffect": "scale(1.03) + shadow",
+          "titleStyle": {
+            "position": "below-image",
+            "fontSize": "14px",
+            "fontWeight": 600,
+            "color": "#ffffff"
+          },
+          "subtitleStyle": {
+            "fontSize": "12px",
+            "color": "#a1a1aa",
+            "pattern": "[Type] [Badge]",
+            "badgeHighlight": "New"
+          },
+          "highlightBorder": {
+            "trigger": "trending/featured",
+            "style": "2px solid #f97316",
+            "borderRadius": "10px"
+          }
+        },
+        "heroCard": {
+          "layout": "full-width banner",
+          "hasTrailerVideo": true,
+          "hasPosterThumbnailOverlay": true,
+          "posterPosition": "bottom-left",
+          "metaPosition": "bottom-left below poster",
+          "metaPattern": "[Type] • [Year] • [Runtime]",
+          "titleStyle": { "fontSize": "28px", "fontWeight": 700 },
+          "actionButton": {
+            "variants": ["Watched", "Want to Watch", "Watching"],
+            "watchedStyle": {
+              "background": "#22c55e",
+              "color": "#000",
+              "borderRadius": "9999px",
+              "icon": "checkmark"
+            }
+          }
+        }
+      },
+
+      "rankingListItem": {
+        "layout": "horizontal",
+        "elements": ["rank-number", "thumbnail", "title", "meta", "interest-count"],
+        "rankNumber": {
+          "fontSize": "48px",
+          "fontWeight": 800,
+          "color": "#374151",
+          "opacity": 0.6
+        },
+        "thumbnail": {
+          "size": "52x72px",
+          "borderRadius": "6px"
+        },
+        "interestCount": {
+          "icon": "flame",
+          "iconColor": "#f97316",
+          "textColor": "#f97316",
+          "fontWeight": 600,
+          "pattern": "[N]K Interested"
+        },
+        "metaPattern": "[Date] • [Status]",
+        "statusLabels": ["New Show", "In Theatre", "New Season", "To Be Confirmed"],
+        "background": "#1a1a1a",
+        "borderRadius": "12px",
+        "padding": "12px 16px"
+      },
+
+      "sectionHeader": {
+        "layout": "icon + title left, filter-dropdown right",
+        "icon": "emoji or icon prefix",
+        "titleStyle": { "fontSize": "20px", "fontWeight": 700, "color": "#ffffff" },
+        "filterDropdown": {
+          "style": "pill-button",
+          "background": "#1e1e1e",
+          "border": "1px solid #27272a",
+          "borderRadius": "9999px",
+          "options": ["This Week", "This Month", "All Time"]
+        }
+      },
+
+      "ratingGauge": {
+        "type": "semicircle-donut",
+        "segments": {
+          "skip": { "color": "#ef4444", "position": "far-left" },
+          "timepass": { "color": "#eab308", "position": "left-center" },
+          "goForIt": { "color": "#22c55e", "position": "right-center" },
+          "perfection": { "color": "#a855f7", "position": "far-right" }
+        },
+        "centerText": {
+          "percentage": { "fontSize": "32px", "fontWeight": 700, "color": "#22c55e" },
+          "votesLabel": { "fontSize": "13px", "color": "#a1a1aa", "pattern": "[votes]/[total] Votes" }
+        },
+        "legend": {
+          "layout": "horizontal below gauge",
+          "dotSize": "10px",
+          "labelStyle": { "fontSize": "13px", "color": "#a1a1aa" },
+          "percentageStyle": { "fontWeight": 600, "color": "#ffffff" }
+        }
+      },
+
+      "reviewCard": {
+        "layout": "vertical stack",
+        "header": {
+          "avatar": { "size": "40px", "borderRadius": "full" },
+          "username": { "fontSize": "15px", "fontWeight": 600 },
+          "date": { "fontSize": "13px", "color": "#71717a" },
+          "ratingBadge": {
+            "position": "top-right",
+            "style": "pill",
+            "background": "#7c3aed",
+            "color": "#ffffff",
+            "fontWeight": 700,
+            "options": ["Skip", "Timepass", "Go For It", "Perfection"]
+          }
+        },
+        "body": {
+          "fontSize": "15px",
+          "lineHeight": 1.6,
+          "truncation": "collapsible with 'more' link"
+        },
+        "footer": {
+          "likeButton": { "icon": "heart-outline", "countStyle": "number beside" },
+          "commentButton": { "icon": "bubble-outline", "countStyle": "number beside" },
+          "menuButton": { "icon": "three-dots", "position": "far-right" }
+        },
+        "background": "#161616",
+        "borderRadius": "12px",
+        "padding": "16px 20px",
+        "marginBottom": "12px"
+      },
+
+      "reviewFilters": {
+        "layout": "horizontal row",
+        "sortDropdown": {
+          "label": "Most Liked",
+          "style": "pill with chevron",
+          "background": "#1e1e1e",
+          "border": "1px solid #27272a"
+        },
+        "toggles": [
+          { "label": "Show Spoilers", "type": "checkbox-pill", "activeBackground": "#7c3aed" },
+          { "label": "Following Only", "type": "checkbox-pill", "activeBackground": "#7c3aed" }
+        ]
+      },
+
+      "profileCard": {
+        "layout": "vertical left-column",
+        "avatar": {
+          "size": "100px",
+          "borderRadius": "full",
+          "style": "illustration/anime art supported"
+        },
+        "nameStyle": { "fontSize": "20px", "fontWeight": 700 },
+        "handleStyle": { "fontSize": "14px", "color": "#71717a", "prefix": "@" },
+        "stats": {
+          "layout": "two-column grid",
+          "items": ["Reviews Posted", "Public Collections"],
+          "valueStyle": { "fontSize": "24px", "fontWeight": 700 },
+          "labelStyle": { "fontSize": "12px", "color": "#a1a1aa" }
+        },
+        "socialStats": {
+          "layout": "inline with bullet separator",
+          "pattern": "[N] Followers • [N] Following",
+          "icon": "people-icon"
+        },
+        "joinDate": { "icon": "calendar", "pattern": "Joined [N] months ago" },
+        "editButton": {
+          "style": "full-width outline",
+          "background": "#1e1e1e",
+          "border": "1px solid #27272a",
+          "borderRadius": "8px"
+        }
+      },
+
+      "contentFilterTabs": {
+        "type": "pill-tabs horizontal",
+        "options": ["All", "Skip", "Timepass", "Go For It", "Perfection"],
+        "activeStyle": {
+          "background": "#27272a",
+          "color": "#ffffff",
+          "fontWeight": 600
+        },
+        "inactiveStyle": {
+          "background": "transparent",
+          "color": "#a1a1aa"
+        },
+        "borderRadius": "9999px",
+        "padding": "6px 14px"
+      },
+
+      "contentGrid": {
+        "columns": 3,
+        "gap": "12px",
+        "cardAspectRatio": "2/3",
+        "titleBelow": true,
+        "metaBelow": true
+      },
+
+      "interestedSidebar": {
+        "title": "Interested In",
+        "itemLayout": "horizontal",
+        "thumbnail": { "size": "48x64px", "borderRadius": "6px" },
+        "titleStyle": { "fontSize": "14px", "fontWeight": 600 },
+        "metaStyle": { "fontSize": "12px", "color": "#71717a" },
+        "statusBadge": { "fontSize": "12px", "color": "#a1a1aa" }
+      }
+    },
+
+    "patterns": {
+      "ratingSystem": {
+        "scale": ["Skip", "Timepass", "Go For It", "Perfection"],
+        "colorMap": {
+          "Skip": "#ef4444",
+          "Timepass": "#eab308",
+          "Go For It": "#22c55e",
+          "Perfection": "#a855f7"
+        },
+        "displayAs": ["badge-pill", "gauge-segment", "filter-tab"]
+      },
+      "interestSystem": {
+        "cta": "Interested",
+        "metric": "[N]K Interested",
+        "icon": "flame",
+        "color": "#f97316"
+      },
+      "watchStatusSystem": {
+        "states": ["Want to Watch", "Watching", "Watched"],
+        "watchedColor": "#22c55e",
+        "buttonStyle": "large pill full-width"
+      },
+      "contentTypeLabels": {
+        "types": ["Movie", "Series", "New Show", "New Movie", "Series Finale", "Glimpse"],
+        "style": "lowercase muted text"
+      }
+    },
+
+    "motionPrinciples": {
+      "cardHover": "scale(1.02-1.04), shadow increase, 150ms ease",
+      "pageTransition": "fade, 200ms",
+      "tabSwitch": "slide + fade",
+      "gaugeAnimation": "arc draw on mount, 600ms ease-out"
+    },
+
+    "designPrinciples": [
+      "Dark-first: everything optimized for dark backgrounds",
+      "Content-first: UI chrome minimal, media art dominant",
+      "Community-led: ratings/reviews/interest counts prominent",
+      "No traditional star ratings: custom 4-tier qualitative scale",
+      "Purple as brand anchor, green for positive actions, orange for social proof",
+      "Anime/illustration avatars normalized in community sections",
+      "Beta badge signals ongoing development, transparency with users"
+    ]
+  }
+}
