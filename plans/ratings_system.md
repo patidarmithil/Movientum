@@ -2,24 +2,24 @@
 
 ## Overview
 
-Two rating flows:
-1. **User Rating** — logged-in user picks one of 4 categories for a movie
-2. **Predefined Rating** — admin-imported bulk data (JSON) → classified into same 4 categories → shown as meter to all visitors
+Movientum combines a rich, fine-grained **numeric rating system (0–10 scale)** in the database with a simplified **4-tiered qualitative meter system** (Skip, Timepass, Go for it, Perfection) on the frontend. 
 
-Both converge into single UI: semicircular meter showing distribution across 4 categories.
+1. **User Rating**: Logged-in users can rate a movie across 4 specific categories (Story, Acting, Direction, Visuals) plus an **Overall Score** on a 0–10 scale. Alternatively, they can quick-rate using the 4-pill qualitative selector.
+2. **Qualitative Mapping**: The system automatically groups the numeric `overall_score` into the 4 qualitative buckets for rendering the visual **Moctale Meter** (semicircular gauge).
+3. **Database Storage**: Ratings are stored as numeric floats in the `ratings` table to preserve detailed signals for the FedPCL recommendation model.
 
 ---
 
-## 1. Rating Categories
+## 1. Rating Categories & Numeric Mapping
 
-| Category | Color | Meaning | Value (stored) |
-|---|---|---|---|
-| Skip | Red (`#FF4D6D`) | Not worth time | `skip` |
-| Timepass | Yellow (`#FFC300`) | Decent, forgettable | `timepass` |
-| Go for it | Green (`#00E5A0`) | Recommend | `go_for_it` |
-| Perfection | Purple (`#9B59FF`) | Masterpiece | `perfection` |
+For rendering the distribution meter on the frontend, numeric `overall_score` values are classified into the 4 buckets as follows:
 
-These are the **only** valid rating values — no stars, no decimals.
+| Category | Color | Range (overall_score) | Meaning | GNN Weight |
+|---|---|---|---|---|
+| **Skip** 🔴 | `#FF4D6D` | `[0.0, 5.0)` | Not worth time | `-1.0` (Strong Negative) |
+| **Timepass** 🟡 | `#FFC300` | `[5.0, 7.0)` | Decent, forgettable | `+0.3` (Weak Positive) |
+| **Go for it** 🟢 | `#00E5A0` | `[7.0, 9.0)` | Recommend | `+0.7` (Recommend) |
+| **Perfection** 🟣 | `#9B59FF` | `[9.0, 10.0]` | Masterpiece | `+1.0` (Masterpiece) |
 
 ---
 
@@ -27,11 +27,14 @@ These are the **only** valid rating values — no stars, no decimals.
 
 ### 2.1 Frontend UX
 
-- On movie detail page → rating widget shows semicircular meter
-- If user not logged in → meter visible (read-only), buttons greyed with tooltip "Login to rate"
-- If logged in + not rated → 4 colored buttons visible below meter
-- If logged in + already rated → user's pick highlighted, option to change
-- On click → optimistic UI update → API call → confirm or revert on error
+- On the movie detail page, the rating widget displays the semicircular **Moctale Meter**.
+- If the user is a guest, the meter is read-only, and rating pills are greyed out with a tooltip: `"Login to rate"`.
+- If logged in, they can quick-rate by clicking one of the 4 pills directly, which maps to a default score:
+  - **Skip**: `overall_score = 3.0`
+  - **Timepass**: `overall_score = 6.0`
+  - **Go for it**: `overall_score = 8.0`
+  - **Perfection**: `overall_score = 10.0`
+- Alternatively, clicking a "Detailed Rating" button opens a modal where the user can rate individual sub-categories (Story, Acting, Direction, Visuals) on a `0.0 - 10.0` slider. The overall score is then calculated as the average of the selected scores.
 
 ### 2.2 Rating Buttons Layout
 
@@ -39,106 +42,88 @@ These are the **only** valid rating values — no stars, no decimals.
 [ Skip 🔴 ]  [ Timepass 🟡 ]  [ Go for it 🟢 ]  [ Perfection 🟣 ]
 ```
 
-Visual: colored pill buttons. Selected = glowing border + filled bg.
+Visual: Colored pill buttons. The selected state glows with the category's signature color.
 
 ### 2.3 API — User Submits Rating
 
-```
+```http
 POST /api/v1/ratings
-Auth: Bearer <JWT>
+Authorization: Bearer <JWT>
+Content-Type: application/json
 
-Body:
 {
-  "movie_id": "tt1234567",
-  "category": "go_for_it"   // skip | timepass | go_for_it | perfection
+  "movie_id": 27205,
+  "overall_score": 8.0,
+  "story_score": 8.5,       // Optional
+  "acting_score": 7.5,      // Optional
+  "direction_score": 8.0,   // Optional
+  "visuals_score": 8.0,     // Optional
+  "review_text": "Great visuals and direction!" // Optional
 }
+```
 
-Response 200:
+**Response 200:**
+```json
 {
-  "success": true,
-  "user_rating": "go_for_it",
+  "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+  "movie_id": 27205,
+  "overall_score": 8.0,
   "updated_distribution": {
-    "skip": 1, "timepass": 11, "go_for_it": 80, "perfection": 9,
-    "total": 101
+    "skip": 5,
+    "timepass": 15,
+    "go_for_it": 120,
+    "perfection": 24,
+    "total": 164
   }
 }
 ```
 
-- UPSERT logic — one rating per user per movie
-- On success → frontend updates meter live
+- **UPSERT logic:** Stored in the `ratings` table. One rating per user per movie. If they rate again, the record is updated.
+- On success, the UI refreshes the meter with the updated distribution.
 
 ### 2.4 API — Fetch User's Existing Rating
 
+```http
+GET /api/v1/ratings/status/27205
+Authorization: Bearer <JWT>
 ```
-GET /api/v1/ratings/user?movie_id=tt1234567
-Auth: Bearer <JWT>
 
-Response:
+**Response 200:**
+```json
 {
-  "movie_id": "tt1234567",
-  "category": "go_for_it",   // null if not rated
-  "rated_at": "2026-05-20T10:00:00Z"
+  "has_rated": true,
+  "rating": {
+    "overall_score": 8.0,
+    "story_score": 8.5,
+    "acting_score": 7.5,
+    "direction_score": 8.0,
+    "visuals_score": 8.0,
+    "review_text": "Great visuals and direction!",
+    "created_at": "2026-05-26T12:00:00Z"
+  }
 }
 ```
 
 ---
 
-## 3. Predefined Rating Flow (Bulk / Admin)
+## 3. Seed Ratings Fallback Flow (TMDB Integration)
 
 ### 3.1 Purpose
+Since local user ratings will be sparse when the platform launches, the system leverages TMDB's community ratings (`vote_average` and `vote_count` from the `movies` table) to generate a seed distribution for the meter. This ensures every movie has a populated gauge on day one.
 
-User provides pre-classified movie rating data (JSON) from external sources (critics, aggregators, etc.).  
-Admin feeds this → system stores as `predefined_ratings` → visible on meter even when user ratings are sparse.
+### 3.2 Mapping Algorithm (TMDB to Moctale Meter)
+When rendering a movie's meter, if the local user ratings are fewer than a threshold (e.g., 5 local ratings), the backend supplements the distribution using TMDB metrics:
+1. **Total Seed Votes**: We cap the TMDB `vote_count` at a reasonable number (e.g., `100` votes) to ensure that local user ratings can eventually shift the meter distribution as they accumulate.
+2. **Distribution Modeling**: We distribute these 100 votes across the 4 categories based on the movie's TMDB `vote_average`:
+   * If `vote_average` < 5.0: 60% Skip, 30% Timepass, 10% Go for it, 0% Perfection.
+   * If 5.0 <= `vote_average` < 7.0: 10% Skip, 60% Timepass, 25% Go for it, 5% Perfection.
+   * If 7.0 <= `vote_average` < 8.5: 2% Skip, 18% Timepass, 65% Go for it, 15% Perfection.
+   * If `vote_average` >= 8.5: 0% Skip, 5% Timepass, 35% Go for it, 60% Perfection.
 
-### 3.2 Input JSON Format (admin-provides)
-
-```json
-[
-  {
-    "movie_id": "tt1234567",
-    "source": "critics_pool_2024",
-    "ratings": {
-      "skip": 2,
-      "timepass": 15,
-      "go_for_it": 112,
-      "perfection": 13
-    }
-  },
-  ...
-]
-```
-
-User (admin) classifies external data into these 4 buckets before upload.  
-System does **not** auto-classify — user does classification, provides ready JSON.
-
-### 3.3 Admin Ingest API
-
-```
-POST /api/v1/admin/ratings/bulk
-Auth: Bearer <Admin JWT>
-
-Body: JSON array as above
-
-Response:
-{
-  "inserted": 142,
-  "skipped": 3,   // duplicates by movie_id + source
-  "errors": []
-}
-```
-
-- Idempotent by `(movie_id, source)` — re-upload same source safe
-- Stored in `predefined_ratings` table (separate from user ratings)
-
-### 3.4 How predefined + user ratings merge for meter
-
-```
-combined_distribution = user_ratings + predefined_ratings (summed by category)
-```
-
-Display priority:
-- If combined total > 0 → show meter with real data
-- If total = 0 → show **empty meter** (grayed out, label: "No ratings yet")
+### 3.3 Dynamic Merge Logic
+When a client requests the rating distribution:
+* **Sparse User Ratings (< 5 total local ratings)**: The API merges the actual user ratings with the simulated TMDB seed distribution (weighted to sum to 100 votes).
+* **Mature User Ratings (>= 5 total local ratings)**: The API phases out the TMDB seed data entirely and shows only actual user ratings to represent the local community.
 
 ---
 
@@ -206,156 +191,121 @@ Props:
 
 ## 5. Database Schema
 
-### 5.1 `user_ratings` table
+The system uses the main `ratings` table defined in [orm_models.py](file:///c:/Users/USER/Desktop/BTP_baseline/FedPCL%20code/backend/app/db/orm_models.py). The schema is:
 
 ```sql
-CREATE TABLE user_ratings (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  movie_id    VARCHAR(20) NOT NULL,  -- TMDB/IMDB id
-  category    VARCHAR(20) NOT NULL   -- skip | timepass | go_for_it | perfection
-                CHECK (category IN ('skip','timepass','go_for_it','perfection')),
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+CREATE TABLE ratings (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id        INTEGER NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+  story_score     FLOAT CHECK (story_score >= 0 AND story_score <= 10),
+  acting_score    FLOAT CHECK (acting_score >= 0 AND acting_score <= 10),
+  direction_score FLOAT CHECK (direction_score >= 0 AND direction_score <= 10),
+  visuals_score   FLOAT CHECK (visuals_score >= 0 AND visuals_score <= 10),
+  overall_score   FLOAT NOT NULL CHECK (overall_score >= 0 AND overall_score <= 10),
+  review_text     TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at      TIMESTAMPTZ,
   UNIQUE (user_id, movie_id)  -- one rating per user per movie
 );
 
-CREATE INDEX idx_ur_movie_id ON user_ratings(movie_id);
-CREATE INDEX idx_ur_user_id  ON user_ratings(user_id);
+CREATE INDEX idx_ratings_movie_id ON ratings(movie_id);
+CREATE INDEX idx_ratings_user_id  ON ratings(user_id);
 ```
-
-### 5.2 `predefined_ratings` table
-
-```sql
-CREATE TABLE predefined_ratings (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  movie_id    VARCHAR(20) NOT NULL,
-  source      VARCHAR(100) NOT NULL,   -- e.g. "critics_pool_2024"
-  skip        INT DEFAULT 0,
-  timepass    INT DEFAULT 0,
-  go_for_it   INT DEFAULT 0,
-  perfection  INT DEFAULT 0,
-  imported_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (movie_id, source)
-);
-
-CREATE INDEX idx_pr_movie_id ON predefined_ratings(movie_id);
-```
-
-### 5.3 `rating_distribution_cache` (denormalized, fast read)
-
-```sql
-CREATE TABLE rating_distribution_cache (
-  movie_id    VARCHAR(20) PRIMARY KEY,
-  skip        INT DEFAULT 0,
-  timepass    INT DEFAULT 0,
-  go_for_it   INT DEFAULT 0,
-  perfection  INT DEFAULT 0,
-  total       INT DEFAULT 0,
-  updated_at  TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-Cache rebuilt on:
-- Any user_rating INSERT/UPDATE
-- Any predefined_ratings bulk import
-- Can also use Redis hash for hot movies
 
 ---
 
 ## 6. API — Get Movie Rating Distribution
 
+```http
+GET /api/v1/ratings/distribution/27205
 ```
-GET /api/v1/ratings/distribution?movie_id=tt1234567
 
-Response 200:
+**Response 200:**
+```json
 {
-  "movie_id": "tt1234567",
+  "movie_id": 27205,
   "distribution": {
-    "skip": 1,
-    "timepass": 11,
-    "go_for_it": 80,
-    "perfection": 9,
-    "total": 101
+    "skip": 5,
+    "timepass": 15,
+    "go_for_it": 120,
+    "perfection": 24,
+    "total": 164
   },
   "percentages": {
-    "skip": 1.0,
-    "timepass": 10.9,
-    "go_for_it": 79.2,
-    "perfection": 8.9
+    "skip": 3.0,
+    "timepass": 9.1,
+    "go_for_it": 73.2,
+    "perfection": 14.6
   },
   "dominant_category": "go_for_it",
-  "has_data": true   // false → show empty meter
+  "average_overall_score": 7.85,
+  "has_data": true
 }
 ```
-
-Read from `rating_distribution_cache` → fast, no heavy JOIN.
 
 ---
 
 ## 7. Backend Service Logic
 
-### 7.1 `RatingService` — key methods
+### 7.1 `RatingService` — Key Methods
 
 ```python
 class RatingService:
 
-    def submit_user_rating(user_id, movie_id, category):
-        # 1. UPSERT into user_ratings
-        # 2. Recompute distribution cache for this movie
-        # 3. Invalidate Redis key for movie
-        # 4. Return updated distribution
+    async def submit_user_rating(self, user_id: UUID, rating_data: RatingCreateSchema) -> dict:
+        # 1. UPSERT into ratings table
+        # 2. Invalidate Redis cache for movie:detail:{movie_id} and rating:distribution:{movie_id}
+        # 3. Return the newly computed distribution
 
-    def get_distribution(movie_id):
-        # 1. Check Redis cache → return if hit
-        # 2. Query rating_distribution_cache
-        # 3. If miss → compute from scratch, store in cache
-        # 4. Return distribution + percentages
+    async def get_distribution(self, movie_id: int) -> dict:
+        # 1. Check Redis cache for key "rating:dist:{movie_id}"
+        # 2. If HIT: return cached JSON
+        # 3. If MISS: Query the ratings table using count filters:
+        #    SELECT 
+        #      COUNT(*) FILTER (WHERE overall_score < 5.0) AS skip,
+        #      COUNT(*) FILTER (WHERE overall_score >= 5.0 AND overall_score < 7.0) AS timepass,
+        #      COUNT(*) FILTER (WHERE overall_score >= 7.0 AND overall_score < 9.0) AS go_for_it,
+        #      COUNT(*) FILTER (WHERE overall_score >= 9.0) AS perfection,
+        #      AVG(overall_score) AS avg_score,
+        #      COUNT(*) AS total
+        #    FROM ratings WHERE movie_id = :movie_id
+        # 
+        # 4. If total < 5, dynamically merge with TMDB vote_average & vote_count fallback
+        # 5. Save final compiled distribution to Redis (TTL = 300s)
+        # 6. Return distribution payload
 
-    def get_user_rating(user_id, movie_id):
-        # Simple SELECT from user_ratings
-
-    def bulk_import_predefined(data: list[dict]):
-        # 1. Validate JSON structure
-        # 2. UPSERT into predefined_ratings (by movie_id + source)
-        # 3. Recompute distribution cache for all affected movies
-        # 4. Return insert/skip/error counts
-
-    def rebuild_distribution_cache(movie_id):
-        # 1. SUM user_ratings by category for movie_id
-        # 2. SUM predefined_ratings by category for movie_id
-        # 3. Add together → write to rating_distribution_cache
-        # 4. Write to Redis with TTL=300s
+    async def get_user_rating(self, user_id: UUID, movie_id: int) -> Optional[dict]:
+        # SELECT from ratings WHERE user_id = :user_id AND movie_id = :movie_id
 ```
 
 ---
 
 ## 8. Caching Strategy
 
-| Layer | What cached | TTL |
-|---|---|---|
-| Redis | `rating_dist:{movie_id}` hash | 300s |
-| PostgreSQL | `rating_distribution_cache` table | Updated on write |
+| Layer | What is Cached | TTL | Rebuilding Trigger |
+|---|---|---|---|
+| **Redis** | `rating:dist:{movie_id}` (distribution JSON) | 300s | Read-through on cache miss, invalidated on rating submit |
+| **Redis** | `movie:detail:{movie_id}` (includes ratings distribution) | 3600s | Invalidated on rating submit |
 
-On rating submit → invalidate Redis key → next read recomputes from DB.  
-Hot movies (trending) → Redis TTL reduced to 60s.
+On rating submission:
+1. Invalidate both Redis cache keys.
+2. Next read will recompute from PostgreSQL `ratings` table and cache the new distribution.
 
 ---
 
 ## 9. Recommendation System Integration
 
-`user_ratings` feeds FedPCL recommendation engine:
-- `go_for_it` + `perfection` → **positive** signal (user likes)
-- `skip` → **strong negative** signal
-- `timepass` → **weak positive** signal
+The `ratings` table feeds the FedPCL recommendation engine:
+* **Positive Signal**: `overall_score` >= 6.0 (corresponds to `Go for it` or `Perfection`).
+* **Weak Positive Signal**: `5.0` <= `overall_score` < `6.0` (corresponds to `Timepass`).
+* **Strong Negative Signal**: `overall_score` < 5.0 (corresponds to `Skip`).
 
-Mapping used in local GNN graph (see `fedpcl_system_implemented.md`):
-```
-perfection → weight 1.0
-go_for_it  → weight 0.7
-timepass   → weight 0.3
-skip       → weight -1.0  (negative edge)
-```
+Mapping used in local GNN graph construction (see `fedpcl_system_implemented.md`):
+* `overall_score` in `[9.0, 10.0]` (Perfection) → weight `1.0`
+* `overall_score` in `[7.0, 9.0)` (Go for it) → weight `0.7`
+* `overall_score` in `[5.0, 7.0)` (Timepass) → weight `0.3`
+* `overall_score` < `5.0` (Skip) → weight `-1.0` (negative edge)
 
 ---
 
@@ -363,21 +313,17 @@ skip       → weight -1.0  (negative edge)
 
 | Case | Behavior |
 |---|---|
-| User rates same movie twice | UPSERT — replaces old rating |
-| No ratings exist | Empty meter shown (gray arc, "No ratings yet") |
-| Only predefined, no user ratings | Meter uses predefined data |
-| Only user ratings, no predefined | Meter uses user data |
-| Admin re-uploads same source | UPSERT by (movie_id, source) — safe |
-| User not logged in | Meter visible, rate buttons hidden |
-| Movie not in predefined list | Falls back to user ratings only |
-| Total votes = 0 | `has_data: false` → empty meter |
+| **User rates same movie twice** | **UPSERT**: Updates the existing row in `ratings` table, invalidates caches, and recomputes the meter. |
+| **No ratings exist (local & TMDB)** | **Empty Meter**: Gray arc shown, center text: `"No ratings yet"`, legend shows 0% for all categories. |
+| **Sparse local ratings (< 5 votes)** | **TMDB Fallback Merged**: Merges local ratings with simulated TMDB seed distribution (weighted to sum to 100 votes). |
+| **Mature local ratings (>= 5 votes)** | **Community Only**: Ignores TMDB seeds entirely, displaying 100% real local user ratings. |
+| **User not logged in** | **Read-Only Meter**: Semicircle and legend are visible. Quick-rating pills and rating buttons are disabled/hidden. |
 
 ---
 
 ## 11. Future Considerations
 
-- **Weight predefined vs user ratings** — currently equal sum; can add confidence weighting
-- **Per-region predefined sets** — different sources for different regions
-- **Rating analytics dashboard** — admin sees distribution trends over time
-- **Abuse detection** — rate limiting on rating endpoint (1 change per 24h per movie)
-- **FedPCL training trigger** — batch rating updates trigger local model retraining round
+- **Rating Abuse Detection**: Implement rate-limiting on submission (e.g., maximum of 1 rating per movie per user, and 5 rating updates per day per user).
+- **Region-Specific Seeding**: Support regional TMDB ratings mapping based on user's region configuration.
+- **FedPCL Re-training Trigger**: Queue the user for local retraining in the next federated round once they submit a new rating.
+

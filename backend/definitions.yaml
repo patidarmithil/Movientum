@@ -1,0 +1,219 @@
+# ============================================================
+# definitions.yaml — Movientum System Constants & Definitions
+# Fixed domain definitions. Rarely change.
+# Read by: backend services, frontend (via API), ML pipelines
+# ============================================================
+
+# ─── Rating Categories ───────────────────────────────────────
+# Movientum custom 4-category rating system (not TMDB ratings)
+rating_categories:
+  - key: "story"
+    label: "Story & Writing"
+    description: "Plot quality, script, narrative structure"
+    weight: 0.25           # Weight in composite score calculation
+    optional: true         # User can skip this category
+
+  - key: "acting"
+    label: "Acting & Performance"
+    description: "Quality of cast performances"
+    weight: 0.20
+    optional: true
+
+  - key: "direction"
+    label: "Direction"
+    description: "Filmmaker's vision and execution"
+    weight: 0.20
+    optional: true
+
+  - key: "visuals"
+    label: "Visuals & Cinematography"
+    description: "Camera work, VFX, production design"
+    weight: 0.15
+    optional: true
+
+  - key: "overall"
+    label: "Overall Score"
+    description: "Your overall impression of the film"
+    weight: 1.0            # Required field — used as primary score
+    optional: false
+
+rating_scale:
+  min: 0.0
+  max: 10.0
+  step: 0.5               # Rating increments (0.5 steps on slider)
+  positive_threshold: 6.0  # Scores >= 6.0 = positive signal for recommendations
+  negative_threshold: 4.0  # Scores < 4.0 = negative signal (avoid similar)
+
+# Movientum semantic rating labels (shown alongside numeric score)
+rating_labels:
+  0.0:  "Skip"
+  1.0:  "Skip"
+  2.0:  "Skip"
+  3.0:  "Skip"
+  4.0:  "Timepass"
+  5.0:  "Timepass"
+  6.0:  "Go for it"
+  7.0:  "Go for it"
+  8.0:  "Perfection"
+  9.0:  "Perfection"
+  10.0: "Perfection"
+
+# ─── User Roles ──────────────────────────────────────────────
+user_roles:
+  - role: "user"
+    permissions:
+      - "browse_movies"
+      - "search"
+      - "rate_movies"
+      - "manage_own_watchlist"
+      - "view_own_dashboard"
+      - "participate_fedpcl"
+
+  - role: "admin"
+    permissions:
+      - "*"               # All user permissions plus:
+      - "manage_movies"
+      - "manage_users"
+      - "view_analytics"
+      - "trigger_retraining"
+      - "manage_news"
+
+# ─── Recommendation Types ────────────────────────────────────
+recommendation_types:
+  - key: "personalized"
+    label: "For You"
+    description: "AI-personalized picks based on your taste"
+    requires_auth: true
+
+  - key: "trending"
+    label: "Trending Now"
+    description: "What everyone is watching this week"
+    requires_auth: false
+
+  - key: "similar"
+    label: "Because You Watched X"
+    description: "Movies similar to a specific title"
+    requires_auth: false
+
+  - key: "top_genre"
+    label: "Top in [Genre]"
+    description: "Highest rated in a specific genre"
+    requires_auth: false
+
+  - key: "hidden_gems"
+    label: "Hidden Gems"
+    description: "Critically loved, lesser-known films"
+    requires_auth: false
+
+  - key: "continue_watching"
+    label: "Continue Watching"
+    description: "Movies in your watchlist"
+    requires_auth: true
+
+# ─── Interaction Types (for recommendation signals) ──────────
+interaction_types:
+  - key: "watched"
+    weight: 1.0
+    label: "Marked as Watched"
+
+  - key: "rated_positive"
+    weight: 1.5
+    label: "Rated >= 6.0"
+
+  - key: "rated_negative"
+    weight: -0.5
+    label: "Rated < 5.0"
+
+  - key: "watchlisted"
+    weight: 0.5
+    label: "Added to Watchlist"
+
+  - key: "detail_viewed"
+    weight: 0.3
+    label: "Viewed Movie Detail Page"
+
+# ─── FedPCL Client Eligibility ───────────────────────────────
+fedpcl_eligibility:
+  min_interactions: 10
+  opted_in_required: true
+  max_participation_frequency_days: 7    # Can't participate more than once per week
+  excluded_roles: []                     # All roles eligible
+
+# ─── Image Sizes (TMDB) ──────────────────────────────────────
+image_sizes:
+  poster:
+    thumbnail: "w185"      # Watchlist, small cards
+    card: "w342"           # MovieCard in grid view
+    detail: "w500"         # Movie Detail page
+  backdrop:
+    hero: "w1280"          # Home page hero banner
+    banner: "w780"         # Movie Detail backdrop section
+
+# ─── Search Ranking Weights ──────────────────────────────────
+search_weights:
+  relevance: 0.50          # Full-text match score (tsvector rank)
+  popularity: 0.30         # TMDB popularity score
+  rating: 0.20             # TMDB vote_average
+
+# ─── News Sources (Whitelisted by tier) ──────────────────────
+news_source_tiers:
+  tier1:                   # Highest quality, shown first
+    - "variety.com"
+    - "hollywoodreporter.com"
+    - "deadline.com"
+    - "indiewire.com"
+  tier2:                   # Secondary quality
+    - "ign.com"
+    - "collider.com"
+    - "screenrant.com"
+    - "cinemablend.com"
+
+# ─── Movie Status Values ─────────────────────────────────────
+movie_statuses:
+  - "Released"
+  - "In Production"
+  - "Post Production"
+  - "Planned"
+  - "Rumored"
+  - "Canceled"
+
+# ─── Supported Languages ─────────────────────────────────────
+supported_languages:
+  - code: "en"
+    label: "English"
+  - code: "hi"
+    label: "Hindi"
+  - code: "es"
+    label: "Spanish"
+  - code: "fr"
+    label: "French"
+  - code: "de"
+    label: "German"
+  - code: "ja"
+    label: "Japanese"
+  - code: "ko"
+    label: "Korean"
+
+# ─── Error Codes ─────────────────────────────────────────────
+error_codes:
+  # Auth
+  AUTH_INVALID_CREDENTIALS: "Invalid email or password"
+  AUTH_EMAIL_EXISTS: "An account with this email already exists"
+  AUTH_TOKEN_EXPIRED: "Your session has expired. Please log in again."
+  AUTH_TOKEN_INVALID: "Invalid authentication token"
+  AUTH_ACCOUNT_DISABLED: "This account has been disabled"
+  AUTH_RATE_LIMITED: "Too many login attempts. Try again in 15 minutes."
+
+  # Movies
+  MOVIE_NOT_FOUND: "Movie not found"
+
+  # Ratings
+  RATING_SCORE_INVALID: "Scores must be between 0 and 10"
+  RATING_NOT_FOUND: "Rating not found"
+
+  # Search
+  SEARCH_QUERY_TOO_SHORT: "Search query must be at least 2 characters"
+
+  # System
+  INTERNAL_ERROR: "Something went wrong. Please try again."
+  SERVICE_UNAVAILABLE: "Service temporarily unavailable"

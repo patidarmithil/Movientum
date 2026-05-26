@@ -1,0 +1,3 @@
+# Alembic migration versions directory.
+# Auto-generated migration files will appear here after running:
+#   alembic revision --autogenerate -m "create_all_tables"
