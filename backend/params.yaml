@@ -1,0 +1,136 @@
+# ============================================================
+# params.yaml — Movientum Runtime Configuration
+# All tunable parameters. No magic numbers in code.
+# Read by: FastAPI backend, Celery tasks, ML pipelines (Phase 5)
+# ============================================================
+
+# ─── Database ────────────────────────────────────────────────
+database:
+  pool_size: 10            # SQLAlchemy connection pool size
+  max_overflow: 5          # Extra connections beyond pool_size (kept low for Supabase free tier)
+  pool_timeout: 30         # Seconds to wait for connection from pool
+  pool_recycle: 1800       # Recycle connections every 30 min (prevents Supabase idle disconnect)
+  echo: false              # Log all SQL — set true in development only
+
+# ─── Redis / Caching ─────────────────────────────────────────
+cache:
+  movie_detail_ttl: 3600          # 1 hour
+  trending_ttl: 1800              # 30 minutes
+  movie_list_ttl: 1800            # 30 minutes
+  search_results_ttl: 600         # 10 minutes
+  autocomplete_ttl: 300           # 5 minutes
+  user_recommendations_ttl: 900   # 15 minutes
+  genre_list_ttl: 86400           # 24 hours (very stable)
+  news_feed_ttl: 7200             # 2 hours
+  movie_news_ttl: 21600           # 6 hours
+  fedpcl_model_ttl: 86400         # 24 hours (models change slowly)
+  tmdb_config_ttl: 86400          # 24 hours (image base URL rarely changes)
+
+# ─── Authentication ──────────────────────────────────────────
+auth:
+  jwt_algorithm: "HS256"
+  access_token_expiry_minutes: 60
+  refresh_token_expiry_days: 30
+  remember_me_expiry_days: 90
+  bcrypt_rounds: 12
+  rate_limit_login_attempts: 5        # Max attempts per window per IP
+  rate_limit_login_window_seconds: 900 # 15 minutes
+  rate_limit_register_per_hour: 10
+
+# ─── External APIs ───────────────────────────────────────────
+external_apis:
+  tmdb:
+    base_url: "https://api.themoviedb.org/3"
+    image_base_url: "https://image.tmdb.org/t/p"
+    requests_per_10s: 40            # TMDB rate limit
+    retry_max_attempts: 3
+    retry_backoff_seconds: 2        # Doubles per attempt: 2s, 4s, 8s
+    timeout_seconds: 10
+    request_delay_seconds: 0.25     # 4 req/s — well within 40 req/10s
+
+  news_api:
+    base_url: "https://newsapi.org/v2"
+    requests_per_day: 100           # Free tier limit
+    page_size: 50
+    max_article_age_hours: 48
+    fetch_interval_minutes: 120     # Fetch every 2 hours
+
+# ─── Search ──────────────────────────────────────────────────
+search:
+  autocomplete_min_chars: 2
+  autocomplete_max_results: 8
+  debounce_ms: 300                  # Frontend debounce (documented here for reference)
+  full_search_db_threshold: 5       # Min local results before TMDB fallback
+  relevance_weight: 0.50            # Full-text match score weight
+  popularity_weight: 0.30           # TMDB popularity weight
+  rating_weight: 0.20               # TMDB vote_average weight
+  max_results_per_page: 20
+
+# ─── Recommendations (Rule-Based — Phase 3) ──────────────────
+recommendations:
+  genre_affinity_weight: 0.40
+  director_affinity_weight: 0.20
+  similar_rated_weight: 0.20
+  trending_weight: 0.20
+  min_rating_for_affinity: 6.0      # Ratings below this not counted as positive signal
+  max_results: 20
+  exploration_budget: 0.10          # 10% random genre exploration (discovery)
+  recency_bonus_days: 180           # Movies < 6 months old get boost
+  recency_bonus_factor: 1.10        # 10% score boost for recent movies
+
+# ─── FedPCL Hyperparameters (Phase 5) ────────────────────────
+fedpcl:
+  embed_dim: 64
+  n_gnn_layers: 2
+  n_rounds: 400
+  clients_per_round: 128
+  local_epochs: 10
+  n_clusters: 5
+  mu1: 0.5                          # Cluster model blend weight
+  mu2: 0.5                          # Global model blend weight
+  cluster_every: 10                 # Re-run K-means every N rounds
+  warmup_rounds: 20                 # Rounds before contrastive loss activates
+  beta1: 0.1                        # Contrastive loss weight
+  lam: 1.0                          # Item contrastive loss weight
+  tau: 0.2                          # InfoNCE temperature
+  lr_item: 0.1                      # Item embedding SGD learning rate
+  lr_user: 0.001                    # User embedding Adam learning rate
+  clip_sigma: 0.1                   # LDP clip bound
+  lambda_laplace: 0.001             # LDP Laplace noise scale
+  epsilon: 100.0                    # Privacy budget (sigma/lambda)
+  min_interactions_to_participate: 10   # Min watch/rate events for eligibility
+  client_collection_window_days: 3      # Days to wait for client updates
+  retrain_interval_days: 14             # Bi-weekly retraining cycle
+  model_keep_versions: 3                # Keep last N model versions
+
+# ─── Model Validation Thresholds (Phase 5) ───────────────────
+model_validation:
+  min_hr10: 0.60
+  min_ndcg10: 0.40
+  max_regression_vs_prod: 0.02      # New model allowed to be 2% worse
+  shadow_test_traffic_fraction: 0.10    # 10% shadow traffic for A/B test
+  shadow_test_duration_hours: 24
+  auto_rollback_engagement_drop: 0.10   # Rollback if CTR drops 10%
+
+# ─── Data Ingestion (TMDB Sync) ──────────────────────────────
+data_ingestion:
+  initial_seed_popular_pages: 25        # 25 pages × 20 = 500 popular movies
+  initial_seed_top_rated_pages: 25      # 25 pages × 20 = 500 top rated
+  daily_sync_enabled: true
+  daily_sync_cron: "0 3 * * *"         # 3 AM IST daily
+  weekly_sync_cron: "0 2 * * 0"        # 2 AM Sunday
+  stale_threshold_hours: 24             # Re-fetch if fetched_at > 24h ago
+
+# ─── Pagination ──────────────────────────────────────────────
+pagination:
+  default_page_size: 20
+  max_page_size: 100
+  autocomplete_limit: 8
+
+# ─── Background Tasks (Celery) ───────────────────────────────
+celery:
+  news_fetch_cron: "0 */2 * * *"        # Every 2 hours
+  movie_sync_cron: "0 3 * * *"          # 3 AM daily
+  recommendation_cache_ttl_after_rate: 0 # Invalidate immediately on new rating
+  task_retry_max: 3
+  task_retry_delay_seconds: 60

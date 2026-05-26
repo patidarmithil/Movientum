@@ -28,7 +28,6 @@ Stores all registered user accounts.
 | updated_at | TIMESTAMPTZ | NOT NULL | Auto-update on change |
 | is_active | BOOLEAN | DEFAULT TRUE | Soft disable accounts |
 | role | VARCHAR(20) | DEFAULT 'user' | user / admin |
-| genre_preferences | TEXT[] | NULLABLE | Array of preferred genres |
 
 ### `movies`
 Master movie catalog. Sourced from TMDB and stored locally.
@@ -187,9 +186,9 @@ INDEX on users(created_at)          → admin queries by date
 ```
 INDEX on movies(popularity DESC)    → trending query
 INDEX on movies(release_date)       → date range filter
-INDEX on movies(vote_average DESC)  → top-rated query
+INDEX on movies(vote_average)       → rating range filter
 INDEX on movies(original_language)  → language filter
-FULL TEXT INDEX on movies(title)    → title search (tsvector)
+FULL TEXT INDEX on movies(search_vector) → title + overview search (gin index)
 ```
 
 ### Ratings Table
@@ -208,8 +207,8 @@ COMPOSITE INDEX on (user_id, watched_at DESC) → user's recent history
 ```
 
 ### Full Text Search (PostgreSQL native)
-- Add `tsvector` column to `movies` table: combines title + overview
-- Update via trigger whenever title/overview changes
+- Add `tsvector` column `search_vector` to `movies` table: combines `title` + `overview`
+- Update via trigger or seed script whenever title/overview changes
 - Index with `GIN` index type (best for full-text)
 - Enables fast `WHERE search_vector @@ to_tsquery('action')` queries
 
