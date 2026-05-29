@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 REQUEST_DELAY = 0.25        # seconds between requests
 REQUEST_TIMEOUT = 10.0      # seconds per request
 MAX_RETRIES = 3
-RETRY_BASE_DELAY = 2        # seconds (doubles each retry: 2, 4, 8)
+RETRY_BASE_DELAY = 1        # seconds (doubles each retry: 1, 2, 4)
 
 
 class TMDBService:
@@ -35,18 +35,33 @@ class TMDBService:
         self.base_url = settings.tmdb_base_url
         self.headers = settings.tmdb_headers
         self._client: Optional[httpx.AsyncClient] = None
+        self._semaphore: Optional[asyncio.Semaphore] = None
+
+    def _get_semaphore(self) -> asyncio.Semaphore:
+        if self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(4)  # max 4 concurrent TMDB calls
+        return self._semaphore
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                headers=self.headers,
+                timeout=REQUEST_TIMEOUT,
+                follow_redirects=True,
+            )
+        return self._client
+
+    async def aclose(self):
+        if self._client:
+            await self._client.aclose()
 
     async def __aenter__(self):
-        self._client = httpx.AsyncClient(
-            headers=self.headers,
-            timeout=REQUEST_TIMEOUT,
-            follow_redirects=True,
-        )
+        # for backwards compatibility with context manager
+        self._get_client()
         return self
 
     async def __aexit__(self, *args):
-        if self._client:
-            await self._client.aclose()
+        await self.aclose()
 
     # ── Core Request Handler ──────────────────────────────────────
 
@@ -59,42 +74,46 @@ class TMDBService:
         """
         url = f"{self.base_url}{endpoint}"
         params = params or {}
+        client = self._get_client()
+        semaphore = self._get_semaphore()
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            await asyncio.sleep(REQUEST_DELAY)  # respect rate limit
-            try:
-                response = await self._client.get(url, params=params)
+        async with semaphore:
+            for attempt in range(1, MAX_RETRIES + 1):
+                await asyncio.sleep(REQUEST_DELAY)  # respect rate limit
+                try:
+                    response = await client.get(url, params=params)
 
-                if response.status_code == 200:
-                    return response.json()
+                    if response.status_code == 200:
+                        logger.debug(f"TMDB OK: {endpoint}")
+                        return response.json()
 
-                elif response.status_code == 429:
-                    wait = RETRY_BASE_DELAY ** attempt
-                    logger.warning(f"TMDB rate limited. Attempt {attempt}/{MAX_RETRIES}. Waiting {wait}s...")
-                    await asyncio.sleep(wait)
-                    continue
+                    elif response.status_code == 429:
+                        wait = RETRY_BASE_DELAY ** attempt
+                        logger.warning(f"TMDB rate limited. Attempt {attempt}/{MAX_RETRIES}. Waiting {wait}s...")
+                        await asyncio.sleep(wait)
+                        continue
 
-                elif response.status_code == 404:
-                    logger.debug(f"TMDB 404: {endpoint}")
-                    return None
+                    elif response.status_code == 404:
+                        logger.debug(f"TMDB 404: {endpoint}")
+                        return None
 
-                else:
-                    logger.warning(f"TMDB {response.status_code} for {endpoint}: {response.text[:100]}")
+                    else:
+                        logger.warning(f"TMDB FAIL: {response.status_code} for {endpoint}: {response.text[:100]}")
+                        if attempt < MAX_RETRIES:
+                            await asyncio.sleep(RETRY_BASE_DELAY * attempt)
+                            continue
+                        return None
+
+                except (httpx.TimeoutException, httpx.RequestError) as e:
+                    logger.warning(f"TMDB FAIL: network error ({type(e).__name__}) for {endpoint}. Attempt {attempt}/{MAX_RETRIES}")
                     if attempt < MAX_RETRIES:
                         await asyncio.sleep(RETRY_BASE_DELAY * attempt)
                         continue
                     return None
 
-            except httpx.TimeoutException:
-                logger.warning(f"TMDB timeout for {endpoint}. Attempt {attempt}/{MAX_RETRIES}")
-                if attempt < MAX_RETRIES:
-                    await asyncio.sleep(RETRY_BASE_DELAY * attempt)
-                    continue
-                return None
-
-            except Exception as e:
-                logger.error(f"TMDB request error for {endpoint}: {e}")
-                return None
+                except Exception as e:
+                    logger.error(f"TMDB FAIL: request error for {endpoint}: {repr(e)}")
+                    return None
 
         return None
 
@@ -126,12 +145,64 @@ class TMDBService:
         """
         return await self._get("/movie/popular", params={"page": page, "language": "en-US"})
 
+    async def fetch_popular_tv(self, page: int = 1) -> Optional[dict]:
+        """
+        GET /tv/popular?page=N
+        """
+        return await self._get("/tv/popular", params={"page": page, "language": "en-US"})
+
+    async def fetch_trending(self, media_type: str = "all", time_window: str = "day") -> Optional[dict]:
+        """
+        GET /trending/{media_type}/{time_window}
+        media_type: 'all', 'movie', 'tv', 'person'
+        time_window: 'day', 'week'
+        """
+        return await self._get(
+            f"/trending/{media_type}/{time_window}",
+            params={"language": "en-IN", "region": "IN"}
+        )
+
+    async def discover_movies(self, genres: str, page: int = 1) -> Optional[dict]:
+        """
+        GET /discover/movie
+        """
+        return await self._get("/discover/movie", params={
+            "with_genres": genres,
+            "language": "en-US",
+            "sort_by": "popularity.desc",
+            "page": page
+        })
+
+    async def discover_tv(self, genres: str, page: int = 1) -> Optional[dict]:
+        """
+        GET /discover/tv
+        """
+        return await self._get("/discover/tv", params={
+            "with_genres": genres,
+            "language": "en-US",
+            "sort_by": "popularity.desc",
+            "page": page
+        })
+
     async def fetch_top_rated_movies(self, page: int = 1) -> Optional[dict]:
         """
         GET /movie/top_rated?page=N
         Same structure as popular. Used to extend initial seed dataset.
         """
         return await self._get("/movie/top_rated", params={"page": page, "language": "en-US"})
+
+    async def fetch_top_rated_tv(self, page: int = 1) -> Optional[dict]:
+        """
+        GET /tv/top_rated?page=N
+        """
+        return await self._get("/tv/top_rated", params={"page": page, "language": "en-US"})
+
+    async def fetch_on_the_air(self, page: int = 1) -> Optional[dict]:
+        """
+        GET /tv/on_the_air
+        TV shows currently broadcasting.
+        """
+        return await self._get("/tv/on_the_air", params={"page": page, "language": "en-US"})
 
     async def fetch_now_playing(self, page: int = 1) -> Optional[dict]:
         """
@@ -193,6 +264,66 @@ class TMDBService:
             "language": "en-US",
             "include_adult": False,
         })
+
+    async def fetch_person_details(self, person_id: int) -> Optional[dict]:
+        """
+        GET /person/{id} — biography, birthday, place_of_birth, profile_path.
+        """
+        return await self._get(f"/person/{person_id}", params={"language": "en-US"})
+
+    async def fetch_person_credits(self, person_id: int) -> Optional[dict]:
+        """
+        GET /person/{id}/combined_credits — all movies+TV this person worked on.
+        Returns { cast: [...], crew: [...] }
+        """
+        return await self._get(
+            f"/person/{person_id}/combined_credits",
+            params={"language": "en-US"},
+        )
+
+    async def fetch_tv_detail(self, tv_id: int) -> Optional[dict]:
+        """
+        GET /tv/{id} — full TV show detail.
+        Returns name, overview, poster_path, backdrop_path,
+        first_air_date, number_of_seasons, number_of_episodes,
+        vote_average, vote_count, genres, created_by, status.
+        Cached in Redis for 24 hours.
+        """
+        cache_key = f"tmdb:raw:tv:{tv_id}"
+        cached = await get_cached(cache_key)
+        if cached:
+            return cached
+        data = await self._get(f"/tv/{tv_id}", params={"language": "en-US"})
+        if data:
+            await set_cached(cache_key, data, 86400)
+        return data
+
+    async def fetch_tv_credits(self, tv_id: int) -> Optional[dict]:
+        """
+        GET /tv/{id}/credits — cast and crew.
+        Same shape as movie credits: { cast: [...], crew: [...] }
+        """
+        return await self._get(f"/tv/{tv_id}/credits", params={"language": "en-US"})
+
+    async def multi_search(self, query: str, page: int = 1) -> Optional[dict]:
+        """
+        GET /search/multi — returns mixed movie + TV results.
+        Each item has media_type: 'movie' | 'tv' | 'person'.
+        """
+        return await self._get("/search/multi", params={
+            "query": query,
+            "page": page,
+            "language": "en-US",
+            "include_adult": "false",
+        })
+
+    async def fetch_similar_movies(self, movie_id: int) -> Optional[dict]:
+        return await self._get(f"/movie/{movie_id}/similar", params={"language": "en-US", "page": 1})
+
+    async def fetch_similar_tv(self, tv_id: int) -> Optional[dict]:
+        return await self._get(f"/tv/{tv_id}/similar", params={"language": "en-US", "page": 1})
+
+
 
     # ── Data Extraction Helpers ───────────────────────────────────
 
@@ -265,3 +396,6 @@ class TMDBService:
             return None
         base = settings.tmdb_image_base_url
         return f"{base}/{size}{path}"
+
+# Global instance for FastAPI routers
+tmdb_service = TMDBService()

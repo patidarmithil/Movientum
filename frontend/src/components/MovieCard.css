@@ -1,0 +1,216 @@
+/* MovieCard.css */
+
+.movie-card {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  /* overflow: visible to allow outer glow */
+  overflow: visible;
+  outline: none;
+  flex-shrink: 0;
+  transition: transform var(--ease-hover);
+}
+
+.movie-card:hover,
+.movie-card:focus-visible {
+  transform: translateY(-4px);
+}
+
+/* ── Standard variant ── */
+.movie-card--standard {
+  width: 160px;
+}
+
+.movie-card--standard .movie-card__poster-wrap {
+  width: 160px;
+  height: 240px;
+}
+
+/* ── Compact variant ── */
+.movie-card--compact {
+  width: 120px;
+}
+
+.movie-card--compact .movie-card__poster-wrap {
+  width: 120px;
+  height: 180px;
+}
+
+/* ── Featured variant ── */
+.movie-card--featured {
+  width: 220px;
+}
+
+.movie-card--featured .movie-card__poster-wrap {
+  width: 220px;
+  height: 330px;
+}
+
+/* ── Poster ── */
+.movie-card__poster-wrap {
+  position: relative;
+  background: var(--surface-input);
+  overflow: hidden;
+  border-top-left-radius: 11px;
+  border-top-right-radius: 11px;
+}
+
+.movie-card__poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 300ms ease;
+}
+
+.movie-card:hover .movie-card__poster {
+  transform: scale(1.04);
+}
+
+.movie-card__poster-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  background: linear-gradient(135deg, #1a0a2e 0%, #0f0f1a 100%);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ── Rating Badge ── */
+.movie-card__rating {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(8, 8, 8, 0.85);
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-family: var(--font-primary);
+}
+
+/* ── TV Badge ── */
+.movie-card__tv-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(6, 182, 212, 0.85);
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Info ── */
+.movie-card__info {
+  padding: 10px 12px 12px;
+}
+
+.movie-card__title {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.movie-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.movie-card__dot {
+  opacity: 0.4;
+}
+
+/* ── Skeleton ── */
+.movie-card-skeleton {
+  width: 160px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+}
+
+.movie-card-skeleton__poster {
+  width: 160px;
+  height: 240px;
+}
+
+.movie-card-skeleton__info {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.movie-card-skeleton__title {
+  height: 13px;
+  width: 80%;
+  border-radius: 4px;
+}
+
+.movie-card-skeleton__meta {
+  height: 11px;
+  width: 50%;
+  border-radius: 4px;
+}
+
+/* ── OTT-Style Bottom Glow Overlay ── */
+.movie-card__glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  pointer-events: none;
+  z-index: 2;
+  filter: blur(22px);
+  opacity: 0.65;
+  transition: opacity 300ms ease, transform 300ms ease;
+  transform-origin: bottom;
+}
+
+/* Hover: Slightly increase glow intensity & add a mild scale-up */
+.movie-card:hover .movie-card__glow {
+  opacity: 0.85;
+  transform: scaleY(1.08);
+}
+
+/* Theme-based glow colors */
+.movie-card__glow--go_for_it {
+  background: linear-gradient(to top, rgba(0, 229, 160, 0.9) 0%, rgba(0, 229, 160, 0) 100%);
+}
+
+.movie-card__glow--perfection {
+  background: linear-gradient(to top, rgba(155, 89, 255, 0.9) 0%, rgba(155, 89, 255, 0) 100%);
+}
+
+.movie-card__glow--timepass {
+  background: linear-gradient(to top, rgba(255, 195, 0, 0.9) 0%, rgba(255, 195, 0, 0) 100%);
+}
+
+.movie-card__glow--skip {
+  background: linear-gradient(to top, rgba(255, 77, 109, 0.9) 0%, rgba(255, 77, 109, 0) 100%);
+}
+
+.movie-card__glow--default {
+  background: linear-gradient(to top, rgba(176, 72, 255, 0.6) 0%, rgba(176, 72, 255, 0) 100%);
+}
+

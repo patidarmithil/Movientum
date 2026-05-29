@@ -1,0 +1,181 @@
+/* CastCrew.css — Phase 1.3 */
+
+.castcrew {
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border);
+}
+
+.castcrew__heading {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.castcrew__heading--crew {
+  margin-top: var(--space-8);
+}
+
+/* ── Cast scroll row ── */
+.castcrew__cast-row {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.castcrew__cast-row::-webkit-scrollbar {
+  height: 4px;
+}
+.castcrew__cast-row::-webkit-scrollbar-track { background: transparent; }
+.castcrew__cast-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ── Cast card ── */
+.cast-card {
+  flex: 0 0 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cast-card:hover .cast-avatar__img,
+.cast-card:hover .cast-avatar__fallback {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.cast-avatar {
+  position: relative;
+}
+
+.cast-avatar__img,
+.cast-avatar__fallback {
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 2px solid var(--border);
+}
+
+.cast-avatar__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.cast-card__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  width: 100%;
+}
+
+.cast-card__character {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  width: 100%;
+}
+
+/* ── Crew grid ── */
+.castcrew__crew-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.crew-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.crew-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.crew-avatar .cast-avatar__img,
+.crew-avatar .cast-avatar__fallback {
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+
+.crew-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.crew-card__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crew-card__job {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  display: inline-block;
+}
+
+/* ── Skeleton ── */
+.castcrew__skeleton-row {
+  display: flex;
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+.castcrew__skeleton-card {
+  flex: 0 0 88px;
+  height: 120px;
+  border-radius: var(--radius-md);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .castcrew__crew-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

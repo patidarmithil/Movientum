@@ -1,0 +1,51 @@
+/* Register.css — Phase 3.5A
+   Reuses auth-page, auth-card, auth-form, auth-field tokens from Login.css
+   Additional Register-specific styles below.
+*/
+
+/* ── Password strength bar ── */
+.pwd-strength {
+  margin-top: var(--space-2);
+}
+
+.pwd-strength__bar-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.pwd-strength__bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 200ms ease, background 200ms ease;
+}
+
+.pwd-strength__label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+/* ── Strength colours ── */
+.pwd-strength--weak   .pwd-strength__bar-fill { background: var(--error);    }
+.pwd-strength--fair   .pwd-strength__bar-fill { background: var(--warning);  }
+.pwd-strength--good   .pwd-strength__bar-fill { background: #00C6FF;         }
+.pwd-strength--strong .pwd-strength__bar-fill { background: var(--success);  }
+
+.pwd-strength--weak   .pwd-strength__label { color: var(--error);   }
+.pwd-strength--fair   .pwd-strength__label { color: var(--warning); }
+.pwd-strength--good   .pwd-strength__label { color: #00C6FF;        }
+.pwd-strength--strong .pwd-strength__label { color: var(--success); }
+
+/* ── Terms checkbox ── */
+.auth-form__terms {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.auth-form__terms a {
+  color: var(--accent);
+  font-weight: 500;
+}

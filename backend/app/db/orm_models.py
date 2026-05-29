@@ -67,6 +67,7 @@ class Movie(Base):
     revenue = Column(BigInteger, default=0)
     original_language = Column(String(10), nullable=True)  # ISO code: en, fr, ja
     imdb_id = Column(String(20), nullable=True)
+    type = Column(String(10), nullable=False, default='movie', server_default='movie')  # 'movie' | 'tv'
     metadata_ = Column("metadata", JSONB, default=dict)    # flexible extra TMDB data
     search_vector = Column(TSVECTOR, nullable=True)         # Full-text search index
     fetched_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
@@ -166,8 +167,9 @@ class User(Base):
 
 class Rating(Base):
     """
-    User ratings — 4-category breakdown (Story/Acting/Direction/Visuals) + Overall.
-    Custom Movientum rating system, not TMDB ratings.
+    User ratings — single category label per user-movie pair.
+    Phase 3.3: category-based system (no numeric scores).
+    Categories: skip | timepass | go_for_it | perfection
     """
     __tablename__ = "ratings"
 
@@ -175,14 +177,9 @@ class Rating(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
 
-    # Category scores (optional except overall)
-    story_score = Column(Float, nullable=True)
-    acting_score = Column(Float, nullable=True)
-    direction_score = Column(Float, nullable=True)
-    visuals_score = Column(Float, nullable=True)
-    overall_score = Column(Float, nullable=False)       # Required
+    # Category enum: skip | timepass | go_for_it | perfection
+    category = Column(String(20), nullable=False)
 
-    review_text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=utcnow)
 
@@ -191,18 +188,17 @@ class Rating(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "movie_id", name="uq_rating_user_movie"),
-        CheckConstraint("overall_score >= 0 AND overall_score <= 10", name="chk_overall_score"),
-        CheckConstraint("story_score IS NULL OR (story_score >= 0 AND story_score <= 10)", name="chk_story_score"),
-        CheckConstraint("acting_score IS NULL OR (acting_score >= 0 AND acting_score <= 10)", name="chk_acting_score"),
-        CheckConstraint("direction_score IS NULL OR (direction_score >= 0 AND direction_score <= 10)", name="chk_direction_score"),
-        CheckConstraint("visuals_score IS NULL OR (visuals_score >= 0 AND visuals_score <= 10)", name="chk_visuals_score"),
+        CheckConstraint(
+            "category IN ('skip', 'timepass', 'go_for_it', 'perfection')",
+            name="chk_rating_category",
+        ),
         Index("idx_ratings_user_id", "user_id"),
         Index("idx_ratings_movie_id", "movie_id"),
-        Index("idx_ratings_overall", "overall_score"),
+        Index("idx_ratings_category", "category"),
     )
 
     def __repr__(self):
-        return f"<Rating user={self.user_id} movie={self.movie_id} overall={self.overall_score}>"
+        return f"<Rating user={self.user_id} movie={self.movie_id} category={self.category}>"
 
 
 class WatchHistory(Base):

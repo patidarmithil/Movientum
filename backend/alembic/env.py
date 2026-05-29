@@ -23,7 +23,9 @@ from app.db.orm_models import Base
 config = context.config
 
 # Override sqlalchemy.url from settings (sync URL for psycopg2)
-config.set_main_option("sqlalchemy.url", settings.safe_sync_db_url)
+# Escape % → %% so configparser doesn't treat percent-encoded chars as interpolation
+_safe_url = settings.safe_sync_db_url.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", _safe_url)
 
 # Logging setup from alembic.ini
 if config.config_file_name is not None:

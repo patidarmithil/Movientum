@@ -1,0 +1,3 @@
+1)keep a log file to check what things did and what came
+
+2)how much movies storage comes and how much time takes to fetch
