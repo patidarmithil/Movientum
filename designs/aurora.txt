@@ -1,4 +1,4 @@
-This to be used in homepage when user opens website without login just for intro of our website
+This to be used in homepage (hero landing page) and dashboard when user opens website without login just for intro of our website
 
 see https://reactbits.dev/backgrounds/aurora for refrence 
 

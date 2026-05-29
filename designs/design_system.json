@@ -1,8 +1,8 @@
 {
   "designSystem": {
-    "name": "Moctale",
-    "type": "Entertainment Discovery Platform",
-    "version": "beta",
+    "name": "Movientum",
+    "type": "Movie list and recommendation Platform",
+    "version": "v1.0.1",
 
     "foundations": {
       "colorPalette": {

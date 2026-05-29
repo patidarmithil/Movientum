@@ -1,0 +1,345 @@
+/* Navbar.css */
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: var(--navbar-h);
+  background: rgba(8, 8, 8, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.navbar__inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+/* ── Logo + Brand Name ── */
+.navbar__logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: opacity var(--ease-hover);
+}
+
+.navbar__logo:hover {
+  opacity: 0.85;
+}
+
+.navbar__logo-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.navbar__logo-text {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.navbar__logo-beta {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 2px;
+  vertical-align: super;
+  user-select: none;
+}
+
+/* ── Left-Shifted Search Bar ── */
+.navbar__search {
+  flex: 0 1 300px;
+  min-width: 180px;
+  padding: 0;
+}
+
+/* ── Right-Aligned Navigation Icons Group ── */
+.navbar__right-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto; /* Push to the far right */
+  flex-shrink: 0;
+}
+
+/* Nav Pill Link (Explore) */
+.navbar__link--icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 20px;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+
+.navbar__link--icon:hover,
+.navbar__link--active.navbar__link--icon {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-icon-svg {
+  flex-shrink: 0;
+}
+
+/* Icon Buttons (Calendar, Coffee, Bookmark, Grid, Bell) */
+.navbar__icon-link {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  transition: all 150ms ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.navbar__icon-link:hover,
+.navbar__icon-link--active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Auth Actions ── */
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* ── Shared Button System ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-primary);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  transition:
+    background var(--ease-hover),
+    box-shadow var(--ease-hover),
+    opacity var(--ease-hover),
+    transform var(--ease-hover);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Sizes */
+.btn--sm  { font-size: var(--text-sm);  padding: 7px 16px; }
+.btn--md  { font-size: var(--text-base); padding: 10px 22px; }
+.btn--lg  { font-size: var(--text-lg);  padding: 13px 28px; }
+
+/* Variants */
+.btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn--primary:not(:disabled):hover {
+  background: #c05fff;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.btn--secondary {
+  background: var(--surface-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn--secondary:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.btn--ghost:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+
+/* ── User dropdown menu ── */
+.navbar__user {
+  position: relative;
+}
+
+.navbar__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  border: 2px solid rgba(176, 72, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow var(--ease-hover), border-color var(--ease-hover);
+}
+
+.navbar__avatar:hover {
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--accent);
+}
+
+.navbar__avatar-skeleton {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-card);
+  animation: shimmer 1.5s linear infinite;
+  background: linear-gradient(90deg, var(--surface-card) 25%, #242424 50%, var(--surface-card) 75%);
+  background-size: 200% 100%;
+}
+
+.navbar__dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 200px;
+  background: rgba(27, 27, 27, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(176, 72, 255, 0.2);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(176, 72, 255, 0.05);
+  z-index: 1100;
+  overflow: hidden;
+  animation: dropReveal 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dropReveal {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.navbar__dropdown-user {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navbar__dropdown-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.navbar__dropdown-email {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navbar__dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+.navbar__dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 10px 16px;
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--ease-hover), color var(--ease-hover);
+  text-align: left;
+}
+
+.navbar__dropdown-item:hover {
+  background: var(--accent-hover);
+  color: var(--text-primary);
+}
+
+.navbar__dropdown-item--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .navbar__search {
+    flex: 0 1 200px;
+  }
+  .navbar__right-group {
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 820px) {
+  .navbar__icon-link[title="Support"],
+  .navbar__icon-link[title="Releases"] {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar__link--icon {
+    display: none;
+  }
+  .navbar__search {
+    flex: 1;
+  }
+}
+
+@media (max-width: 580px) {
+  .navbar__icon-link[title="Bookmarks"],
+  .navbar__icon-link[title="Dashboard"],
+  .navbar__icon-link[title="Notifications"] {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar__search {
+    display: none;
+  }
+}

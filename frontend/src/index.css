@@ -1,0 +1,375 @@
+/* ═══════════════════════════════════════════════════════
+   Movientum — Design System
+   Source of truth: plans/website.md
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Google Fonts fallback (loaded in index.html) ──── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+/* ── CSS Tokens ──────────────────────────────────────── */
+:root {
+  /* Background */
+  --bg-void:           #080808;
+  --surface-card:      #1B1B1B;
+  --surface-input:     #2A2A2A;
+  --border:            #252833;
+
+  /* Text */
+  --text-primary:      #FFFFFF;
+  --text-muted:        #9CA3AF;
+
+  /* Accent */
+  --accent:            #B048FF;
+  --accent-glow:       rgba(176, 72, 255, 0.25);
+  --accent-hover:      rgba(176, 72, 255, 0.12);
+
+  /* Semantic */
+  --success:           #22C55E;
+  --error:             #EF4444;
+  --warning:           #FFC300;
+
+  /* Rating */
+  --rating-skip:       #FF4D6D;
+  --rating-timepass:   #FFC300;
+  --rating-goforit:    #00E5A0;
+  --rating-perfection: #9B59FF;
+
+  /* Typography */
+  --font-primary: 'Outfit', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+
+  /* Type Scale */
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-lg:   20px;
+  --text-xl:   24px;
+  --text-2xl:  30px;
+  --text-3xl:  38px;
+  --text-hero: 54px;
+
+  /* Spacing (4px base unit) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Layout */
+  --max-width:    1280px;
+  --navbar-h:     64px;
+  --radius-sm:    6px;
+  --radius-md:    12px;
+  --radius-lg:    16px;
+
+  /* Motion */
+  --ease-hover:   150ms ease;
+  --ease-page:    200ms ease;
+  --ease-modal:   250ms ease;
+}
+
+/* ── Reset ───────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Typography ──────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+h1 { font-size: var(--text-3xl); font-weight: 800; }
+h2 { font-size: var(--text-2xl); font-weight: 700; }
+h3 { font-size: var(--text-xl);  font-weight: 700; }
+h4 { font-size: var(--text-lg);  font-weight: 600; }
+
+p { color: var(--text-muted); line-height: 1.7; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity var(--ease-hover);
+}
+a:hover { opacity: 0.8; }
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font-family: var(--font-primary);
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+/* ── Layout Utilities ────────────────────────────────── */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.page-content {
+  padding-top: var(--navbar-h);
+  flex: 1;
+}
+
+.section {
+  padding: var(--space-20) 0;
+}
+
+.section-sm {
+  padding: var(--space-10) 0;
+}
+
+/* ── Shimmer / Skeleton ──────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-card) 25%,
+    #242424 50%,
+    var(--surface-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-void); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--surface-input); }
+
+/* ── Horizontal Scroll Row ───────────────────────────── */
+.scroll-row {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 6px;
+  padding-bottom: var(--space-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.scroll-row::-webkit-scrollbar { height: 4px; }
+.scroll-row::-webkit-scrollbar-track { background: transparent; }
+.scroll-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Horizontal Scroll Fade Effects ────────────────── */
+.scroll-row-container {
+  position: relative;
+  width: 100%;
+}
+
+.scroll-row-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.scroll-row-fade.left-fade {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-void) 0%, rgba(8, 8, 8, 0) 100%);
+}
+
+.scroll-row-fade.right-fade {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-void) 0%, rgba(8, 8, 8, 0) 100%);
+}
+
+/* ── Movie Grid ──────────────────────────────────────── */
+.movie-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ── Section Header ──────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.section-header h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.section-header a {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  transition: color var(--ease-hover);
+}
+
+.section-header a:hover {
+  color: var(--accent);
+}
+
+/* ── Error / Empty States ────────────────────────────── */
+.error-state {
+  text-align: center;
+  padding: var(--space-16) var(--space-6);
+  color: var(--error);
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-16) var(--space-6);
+  color: var(--text-muted);
+}
+
+.empty-state h3 {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-3);
+  color: var(--text-muted);
+}
+
+/* ── Genre Tag ───────────────────────────────────────── */
+.genre-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: var(--surface-input);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: color var(--ease-hover), border-color var(--ease-hover);
+}
+
+.genre-tag:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.genre-tag--link {
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-muted);
+}
+.genre-tag--link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .container { padding: 0 var(--space-4); }
+  .section   { padding: var(--space-10) 0; }
+  h1 { font-size: var(--text-2xl); }
+  h2 { font-size: var(--text-xl); }
+}
+
+@media (max-width: 480px) {
+  .movie-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Aurora Animated Background ──────────────────────── */
+.aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--bg-void);
+  pointer-events: none;
+  opacity: 0.15;
+}
+
+/* ── Page Transitions & Micro-Animations ───────────────── */
+.page-content {
+  opacity: 0;
+  animation: pageReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageReveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Delay staggered entry for layout groups */
+.hero__content > * {
+  opacity: 0;
+  animation: itemReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hero__content > *:nth-child(1) { animation-delay: 0.1s; }
+.hero__content > *:nth-child(2) { animation-delay: 0.18s; }
+.hero__content > *:nth-child(3) { animation-delay: 0.26s; }
+.hero__content > *:nth-child(4) { animation-delay: 0.34s; }
+.hero__content > *:nth-child(5) { animation-delay: 0.42s; }
+
+.movie-row {
+  opacity: 0;
+  animation: itemReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.movie-row:nth-of-type(1) { animation-delay: 0.2s; }
+.movie-row:nth-of-type(2) { animation-delay: 0.35s; }
+.movie-row:nth-of-type(3) { animation-delay: 0.5s; }
+
+@keyframes itemReveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
