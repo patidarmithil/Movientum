@@ -19,7 +19,7 @@ const isLocalhost = typeof window !== 'undefined' &&
 
 const fallbackAPIUrl = isLocalhost 
   ? 'http://localhost:8000' 
-  : 'https://fundscopebackend-gbeybdd2gcd3egez.southeastasia-01.azurewebsites.net';
+  : 'https://movientum-ewhhfwahfdh2bfgd.southeastasia-01.azurewebsites.net';
 
 const BASE_URL = import.meta.env.VITE_API_URL || fallbackAPIUrl;
 
