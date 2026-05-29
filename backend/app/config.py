@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # ── CORS ───────────────────────────────────────────────────────
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    allowed_origins: str = "http://localhost:3000,http://localhost:5173,https://movientum.vercel.app"
 
     # ── Celery ─────────────────────────────────────────────────────
     celery_broker_url: str = ""
