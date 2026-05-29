@@ -12,8 +12,19 @@ const KEYS = {
   refresh: 'mv_refresh_token',
 }
 
+const isLocalhost = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || 
+   window.location.hostname === '127.0.0.1' || 
+   window.location.hostname === '[::1]');
+
+const fallbackAPIUrl = isLocalhost 
+  ? 'http://localhost:8000' 
+  : 'https://fundscopebackend-gbeybdd2gcd3egez.southeastasia-01.azurewebsites.net';
+
+const BASE_URL = import.meta.env.VITE_API_URL || fallbackAPIUrl;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: BASE_URL,
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -87,7 +98,7 @@ api.interceptors.response.use(
       try {
         // Call refresh directly (avoid circular import with AuthContext)
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/auth/refresh`,
+          `${BASE_URL}/api/v1/auth/refresh`,
           {},
           { headers: { Authorization: `Bearer ${storedRefresh}` } }
         )
