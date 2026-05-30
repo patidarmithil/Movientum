@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.db.database import get_db
+from app.db.database import get_db, AsyncSessionLocal
 from app.db.orm_models import Movie, Genre, MovieGenre
 from app.db.cache import get_cached, set_cached, key_tv_credits, key_tv_detail, inflight_lock
 from app.services.tmdb_service import tmdb_service as tmdb
@@ -126,6 +126,9 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
         # Construct basic data if we only have DB
         pass # Optional DB fallback formatting can go here, but for now we prioritize TMDB
 
+    # Release DB connection before slow TMDB calls
+    await db.close()
+
     async with inflight_lock(cache_key) as waited:
         if waited:
             cached = await get_cached(cache_key)
@@ -187,7 +190,8 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
     pop = float(raw.get("popularity", 0.0) or 0.0)
     if _is_persistable(raw):
         try:
-            await persist_tv_full(db, raw)
+            async with AsyncSessionLocal() as new_db:
+                await persist_tv_full(new_db, raw)
             ttl = get_ttl_for_popularity(pop)
         except Exception as e:
             logger.warning(f"Failed to persist TMDB tv id={tv_id}: {e}")

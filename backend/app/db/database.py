@@ -18,8 +18,8 @@ from app.config import settings
 # Used by FastAPI at runtime for all DB operations
 engine = create_async_engine(
     settings.safe_async_db_url,
-    pool_size=10,
-    max_overflow=5,
+    pool_size=5,
+    max_overflow=2,
     pool_pre_ping=True,          # re-check connection before use
     pool_recycle=1800,           # recycle connections every 30 min
     echo=settings.debug,         # log SQL queries in development
@@ -54,9 +54,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+            if session.is_active:
+                await session.commit()
         except Exception:
-            await session.rollback()
+            if session.is_active:
+                await session.rollback()
             raise
         finally:
             await session.close()

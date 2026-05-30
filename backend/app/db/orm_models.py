@@ -155,6 +155,7 @@ class User(Base):
     watch_histories = relationship("WatchHistory", back_populates="user", cascade="all, delete-orphan")
     watchlist_entries = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
     genre_preferences = relationship("UserGenrePreference", back_populates="user", cascade="all, delete-orphan")
+    click_histories = relationship("ClickHistory", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_users_email", "email"),
@@ -259,3 +260,25 @@ class UserGenrePreference(Base):
 
     def __repr__(self):
         return f"<UserGenrePref user={self.user_id} genre={self.genre_id} w={self.weight}>"
+
+
+class ClickHistory(Base):
+    """Tracks clicks on movie/TV items for behavioral analysis."""
+    __tablename__ = "click_history"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, nullable=False)
+    media_type = Column(String(10), nullable=False, default="movie", server_default="movie")
+    source = Column(String(30), nullable=True)
+    clicked_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    user = relationship("User", back_populates="click_histories")
+
+    __table_args__ = (
+        Index("idx_click_history_user_id", "user_id"),
+        Index("idx_click_history_user_clicked", "user_id", "clicked_at", postgresql_ops={"clicked_at": "DESC"}),
+    )
+
+    def __repr__(self):
+        return f"<ClickHistory user={self.user_id} item={self.item_id} type={self.media_type}>"

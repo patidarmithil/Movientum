@@ -323,6 +323,18 @@ class TMDBService:
     async def fetch_similar_tv(self, tv_id: int) -> Optional[dict]:
         return await self._get(f"/tv/{tv_id}/similar", params={"language": "en-US", "page": 1})
 
+    async def fetch_movie_recommendations(self, movie_id: int) -> Optional[dict]:
+        return await self._get(f"/movie/{movie_id}/recommendations", params={"language": "en-US", "page": 1})
+
+    async def fetch_tv_recommendations(self, tv_id: int) -> Optional[dict]:
+        return await self._get(f"/tv/{tv_id}/recommendations", params={"language": "en-US", "page": 1})
+
+    async def fetch_movie_keywords(self, movie_id: int) -> Optional[dict]:
+        return await self._get(f"/movie/{movie_id}/keywords")
+
+    async def fetch_tv_keywords(self, tv_id: int) -> Optional[dict]:
+        return await self._get(f"/tv/{tv_id}/keywords")
+
 
 
     # ── Data Extraction Helpers ───────────────────────────────────

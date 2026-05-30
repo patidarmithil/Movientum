@@ -1,24 +1,25 @@
 """
-Movientum — Recommendation Service (Phase 3.4)
-
-Service layer: all DB logic for recommendations.
-Routers call these functions — no raw SQL in router handlers.
+Movientum — Recommendation Service (Simplified)
 
 get_personalized_recommendations(db, user_id)
-    → genre-affinity picks (or trending fallback if < 3 watched movies)
-    → always returns exactly 20 movies (backfilled with trending if needed)
+    → genre-affinity picks from watch history
+    → fallback: trending if < 3 watched
+    → returns up to 40 items
     → source tag: "genre_affinity" | "trending_fallback"
 
-get_similar_movies(db, movie_id)
-    → movies sharing >=1 genre with target movie
-    → excludes target movie itself
-    → sorted by popularity DESC, top 10
+get_similar_items(db, item_id, media_type, user_id)
+    → delegates to simple pipeline in advanced_recs
+    → returns flat list of up to 40 items
 
-fetch_trending(db, exclude_ids, limit)
-    → internal helper: top movies by popularity, excluding given ids
+Removed:
+  - Click profile integration
+  - Complex multi-factor scoring
+  - High-interest item injection
+  - Bucket splitting
 """
 import logging
 import asyncio
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -32,16 +33,16 @@ from app.services.tmdb_service import tmdb_service as _tmdb
 
 logger = logging.getLogger(__name__)
 
-_REC_TARGET = 20
-_SIMILAR_LIMIT = 10
-_MIN_WATCHED_FOR_AFFINITY = 3  # below this → trending_fallback
+_REC_TARGET = 40
+_MIN_WATCHED_FOR_AFFINITY = 3
 
 
-# ── Internal helpers ─────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────
 
 def _movie_to_dict(movie: Movie) -> dict:
     """Serialize Movie ORM → dict compatible with MovieListItem schema."""
     genres = [mg.genre.name for mg in (movie.genres or [])]
+    genre_ids = [mg.genre_id for mg in (movie.genres or [])]
     release_year = movie.release_date.year if movie.release_date else None
     return {
         "id": movie.id,
@@ -50,32 +51,38 @@ def _movie_to_dict(movie: Movie) -> dict:
         "backdrop_path": movie.backdrop_path,
         "release_year": release_year,
         "genres": genres,
-        "vote_average": movie.vote_average,
-        "media_type": "movie",
+        "genre_ids": genre_ids,
+        "vote_average": float(movie.vote_average or 0),
+        "vote_count": int(movie.vote_count or 0),
+        "popularity": float(movie.popularity or 0),
+        "media_type": getattr(movie, "type", "movie"),
     }
 
 
-async def _fetch_trending(
-    db: AsyncSession,
-    exclude_ids: list[int],
-    limit: int,
-) -> list[Movie]:
+def _passes_quality(m: dict) -> bool:
+    if float(m.get("vote_average", 0)) < 6.5:
+        return False
+    if int(m.get("vote_count", 0)) < 100:
+        return False
+    if not m.get("poster_path"):
+        return False
+    return True
+
+
+def _compute_score(item: dict, user_genre_profile: dict) -> float:
     """
-    Top movies by popularity DESC.
-    Excludes movie IDs in exclude_ids list.
+    score = genre_match * 0.7 + rating * 0.3
+    + optional small user genre boost
     """
-    stmt = (
-        select(Movie)
-        .options(selectinload(Movie.genres).selectinload(MovieGenre.genre))
-        .where(Movie.vote_count > 50)
-        .order_by(Movie.popularity.desc())
-        .limit(limit + len(exclude_ids) + 10)  # over-fetch, filter in Python
-    )
-    result = await db.execute(stmt)
-    movies = result.scalars().all()
-    exclude_set = set(exclude_ids)
-    filtered = [m for m in movies if m.id not in exclude_set]
-    return filtered[:limit]
+    genre_ids = set(item.get("genre_ids", []))
+    rating_score = float(item.get("vote_average", 0)) / 10.0
+
+    # Genre match = how well this item matches user's top genres
+    genre_match = 0.0
+    if user_genre_profile and genre_ids:
+        genre_match = min(sum(user_genre_profile.get(gid, 0.0) for gid in genre_ids), 1.0)
+
+    return (genre_match * 0.7) + (rating_score * 0.3)
 
 
 # ── Public service functions ─────────────────────────────────────
@@ -87,205 +94,142 @@ async def get_personalized_recommendations(
     """
     Personalized picks for authenticated user.
 
-    Algorithm:
-    1. Count user's watched movies.
-       - If < 3: return trending_fallback (20 movies, source="trending_fallback")
-    2. Get top 3 genres from watch_history JOIN movie_genres (by frequency).
-    3. Fetch movies in those genres NOT yet in watch_history, sorted by popularity DESC.
-    4. If result < 20: backfill with trending (excluding already-listed + watched ids).
-    5. Deduplicate by movie_id. Return exactly 20 (or all available if DB has < 20).
+    Pipeline:
+    1. Count watched movies. If < 3 → trending fallback.
+    2. Build genre profile from watch history (normalized freq).
+    3. Fetch unwatched movies in matching genres from local DB.
+    4. Backfill with TMDB discover if < 20 local results.
+    5. Quality filter + deduplicate.
+    6. Score: genre_match * 0.7 + rating * 0.3.
+    7. Sort descending, return top 40.
 
-    Returns dict: {movies: [list of movie dicts], source: str}
+    Returns: {movies: [...], source: str}
     """
-    # Step 1 — Count watched movies
-    count_stmt = select(func.count(WatchHistory.id)).where(
-        WatchHistory.user_id == user_id
-    )
+    # Step 1 — Count watched
+    count_stmt = select(func.count(WatchHistory.id)).where(WatchHistory.user_id == user_id)
     watched_count = (await db.execute(count_stmt)).scalar_one()
 
     if watched_count < _MIN_WATCHED_FOR_AFFINITY:
-        # Trending fallback — no history to personalize from
         trending_data = await get_trending(db=None)
         trending_movies = trending_data.get("movies", [])
-        logger.info(
-            "RECS_GENERATED",
-            extra={"user_id": str(user_id), "source": "trending_fallback", "count": len(trending_movies)},
-        )
-        return {
-            "movies": trending_movies,
-            "source": "trending_fallback",
-        }
+        logger.info("RECS_GENERATED", extra={"user_id": str(user_id), "source": "trending_fallback", "count": len(trending_movies)})
+        return {"movies": trending_movies, "source": "trending_fallback"}
 
-    # Step 2 — Get watched movie IDs
-    watched_ids_stmt = select(WatchHistory.movie_id).where(
-        WatchHistory.user_id == user_id
-    )
+    # Step 2 — Build genre profile from watch history
+    watched_ids_stmt = select(WatchHistory.movie_id).where(WatchHistory.user_id == user_id)
     watched_result = await db.execute(watched_ids_stmt)
     watched_ids: list[int] = list(watched_result.scalars().all())
     watched_set = set(watched_ids)
 
-    # Step 3 — Top 3 genres by frequency in watch history
-    genre_freq_stmt = (
-        select(MovieGenre.genre_id, func.count(MovieGenre.genre_id).label("freq"))
+    genre_cnt_stmt = (
+        select(MovieGenre.genre_id, func.count(MovieGenre.genre_id).label("cnt"))
         .where(MovieGenre.movie_id.in_(watched_ids))
         .group_by(MovieGenre.genre_id)
-        .order_by(func.count(MovieGenre.genre_id).desc())
-        .limit(3)
     )
-    genre_result = await db.execute(genre_freq_stmt)
-    top_genre_ids = [row.genre_id for row in genre_result.all()]
+    genre_cnt_res = await db.execute(genre_cnt_stmt)
+    genre_counts = {row.genre_id: row.cnt for row in genre_cnt_res.all()}
+    total = sum(genre_counts.values())
 
-    if not top_genre_ids:
-        # No genre data → fallback
+    if not genre_counts or total == 0:
+        # No usable genre data — trending fallback
         trending_data = await get_trending(db=None)
         trending_movies = trending_data.get("movies", [])
-        logger.info(
-            "RECS_GENERATED",
-            extra={"user_id": str(user_id), "source": "trending_fallback", "count": len(trending_movies)},
-        )
-        return {
-            "movies": trending_movies,
-            "source": "trending_fallback",
-        }
+        logger.info("RECS_GENERATED", extra={"user_id": str(user_id), "source": "trending_fallback", "count": len(trending_movies)})
+        return {"movies": trending_movies, "source": "trending_fallback"}
 
-    # Step 4 — Movies in top genres, not yet watched
-    # Subquery: movie IDs that have at least one matching genre
+    user_genre_profile = {gid: cnt / total for gid, cnt in genre_counts.items()}
+    candidate_genre_ids = set(user_genre_profile.keys())
+
+    # Step 3 — Fetch unwatched candidates from local DB (top 100 by popularity)
     genre_movie_ids_stmt = (
         select(MovieGenre.movie_id)
-        .where(MovieGenre.genre_id.in_(top_genre_ids))
+        .where(MovieGenre.genre_id.in_(candidate_genre_ids))
         .where(MovieGenre.movie_id.not_in(watched_ids))
         .distinct()
     )
-    genre_movie_ids_result = await db.execute(genre_movie_ids_stmt)
-    candidate_ids = [row.movie_id for row in genre_movie_ids_result.all()]
+    genre_movie_ids_res = await db.execute(genre_movie_ids_stmt)
+    candidate_ids = [row.movie_id for row in genre_movie_ids_res.all()]
 
-    genre_movies: list[Movie] = []
+    local_movies: list[dict] = []
     if candidate_ids:
         stmt = (
             select(Movie)
             .options(selectinload(Movie.genres).selectinload(MovieGenre.genre))
             .where(Movie.id.in_(candidate_ids))
             .order_by(Movie.popularity.desc())
-            .limit(_REC_TARGET)
+            .limit(100)
         )
         result = await db.execute(stmt)
-        genre_movies = list(result.scalars().all())
+        local_movies = [_movie_to_dict(m) for m in result.scalars().all()]
 
-    genre_movies_dicts = [_movie_to_dict(m) for m in genre_movies]
-
-    # Step 5 — Backfill with TMDB if needed
-    if len(genre_movies_dicts) < 10:
-        top_genre_ids_str = ",".join(str(g) for g in top_genre_ids)
-        
-        # Parallel TMDB Fetch
-        discover_results = await asyncio.gather(
-            _tmdb.discover_movies(top_genre_ids_str),
-            _tmdb.discover_tv(top_genre_ids_str),
-            return_exceptions=True
+    # Step 4 — Backfill with TMDB discover if needed
+    if len(local_movies) < 20:
+        top_genre_ids_str = ",".join(
+            str(gid) for gid, _ in sorted(user_genre_profile.items(), key=lambda x: x[1], reverse=True)[:3]
         )
-        
-        # Parse results
-        tmdb_movies = discover_results[0].get("results", []) if isinstance(discover_results[0], dict) else []
-        tmdb_tv = discover_results[1].get("results", []) if isinstance(discover_results[1], dict) else []
-        
-        tmdb_items = []
-        for m in tmdb_movies:
-            m["media_type"] = "movie"
-            tmdb_items.append(_tmdb_to_search_result(m))
-            
-        for t in tmdb_tv:
-            t["media_type"] = "tv"
-            tmdb_items.append(_tmdb_to_search_result(t))
-            
-        # Combine
-        genre_movies_dicts.extend(tmdb_items)
+        try:
+            discover_results = await asyncio.gather(
+                _tmdb.discover_movies(top_genre_ids_str),
+                _tmdb.discover_tv(top_genre_ids_str),
+                return_exceptions=True,
+            )
+            tmdb_movies = discover_results[0].get("results", []) if isinstance(discover_results[0], dict) else []
+            tmdb_tv = discover_results[1].get("results", []) if isinstance(discover_results[1], dict) else []
 
-    # Deduplicate strictly by id + media_type
+            for m in tmdb_movies:
+                m["media_type"] = "movie"
+                local_movies.append(_tmdb_to_search_result(m))
+            for t in tmdb_tv:
+                t["media_type"] = "tv"
+                local_movies.append(_tmdb_to_search_result(t))
+        except Exception as e:
+            logger.warning(f"TMDB discover backfill failed: {e}")
+
+    # Step 5 — Quality filter + deduplicate (skip watched movies)
     seen: set[str] = set()
-    unique_movies: list[dict] = []
-    
-    for m in genre_movies_dicts:
+    unique: list[dict] = []
+    for m in local_movies:
         if m.get("media_type", "movie") == "movie" and m["id"] in watched_set:
             continue
-            
+        if not _passes_quality(m):
+            continue
         key = f"{m['id']}_{m.get('media_type', 'movie')}"
         if key not in seen:
             seen.add(key)
-            unique_movies.append(m)
+            unique.append(m)
 
-    final = unique_movies[:_REC_TARGET]
-    logger.info(
-        "RECS_GENERATED",
-        extra={"user_id": str(user_id), "source": "genre_affinity", "count": len(final)},
-    )
-    return {
-        "movies": final,
-        "source": "genre_affinity",
-    }
+    # Step 6 — Score
+    for m in unique:
+        m["_score"] = _compute_score(m, user_genre_profile)
+
+    # Step 7 — Sort + top 40
+    unique.sort(key=lambda x: x["_score"], reverse=True)
+    final = unique[:_REC_TARGET]
+
+    for m in final:
+        m.pop("_score", None)
+
+    logger.info("RECS_GENERATED", extra={"user_id": str(user_id), "source": "genre_affinity", "count": len(final)})
+    return {"movies": final, "source": "genre_affinity"}
 
 
 async def get_similar_items(
     db: AsyncSession,
     item_id: int,
-    media_type: str = "movie"
+    media_type: str = "movie",
+    user_id: Optional[UUID] = None,
 ) -> list[dict]:
     """
-    Fetch similar items using TMDB API.
-    Interleaves movies and TV shows for cross-media recommendations.
-    Returns up to 20 items.
+    Fetch similar items using simplified pipeline.
+    Returns flat list of up to 40 items.
     """
-    from app.services.tmdb_service import tmdb_service as _tmdb
-    import asyncio
+    from app.services.advanced_recs import get_advanced_similar_items
 
-    # Determine genres to use for cross-media discovery
-    target_genres = ""
-    if media_type == "movie":
-        target_info = await _tmdb._get(f"/movie/{item_id}", params={"language": "en-US"})
-    else:
-        target_info = await _tmdb.fetch_tv_detail(item_id)
-        
-    if target_info and "genres" in target_info:
-        target_genres = ",".join(str(g["id"]) for g in target_info["genres"])
+    buckets = await get_advanced_similar_items(db, item_id, media_type, user_id)
 
-    # Fetch parallel data
-    tasks = []
-    if media_type == "movie":
-        tasks.append(_tmdb.fetch_similar_movies(item_id))
-        tasks.append(_tmdb.discover_tv(target_genres) if target_genres else _tmdb.fetch_popular_movies(1)) # fallback if no genres
-    else:
-        tasks.append(_tmdb.fetch_similar_tv(item_id))
-        tasks.append(_tmdb.discover_movies(target_genres) if target_genres else _tmdb.fetch_popular_movies(1))
-
-    results = await asyncio.gather(*tasks)
-    
-    primary_raw = results[0].get("results", []) if results[0] else []
-    secondary_raw = results[1].get("results", []) if results[1] else []
-
-    # Map TMDB results to our schema
-    from app.routers.search import _tmdb_to_search_result
-    
-    primary = []
-    for item in primary_raw:
-        item["media_type"] = media_type
-        primary.append(_tmdb_to_search_result(item))
-        
-    secondary = []
-    sec_media_type = "tv" if media_type == "movie" else "movie"
-    for item in secondary_raw:
-        item["media_type"] = sec_media_type
-        secondary.append(_tmdb_to_search_result(item))
-
-    # Interleave results (1 primary, 1 secondary)
-    mixed = []
-    max_len = max(len(primary), len(secondary))
-    for i in range(max_len):
-        if i < len(primary):
-            mixed.append(primary[i])
-        if i < len(secondary):
-            mixed.append(secondary[i])
-
-    # Filter out the target item just in case
-    mixed = [m for m in mixed if m["id"] != item_id]
-    
-    logger.info("SIMILAR_ITEMS", extra={"item_id": item_id, "media_type": media_type, "count": len(mixed[:20])})
-    return mixed[:20]
+    # Flatten buckets → flat list (backward compat)
+    final_list: list[dict] = []
+    final_list.extend(buckets.get("bucket_1", []))
+    final_list.extend(buckets.get("bucket_2", []))
+    final_list.extend(buckets.get("bucket_3", []))
+    return final_list

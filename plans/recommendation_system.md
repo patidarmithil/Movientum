@@ -1,183 +1,58 @@
-# Recommendation System — Movientum
+# Recommendation System
 
-## Overview
+This document outlines the current logic and workings of the recommendation system for both the home page and individual item pages.
 
-Movientum recommendation system evolves in phases. Starts simple (rule-based, fast to build), transitions to collaborative filtering ML, then to federated learning via FedPCL. Each phase runs on top of the previous — no full rewrites.
+## 1) Home Page "For You" Section (Overall Recommendations)
 
----
+The "For You" section provides personalized recommendations for authenticated users. The logic ensures exactly 20 items are returned, leveraging the user's watch history or falling back to trending content.
 
-## Phase 1: Rule-Based Recommendations (MVP)
+### Algorithm & Logic
+- **Condition Check**: The system first checks how many movies the user has watched (`watch_history`).
+- **Trending Fallback (Cold Start)**: 
+  - If the user has watched **fewer than 3 movies**, the system uses a `trending_fallback`.
+  - It fetches the top trending items based on popularity and returns them.
+- **Genre Affinity (Personalized)**: 
+  - If the user has watched **3 or more movies**, the system utilizes a `genre_affinity` algorithm.
+  - **Step 1**: It determines the user's top 3 favorite genres based on the frequency of genres in their watch history.
+  - **Step 2**: It queries the database for movies that match these top 3 genres, which the user *has not yet watched*, sorted descending by popularity.
+  - **Step 3 (Backfill)**: If the local database query returns fewer than 10 results, the system automatically reaches out to TMDB in parallel to discover additional movies and TV shows matching those top genres to backfill the recommendations.
+  - **Step 4**: Results are deduplicated (ensuring watched items are excluded) and sliced to exactly 20 items.
 
-No ML. Pure logic. Fast to implement.
-
-### Logic
-
-**For unauthenticated users:**
-- Show globally popular movies (sorted by TMDB popularity score)
-- Show "Trending Now" (movies popular this week)
-- Show top-rated by genre (static genre rows)
-
-**For authenticated users (no watch history yet):**
-- Prompt for genre preferences during onboarding
-- Show movies matching selected genres, sorted by rating
-- "Start watching to get personalized picks"
-
-**For authenticated users (with watch history):**
-
-1. **Genre affinity**: Count genres in user's watch history → rank genres by frequency → recommend top movies in top genres NOT yet watched
-
-2. **Director affinity**: If user watched 2+ movies by same director → recommend other movies by that director
-
-3. **Rating-based expansion**: If user rated a movie ≥ 7.0 → find similar movies (same genre + similar vote_average) → recommend those
-
-4. **Popularity boost**: Blend popular movies into recommendations (30%) so users discover trending content
-
-### Recommendation Blend Formula (Phase 1)
-```
-final_list =
-  (genre_affinity_picks × 0.40)
-  + (director_affinity_picks × 0.20)
-  + (similar_to_rated_picks × 0.20)
-  + (trending_popular_picks × 0.20)
-```
-
-Deduplicate, remove already-watched, return top 20.
+### Caching
+- Personalized recommendations are cached per user for **15 minutes**.
+- The cache is invalidated automatically if the user adds a new movie to their watch history or modifies their ratings.
 
 ---
 
-## Phase 2: Collaborative Filtering (ML-Based)
+## 2) Individual Movie/TV Page Recommendations (More Like This)
 
-### Concept
+The "More Like This" section on individual movie and TV pages has been upgraded for **accuracy, stability, and consistency** without increasing latency. The pipeline strictly limits TMDB API calls, focuses on high signal quality, and prevents irrelevant recommendations.
 
-"Users similar to you liked these movies." Don't use content similarity — use behavior similarity.
+### Two-Stage Filtering & Relaxation Pipeline
 
-### User-Item Matrix
-
-Build matrix where:
-- Rows = users
-- Columns = movies
-- Cells = rating score (or 0 if not rated)
-
-```
-         Movie A  Movie B  Movie C  Movie D
-User 1:    8.0      7.5      0        9.0
-User 2:    0        8.0      7.0      0
-User 3:    7.5      0        8.5      8.0
-```
-
-### Training
-
-Use **Matrix Factorization** (e.g., SVD or ALS):
-- Decompose sparse matrix into two dense matrices (user factors × movie factors)
-- Dot product of user vector + movie vector = predicted rating
-- Train to minimize prediction error
-- Learns latent features (e.g., "user likes cerebral sci-fi")
-
-### Serving Recommendations
-
-For user U:
-1. Get user's latent vector from trained model
-2. Compute dot product with all movie vectors
-3. Sort by predicted rating descending
-4. Filter out already-watched movies
-5. Return top N
-
-### Watch History as Implicit Feedback
-
-Not all users rate movies. Use watch history as implicit signal:
-- Watched = positive signal (weight: 1.0)
-- Rated + score ≥ 7 = strong positive signal (weight: 2.0)
-- Rated + score < 5 = negative signal (weight: -0.5)
-- Added to watchlist = weak positive signal (weight: 0.5)
-
-### Retraining Schedule
-
-- Full retrain: weekly (all data)
-- Incremental update: daily (new ratings/watches)
-- Model stored as serialized file, loaded into memory for serving
-
----
-
-## Phase 3: FedPCL Integration (Privacy-Preserving ML)
-
-See `fedpcl_system_implemented.md` for deep explanation.
-
-Summary: Instead of sending user data to central server, ML model trains locally on each user's device. Only model updates (gradients) are sent. Central server aggregates updates. Privacy preserved.
-
----
-
-## User Behavior Tracking
-
-All behavior tracked for recommendation engine input:
-
-| Event | Data Captured | Weight |
-|-------|--------------|--------|
-| Movie viewed (detail page) | user_id, movie_id, timestamp | 0.3 |
-| Added to watchlist | user_id, movie_id, timestamp | 0.5 |
-| Marked as watched | user_id, movie_id, timestamp | 1.0 |
-| Rated (overall_score) | user_id, movie_id, score | score/10 × 2.0 |
-| Search query | user_id, query, clicked_result | 0.4 |
-| Time spent on detail page | user_id, movie_id, duration_sec | proportional |
-
-Events stored in `events` table or streamed to analytics pipeline.
-
----
-
-## Cold Start Problem
-
-New user has no behavior history. Solutions:
-
-1. **Onboarding survey**: Ask 5 genre preference questions during registration
-2. **Genre-based defaults**: Show top movies in chosen genres
-3. **Demographic defaults**: If region known, show locally popular content
-4. **Explicit ratings ask**: Prompt user to rate 5–10 movies they've already seen
-5. **Popularity fallback**: Show globally trending content
-
-New movie (no ratings): rely on TMDB popularity + genre similarity to other movies.
-
----
-
-## Recommendation Diversity
-
-Pure ML recommendations can get "trapped" in bubble (only recommends same genre forever).
-
-**Diversity strategies:**
-- **Exploration budget**: 10% of recommendations = random picks from other genres
-- **Genre rotation**: Ensure at least 3 different genres in top 20 results
-- **Recency bonus**: Boost newly released movies in recommendations
-- **User-controlled serendipity slider** (future): User sets how adventurous recommendations should be
-
----
-
-## Serving Architecture
-
-```
-User requests recommendations
-  │
-  ├── Check Redis: user:recommendations:{user_id}
-  │     ├── HIT → return (fast path)
-  │     └── MISS ↓
-  │
-  ├── Load user behavior data from DB
-  ├── Call recommendation engine:
-  │     Phase 1: rule engine (in-process)
-  │     Phase 2: ML model inference (in-process or separate service)
-  │     Phase 3: FedPCL aggregated model inference
-  │
-  ├── Post-process: deduplicate, filter watched, apply diversity rules
-  ├── Cache result in Redis (TTL: 15 min)
-  └── Return top 20 recommendations
-```
-
----
-
-## Recommendation Types
-
-| Type | Description | Where Shown |
-|------|-------------|------------|
-| For You | Personalized picks | Home page hero row |
-| Because You Watched X | Based on specific movie | Movie Detail page |
-| Top in [Genre] | Genre-specific top picks | Genre rows on Home |
-| Trending Now | Global popularity spike | Home page |
-| Continue Watching | Resume from watchlist | Home page |
-| Hidden Gems | High rated, low popularity | Discovery section |
+1. **Fetch (Max 3 TMDB Calls)**: Concurrently fetch candidates (4 seconds timeout):
+   - TMDB Recommendations for the given item.
+   - TMDB Discover results (cross-type) based on the current item's genres.
+   - TMDB Similar Items for the given item.
+2. **Merge & Deduplicate**: Merge candidate sources in order (recommendations -> discover -> similar) and deduplicate by `(id, media_type)`.
+3. **Hard Filter**: Filter candidates:
+   - Must have a valid `poster_path`
+   - `vote_count` $\ge$ 30
+   - Exclude the current item.
+4. **Strict Filter**: Keep items that pass strict quality checks:
+   - `vote_average` $\ge$ 6.5
+   - $\ge \min(2, \text{len}(current\_genre\_ids))$ genre matches.
+   - Remove weak-only genres (Drama/Comedy only - matching genres cannot be a subset of `{18, 35}`).
+   - Conditional Intensity Filter:
+     - If calm-type: exclude high-intensity genres (Action 28, Horror 27, Thriller 53).
+     - If action-type: must have at least one action genre.
+     - If comedy-type: must have Comedy (35).
+5. **Relax Level 1**: If candidates count < 40, append items that have $\ge 1$ genre match and `vote_average` $\ge$ 7.0.
+6. **Relax Level 2**: If candidates count still < 40, append items that have `vote_average` $\ge$ 7.2.
+7. **Final Fallback**: If candidates count still < 40, append items that have `vote_average` $\ge$ 6.5.
+8. **Scoring & Personalization**:
+   - Compute score: `0.50 * genre_match + 0.25 * rating_score + 0.15 * popularity_score + 0.10 * recency_score`.
+   - Apply a $\times 1.2$ personalization boost to the top 50% of candidates matching the user's top 2 genres.
+   - **No double filtering**: No items are discarded after the scoring stage.
+9. **Sort & Slice**: Sort descending by final score and slice to exactly 40 items.
+10. **Cache**: Wrap in bucket structures and cache with Redis.

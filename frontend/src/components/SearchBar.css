@@ -11,13 +11,15 @@
 .searchbar__form {
   display: flex;
   align-items: center;
-  background: var(--surface-input);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   padding: 0 14px;
   height: 38px;
   gap: 8px;
-  transition: border-color var(--ease-hover), box-shadow var(--ease-hover);
+  transition: border-color var(--ease-hover), box-shadow var(--ease-hover), background var(--ease-hover);
 }
 
 .searchbar__form:focus-within {

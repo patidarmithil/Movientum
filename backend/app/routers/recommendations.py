@@ -10,6 +10,7 @@ Cache:
   movie:similar:{movie_id}         TTL 3600s (1hr)
 """
 import logging
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -25,12 +26,12 @@ from app.db.cache import (
 )
 from app.db.database import get_db
 from app.services import recommendation_service
-from app.utils.deps import get_current_user
+from app.utils.deps import get_current_user, get_optional_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_TTL_SIMILAR = TTL_MOVIE_DETAIL  # 1hr (reuse existing constant = 3600s)
+_TTL_SIMILAR = 900  # 15 min (was 1hr)
 
 
 # ── GET /recommendations ──────────────────────────────────────────
@@ -82,14 +83,19 @@ async def get_recommendations(
 @router.get(
     "/similar/{item_id}",
     summary="Similar items",
-    response_description="Up to 20 items sharing at least one genre with the target item",
+    response_description="Up to 40 items scored via advanced pipeline",
 )
 async def get_similar_items(
     item_id: int,
     media_type: str = "movie",
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[dict] = Depends(get_optional_user),
 ) -> dict:
-    cache_key = key_movie_similar(item_id) + f":{media_type}"
+    from typing import Optional
+    from uuid import UUID
+    
+    user_id_str = current_user["sub"] if current_user else "guest"
+    cache_key = f"rec:item:{item_id}:{media_type}:{user_id_str}"
 
     cached = await get_cached(cache_key)
     if cached:
@@ -97,7 +103,9 @@ async def get_similar_items(
         return cached
 
     logger.info("CACHE_MISS", extra={"key": cache_key})
-    movies = await recommendation_service.get_similar_items(db, item_id=item_id, media_type=media_type)
+    
+    user_uuid = UUID(current_user["sub"]) if current_user else None
+    movies = await recommendation_service.get_similar_items(db, item_id=item_id, media_type=media_type, user_id=user_uuid)
 
     result = {"movies": movies, "movie_id": item_id, "media_type": media_type}
     await set_cached(cache_key, result, _TTL_SIMILAR)
