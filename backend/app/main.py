@@ -229,6 +229,14 @@ app.include_router(person.router, prefix="/api/v1/person", tags=["Person"])
 from app.routers import tv
 app.include_router(tv.router, prefix="/api/v1/tv", tags=["TV"])
 
+# ── Improvement: Clicks Router ───────────────────────────────────
+from app.routers import clicks
+app.include_router(clicks.router, prefix="/api/v1/clicks", tags=["Clicks"])
+
+# ── Improvement: Users Router (Analysis) ─────────────────────────
+from app.routers import users
+app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+
 # ── Phase 3.4+ (not yet implemented) ─────────────────────────────
 # from app.routers import news
 # app.include_router(news.router, prefix="/api/v1/news", tags=["News"])

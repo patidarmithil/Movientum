@@ -23,6 +23,7 @@ import Dashboard from './pages/Dashboard'
 import Search from './pages/Search'
 import PersonPage from './pages/PersonPage'
 import Explore from './pages/Explore'
+import Analysis from './pages/Analysis'
 import TVDetail from './pages/TVDetail'
 import './index.css'
 import './components/Navbar.css'
@@ -57,6 +58,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/analysis"
+          element={
+            <ProtectedRoute>
+              <Analysis />
             </ProtectedRoute>
           }
         />

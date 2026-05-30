@@ -662,6 +662,9 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
         await set_cached(cache_key, data, TTL_MOVIE_DETAIL)
         return data
 
+    # NOT IN DB: release DB connection before slow TMDB calls
+    await db.close()
+
     # 3. TMDB (live fallback — always works for any movie ID)
     raw = await tmdb.fetch_movie_detail(movie_id)
     if not raw:
@@ -679,7 +682,8 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
     pop = raw.get("popularity", 0.0) or 0.0
     if _is_persistable(raw):
         try:
-            await persist_safe(raw["id"], db, raw)
+            async with AsyncSessionLocal() as new_db:
+                await persist_safe(raw["id"], new_db, raw)
             ttl = get_ttl_for_popularity(pop)
         except Exception as e:
             logger.warning(f"Failed to persist TMDB movie id={movie_id}: {e}")
