@@ -373,3 +373,35 @@ button {
   }
 }
 
+/* ── Custom 'E' design matching the logo branding ── */
+.brand-name__e {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 0.65em;
+  height: 0.72em;
+  vertical-align: middle;
+  margin: 0 0.05em;
+  position: relative;
+  top: -1.5px; /* Align visually with uppercase font */
+}
+
+.brand-name__e-bar {
+  display: block;
+  height: 0.12em; /* Thickness of each horizontal bar */
+  width: 100%;
+  border-radius: 1px;
+}
+
+.brand-name__e-bar--top {
+  background: #00E5A0; /* Cyan */
+}
+
+.brand-name__e-bar--mid {
+  background: #FF4DCD; /* Pink */
+}
+
+.brand-name__e-bar--bot {
+  background: #FFC300; /* Yellow */
+}
+

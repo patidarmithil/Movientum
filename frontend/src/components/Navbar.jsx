@@ -44,7 +44,15 @@ export default function Navbar() {
         {/* ── Logo + Brand Name + Beta Symbol ── */}
         <Link to="/" className="navbar__logo" aria-label="Movientum home">
           <img src="/favicon.svg" alt="Movientum Logo" className="navbar__logo-img" />
-          <span className="navbar__logo-text">MOVIENTUM</span>
+          <span className="navbar__logo-text">
+            MOVI
+            <span className="brand-name__e" aria-label="E">
+              <span className="brand-name__e-bar brand-name__e-bar--top"></span>
+              <span className="brand-name__e-bar brand-name__e-bar--mid"></span>
+              <span className="brand-name__e-bar brand-name__e-bar--bot"></span>
+            </span>
+            NTUM
+          </span>
           <span className="navbar__logo-beta">β</span>
         </Link>
 
