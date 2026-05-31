@@ -71,8 +71,16 @@ export default function Login() {
         {/* Logo */}
         <div className="auth-card__logo">
           <Link to="/" className="auth-card__logo" style={{ gap: '8px', textDecoration: 'none' }}>
-            <span className="auth-card__logo-mark">M</span>
-            <span className="auth-card__logo-text">Movientum</span>
+            <img src="/favicon.svg" alt="Movientum Logo" className="auth-card__logo-img" />
+            <span className="auth-card__logo-text">
+              MOVI
+              <span className="brand-name__e" aria-label="E">
+                <span className="brand-name__e-bar brand-name__e-bar--top"></span>
+                <span className="brand-name__e-bar brand-name__e-bar--mid"></span>
+                <span className="brand-name__e-bar brand-name__e-bar--bot"></span>
+              </span>
+              NTUM
+            </span>
           </Link>
         </div>
 

@@ -70,26 +70,20 @@
   margin-bottom: var(--space-8);
 }
 
-.auth-card__logo-mark {
-  width: 36px;
-  height: 36px;
-  background: var(--accent);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 20px;
-  color: #fff;
-  box-shadow: 0 0 20px var(--accent-glow);
+.auth-card__logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .auth-card__logo-text {
   font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .auth-card__title {
