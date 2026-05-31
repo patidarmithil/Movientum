@@ -301,6 +301,7 @@ button {
 @media (max-width: 768px) {
   .container { padding: 0 var(--space-4); }
   .section   { padding: var(--space-10) 0; }
+  .section-sm { padding: var(--space-4) 0; }
   h1 { font-size: var(--text-2xl); }
   h2 { font-size: var(--text-xl); }
 }
