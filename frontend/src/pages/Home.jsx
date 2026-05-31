@@ -44,10 +44,11 @@ function MovieRow({ title, movies, loading = false, seeAllHref = '/movies', chil
       <div className="section-header">
         <div className="section-header-left">
           <h2>{title}</h2>
-          {children}
         </div>
         <Link to={seeAllHref} className="see-all-link">See all →</Link>
       </div>
+      
+      {children && <div className="movie-row__pills-container">{children}</div>}
       <div className="scroll-row-container">
         <div className="scroll-row-fade left-fade"></div>
         <div className="scroll-row">
