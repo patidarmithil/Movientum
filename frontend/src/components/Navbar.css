@@ -343,11 +343,18 @@
 }
 
 @media (max-width: 768px) {
+  .navbar__inner {
+    padding: 0 var(--space-4);
+    gap: var(--space-4);
+  }
   .navbar__link--icon {
     display: none;
   }
   .navbar__search {
     flex: 1;
+  }
+  .navbar__logo-text {
+    font-size: 16px;
   }
 }
 
@@ -362,5 +369,24 @@
 @media (max-width: 480px) {
   .navbar__search {
     display: none;
+  }
+  .navbar__inner {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+  .navbar__logo-text,
+  .navbar__logo-beta {
+    display: none;
+  }
+  .navbar__logo-img {
+    width: 38px;
+    height: 38px;
+  }
+  .navbar__actions {
+    gap: var(--space-2);
+  }
+  .btn--sm {
+    padding: 6px 12px;
+    font-size: var(--text-xs);
   }
 }
