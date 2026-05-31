@@ -77,6 +77,11 @@
   opacity: 0.8;
 }
 
+.movie-row__pills-container {
+  margin-bottom: var(--space-4);
+  width: 100%;
+}
+
 /* Genre Pills */
 .genre-pills {
   display: flex;
@@ -391,6 +396,10 @@
   .genre-pill-btn {
     padding: 4px 10px;
     font-size: 11px;
+  }
+  
+  .movie-row__pills-container {
+    margin-bottom: var(--space-2);
   }
 }
 
