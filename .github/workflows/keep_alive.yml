@@ -1,0 +1,21 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # runs every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping backend health endpoint
+        run: |
+          echo "Pinging backend..."
+          curl -s -o /dev/null -w "Status: %{http_code}\n" https://movientum-ewhhfwahfdh2bfgd.southeastasia-01.azurewebsites.net/api/health
+
+      - name: Optional deeper ping (DB + cache wake)
+        run: |
+          echo "Warming DB/cache..."
+          curl -s -o /dev/null -w "Status: %{http_code}\n" "https://movientum-ewhhfwahfdh2bfgd.southeastasia-01.azurewebsites.net/api/v1/movies/trending"
