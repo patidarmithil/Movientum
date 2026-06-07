@@ -18,8 +18,8 @@ celery_app = Celery(
     backend=settings.celery_result_backend,
     include=[
         "app.tasks.sync_movies",
-        # "app.tasks.fetch_news",       # Phase 3: news integration
-        # "app.tasks.invalidate_cache", # Phase 3: cache management
+        "app.tasks.fetch_news",
+        # "app.tasks.invalidate_cache", # future
     ],
 )
 
@@ -43,9 +43,15 @@ celery_app.conf.update(
             "options": {"expires": 3600},              # Don't run if delayed > 1hr
         },
         # Phase 3 additions:
-        # "news-fetch-every-2-hours": {
-        #     "task": "app.tasks.fetch_news.fetch_movie_news",
-        #     "schedule": crontab(minute=0, hour="*/2"),
-        # },
+        "news-fetch-every-2-hours": {
+            "task": "app.tasks.fetch_news.fetch_movie_news_task",
+            "schedule": crontab(minute=0, hour="*/2"),
+            "options": {"expires": 3600},
+        },
+        "news-expire-daily": {
+            "task": "app.tasks.fetch_news.expire_news_task",
+            "schedule": crontab(hour=2, minute=0),    # 2 AM IST daily
+            "options": {"expires": 3600},
+        },
     },
 )

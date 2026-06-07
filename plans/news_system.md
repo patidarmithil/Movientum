@@ -31,7 +31,7 @@ Movientum's news section surfaces movie-related articles, interviews, trailers, 
 
 ### Global News (Not Personalized)
 
-Cron job every 2 hours:
+Celery Beat background task every 2 hours:
 ```
 1. Call NewsAPI with broad query:
    q="movies OR cinema OR film OR Hollywood OR Netflix OR Disney"
@@ -206,7 +206,7 @@ Free tier: 100 requests/day.
 
 Strategies:
 1. Bulk fetch 50 articles per request (use pageSize=50 max)
-2. Cache aggressively — 2-hour cron, not per-user-request
+2. Cache aggressively — 2-hour Celery Beat schedule, not per-user-request
 3. Movie-specific fetch only on cache miss (not every page view)
 4. Store and reuse — articles in DB are reusable for days
 5. Upgrade to paid plan as platform grows (1000+ req/day tier)
