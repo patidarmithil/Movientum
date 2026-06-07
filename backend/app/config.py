@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     tmdb_base_url: str = "https://api.themoviedb.org/3"
     tmdb_image_base_url: str = "https://image.tmdb.org/t/p"
 
+    # ── NewsAPI ────────────────────────────────────────────────────
+    news_api_key: str = ""  # free tier: 100 req/day
+
     # ── Database (Supabase PostgreSQL) ─────────────────────────────
     database_url: str           # sync (psycopg2) — Alembic migrations only
     database_pool_url: str      # sync pooler URL  — reference

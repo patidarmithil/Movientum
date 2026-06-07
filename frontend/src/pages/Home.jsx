@@ -20,6 +20,7 @@ import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
 import BorderGlow from '../components/BorderGlow'
+import HomeNewsStrip from '../components/HomeNewsStrip'
 import api from '../utils/api'
 import './Home.css'
 
@@ -210,6 +211,9 @@ export default function Home() {
             loading={topRatedLoad} 
             seeAllHref="/explore?sort=rating" 
           />
+
+          {/* News Strip */}
+          <HomeNewsStrip />
 
           {/* Top Rated in Genre */}
           <MovieRow 

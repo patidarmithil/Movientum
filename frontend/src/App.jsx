@@ -25,6 +25,7 @@ import PersonPage from './pages/PersonPage'
 import Explore from './pages/Explore'
 import Analysis from './pages/Analysis'
 import TVDetail from './pages/TVDetail'
+import News from './pages/News'
 import './index.css'
 import './components/Navbar.css'
 
@@ -82,6 +83,9 @@ function AppRoutes() {
 
         {/* Improvement 1.7 — TV Shows */}
         <Route path="/tv/:id" element={<TVDetail />} />
+
+        {/* News */}
+        <Route path="/news" element={<News />} />
 
         {/* 404 fallback */}
         <Route

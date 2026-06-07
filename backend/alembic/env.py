@@ -18,6 +18,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 from app.config import settings
 from app.db.orm_models import Base
+import app.db.orm_models_news  # noqa: F401 — register news tables into Base.metadata
 
 # ── Alembic Config Object ─────────────────────────────────────
 config = context.config

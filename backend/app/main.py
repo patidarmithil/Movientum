@@ -237,6 +237,8 @@ app.include_router(clicks.router, prefix="/api/v1/clicks", tags=["Clicks"])
 from app.routers import users
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 
-# ── Phase 3.4+ (not yet implemented) ─────────────────────────────
-# from app.routers import news
-# app.include_router(news.router, prefix="/api/v1/news", tags=["News"])
+# ── News Router ───────────────────────────────────────
+# Also import news ORM models so Alembic picks them up
+from app.db import orm_models_news  # noqa: F401 — side-effect import for Alembic
+from app.routers import news
+app.include_router(news.router, prefix="/api/v1/news", tags=["News"])
