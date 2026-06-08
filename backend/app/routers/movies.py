@@ -99,6 +99,10 @@ def _movie_to_detail(movie: Movie) -> dict:
         "vote_count": movie.vote_count,
         "original_language": movie.original_language,
         "media_type": getattr(movie, "type", "movie"),
+        # production info not stored in local DB — empty fallback
+        # TMDB path in get_movie_by_id will always populate these
+        "production_companies": [],
+        "production_countries": [],
     }
 
 
@@ -221,6 +225,37 @@ SORT_MAP = {
     "title":        Movie.title.asc(),
 }
 
+GENRE_NAME_TO_ID = {
+    "action": 28, "adventure": 12, "animation": 16, "comedy": 35, "crime": 80,
+    "documentary": 99, "drama": 18, "family": 10751, "fantasy": 14, "history": 36,
+    "horror": 27, "music": 10402, "mystery": 9648, "romance": 10749, "science fiction": 878,
+    "tv movie": 10770, "thriller": 53, "war": 10752, "western": 37, "action & adventure": 10759,
+    "kids": 10762, "news": 10763, "reality": 10764, "sci-fi & fantasy": 10765, "soap": 10766,
+    "talk": 10767, "war & politics": 10768
+}
+
+def _tmdb_to_list_item(item: dict) -> dict:
+    release_date = item.get("release_date") or item.get("first_air_date")
+    release_year = None
+    if release_date:
+        try:
+            release_year = int(release_date.split("-")[0])
+        except ValueError:
+            pass
+    return {
+        "id": item["id"],
+        "title": item.get("title") or item.get("name") or "",
+        "name": item.get("title") or item.get("name") or "",
+        "poster_path": item.get("poster_path"),
+        "backdrop_path": item.get("backdrop_path"),
+        "release_year": release_year,
+        "genres": [],
+        "vote_average": item.get("vote_average", 0.0),
+        "media_type": item.get("media_type", "movie"),
+    }
+
+TTL_EXPLORE = 600   # 10 minutes
+
 @router.get("/explore", summary="Filtered movie browse (Explore page)")
 async def explore_movies(
     genres:     Optional[str] = Query(default=None, description="Comma-separated genre names"),
@@ -230,61 +265,153 @@ async def explore_movies(
     sort:       str           = Query(default="popularity", description="Sort: popularity|rating|release_date|title"),
     page:       int           = Query(default=1, ge=1),
     limit:      int           = Query(default=24, ge=1, le=100),
+    companies:  Optional[str] = Query(default=None, description="Comma-separated TMDB company IDs"),
+    countries:  Optional[str] = Query(default=None, description="Comma-separated origin country ISO codes"),
+    providers:  Optional[str] = Query(default=None, description="Comma-separated watch provider IDs"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Rich filtered browse for the Explore page.
-    genres: comma-separated, e.g. "Action,Drama" (OR logic — movie matches any).
+    Rich filtered browse for the Explore page, powered by TMDB discover.
+    genres: comma-separated, e.g. "Action,Drama".
     min_rating: floor for vote_average.
     year_from / year_to: inclusive release year range.
     sort: popularity | rating | release_date | title.
     Cached 10 minutes per combo.
     """
-    from hashlib import md5, sha256
+    from hashlib import md5
     import json as _json
     genre_list = [g.strip() for g in genres.split(",")] if genres else []
     params_key = _json.dumps({
         "g": sorted(genre_list), "mr": min_rating,
         "yf": year_from, "yt": year_to,
         "s": sort, "p": page, "l": limit,
+        "comp": companies, "count": countries, "prov": providers
     }, sort_keys=True)
     cache_key = f"explore:{md5(params_key.encode()).hexdigest()[:12]}"
     cached = await get_cached(cache_key)
     if cached:
         return cached
 
-    order_by = SORT_MAP.get(sort, Movie.popularity.desc())
-    offset = (page - 1) * limit
+    # Map genre names to IDs
+    genre_ids = []
+    for g_name in genre_list:
+        g_id = GENRE_NAME_TO_ID.get(g_name.lower())
+        if g_id:
+            genre_ids.append(str(g_id))
 
-    def _base(for_count: bool):
-        q = select(func.count() if for_count else Movie)
-        if not for_count:
-            q = q.options(selectinload(Movie.genres).selectinload(MovieGenre.genre))
+    # Base params for TMDB discover
+    params_movie = {
+        "language": "en-US",
+        "page": page,
+        "include_adult": "false",
+        "vote_average.gte": min_rating,
+    }
+    params_tv = {
+        "language": "en-US",
+        "page": page,
+        "include_adult": "false",
+        "vote_average.gte": min_rating,
+    }
 
-        if genre_list:
-            # Join genres, apply OR filter across all requested genres
-            q = q.join(Movie.genres).join(MovieGenre.genre).where(
-                func.lower(Genre.name).in_([g.lower() for g in genre_list])
-            ).distinct()
-        if min_rating > 0:
-            q = q.where(Movie.vote_average >= min_rating)
-        if year_from:
-            q = q.where(func.extract("year", Movie.release_date) >= year_from)
-        if year_to:
-            q = q.where(func.extract("year", Movie.release_date) <= year_to)
-        return q
+    if genre_ids:
+        params_movie["with_genres"] = ",".join(genre_ids)
+        params_tv["with_genres"] = ",".join(genre_ids)
 
-    total = (await db.execute(_base(for_count=True))).scalar_one()
-    result = await db.execute(_base(for_count=False).order_by(order_by).offset(offset).limit(limit))
-    movies = result.scalars().unique().all()
+    if companies:
+        params_movie["with_companies"] = companies
+        params_tv["with_companies"] = companies
 
-    # Fetch all genre names for sidebar
+    if countries:
+        params_movie["with_origin_country"] = countries.replace(",", "|")
+        params_tv["with_origin_country"] = countries.replace(",", "|")
+
+    if providers:
+        params_movie["with_watch_providers"] = providers.replace(",", "|")
+        params_tv["with_watch_providers"] = providers.replace(",", "|")
+        params_movie["watch_region"] = "IN"
+        params_tv["watch_region"] = "IN"
+    
+    if year_from:
+        params_movie["primary_release_date.gte"] = f"{year_from}-01-01"
+        params_tv["first_air_date.gte"] = f"{year_from}-01-01"
+    if year_to:
+        params_movie["primary_release_date.lte"] = f"{year_to}-12-31"
+        params_tv["first_air_date.lte"] = f"{year_to}-12-31"
+    
+    # Sort mapping
+    if sort == "popularity":
+        params_movie["sort_by"] = "popularity.desc"
+        params_tv["sort_by"] = "popularity.desc"
+    elif sort == "rating":
+        params_movie["sort_by"] = "vote_average.desc"
+        params_tv["sort_by"] = "vote_average.desc"
+        params_movie["vote_count.gte"] = 50
+        params_tv["vote_count.gte"] = 50
+    elif sort == "release_date":
+        params_movie["sort_by"] = "primary_release_date.desc"
+        params_tv["sort_by"] = "first_air_date.desc"
+    elif sort == "title":
+        params_movie["sort_by"] = "original_title.asc"
+        params_tv["sort_by"] = "original_name.asc"
+
+    responses = await asyncio.gather(
+        tmdb._get("/discover/movie", params=params_movie),
+        tmdb._get("/discover/tv", params=params_tv),
+        return_exceptions=True
+    )
+
+    master_list = []
+    for i, resp in enumerate(responses):
+        if isinstance(resp, dict) and "results" in resp:
+            for item in resp["results"]:
+                if "media_type" not in item:
+                    item["media_type"] = "movie" if i == 0 else "tv"
+                if not item.get("poster_path") or item.get("adult"):
+                    continue
+                master_list.append(item)
+
+    seen = set()
+    deduped = []
+    for item in master_list:
+        key = f"{item['id']}_{item.get('media_type', 'movie')}"
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+
+    if sort == "popularity":
+        deduped.sort(key=lambda x: (x.get("popularity", 0.0)), reverse=True)
+    elif sort == "rating":
+        deduped.sort(key=lambda x: (x.get("vote_average", 0.0)), reverse=True)
+    elif sort == "release_date":
+        def _get_date(x):
+            d = x.get("release_date") or x.get("first_air_date") or ""
+            return d
+        deduped.sort(key=_get_date, reverse=True)
+    elif sort == "title":
+        def _get_title(x):
+            return (x.get("title") or x.get("name") or "").lower()
+        deduped.sort(key=_get_title)
+
+    formatted = [_tmdb_to_list_item(item) for item in deduped]
+
+    total_results = sum(
+        resp.get("total_results", 0)
+        for resp in responses
+        if isinstance(resp, dict) and "total_results" in resp
+    )
+    if not total_results:
+        total_results = len(formatted)
+
+    # Fetch all genre names for sidebar (remains local DB query)
     genre_names_stmt = select(Genre.name).order_by(Genre.name)
     all_genres = (await db.execute(genre_names_stmt)).scalars().all()
 
+    # Slice to limit
+    results = formatted[:limit]
+
     data = {
-        "movies":     [_movie_to_list_item(m) for m in movies],
-        "total":      total,
+        "movies":     results,
+        "total":      total_results,
         "page":       page,
         "limit":      limit,
         "all_genres": list(all_genres),
@@ -531,6 +658,16 @@ def _tmdb_detail_to_dict(raw: dict, directors: list[str]) -> dict:
             release_year = int(release_date.split("-")[0])
         except (ValueError, IndexError):
             pass
+    production_companies = [
+        {"id": c["id"], "name": c["name"], "logo_path": c.get("logo_path")}
+        for c in raw.get("production_companies", [])
+        if c.get("name")
+    ]
+    production_countries = [
+        {"iso_3166_1": c.get("iso_3166_1", ""), "name": c["name"]}
+        for c in raw.get("production_countries", [])
+        if c.get("name")
+    ]
     return {
         "id": raw["id"],
         "title": raw.get("title") or raw.get("original_title") or "",
@@ -545,6 +682,8 @@ def _tmdb_detail_to_dict(raw: dict, directors: list[str]) -> dict:
         "vote_count": raw.get("vote_count", 0),
         "original_language": raw.get("original_language"),
         "media_type": "movie",
+        "production_companies": production_companies,
+        "production_countries": production_countries,
     }
 
 
@@ -646,6 +785,23 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
     if cached:
         return cached
 
+    # Fetch MovieRating separately to ensure it is always attached
+    from app.db.orm_models import MovieRating
+    stmt_moctale = select(MovieRating).where(MovieRating.id == movie_id)
+    result_moctale = await db.execute(stmt_moctale)
+    moctale_rating = result_moctale.scalar_one_or_none()
+    moctale_data = None
+    if moctale_rating:
+        moctale_data = {
+            "score": moctale_rating.score,
+            "total_votes": moctale_rating.total_votes,
+            "perfection": moctale_rating.perfection,
+            "go_for_it": moctale_rating.go_for_it,
+            "timepass": moctale_rating.timepass,
+            "skip": moctale_rating.skip,
+        }
+
+
     stmt = (
         select(Movie)
         .options(
@@ -659,6 +815,20 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
 
     if movie:
         data = _movie_to_detail(movie)
+        # Release DB before TMDB call
+        await db.close()
+        # Fetch TMDB detail to enrich with production_companies/countries
+        raw = await tmdb.fetch_movie_detail(movie_id)
+        if raw:
+            data["production_companies"] = [
+                {"id": c["id"], "name": c["name"], "logo_path": c.get("logo_path")}
+                for c in raw.get("production_companies", []) if c.get("name")
+            ]
+            data["production_countries"] = [
+                {"iso_3166_1": c.get("iso_3166_1", ""), "name": c["name"]}
+                for c in raw.get("production_countries", []) if c.get("name")
+            ]
+        data["moctale_rating"] = moctale_data
         await set_cached(cache_key, data, TTL_MOVIE_DETAIL)
         return data
 
@@ -691,6 +861,8 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
     else:
         ttl = get_ttl_for_popularity(pop)
 
+    data["moctale_rating"] = moctale_data
+
     # 5. Cache and return
     await set_cached(cache_key, data, ttl)
     return data
@@ -698,7 +870,130 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
 
 
 
-# ── GET /movies/{movie_id}/credits ───────────────────────────────
+# ── GET /movies/company/{company_id} ────────────────────────────
+@router.get("/company/{company_id}", summary="Movies by production company (TMDB discover)")
+async def get_movies_by_company(company_id: int, page: int = Query(default=1, ge=1)):
+    """
+    Discover movies from a specific production company via TMDB.
+    Cached 30 minutes.
+    """
+    cache_key = f"movie:company:{company_id}:p{page}"
+    cached = await get_cached(cache_key)
+    if cached and cached.get("movies"):
+        return cached
+
+    responses = await asyncio.gather(
+        tmdb._get("/discover/movie", params={
+            "with_companies": str(company_id),
+            "language": "en-US",
+            "sort_by": "popularity.desc",
+            "page": page,
+            "include_adult": "false",
+        }),
+        tmdb._get("/discover/tv", params={
+            "with_companies": str(company_id),
+            "language": "en-US",
+            "sort_by": "popularity.desc",
+            "page": page,
+            "include_adult": "false",
+        }),
+        return_exceptions=True,
+    )
+
+    master_list = []
+    for i, resp in enumerate(responses):
+        if isinstance(resp, dict) and "results" in resp:
+            for item in resp["results"]:
+                if "media_type" not in item:
+                    item["media_type"] = "movie" if i == 0 else "tv"
+                master_list.append(item)
+
+    seen = set()
+    deduped = []
+    for item in master_list:
+        key = f"{item['id']}_{item.get('media_type', 'movie')}"
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+
+    deduped.sort(key=lambda x: (x.get("popularity", 0.0)), reverse=True)
+    formatted = [_tmdb_to_search_result(item) for item in deduped[:30]]
+
+    total_results = sum(
+        resp.get("total_results", 0)
+        for resp in responses
+        if isinstance(resp, dict) and "total_results" in resp
+    )
+    if not total_results:
+        total_results = len(formatted)
+
+    data = {"movies": formatted, "total": total_results, "page": page}
+    await set_cached(cache_key, data, 1800)
+    return data
+
+
+# ── GET /movies/country/{iso_code} ───────────────────────────────
+@router.get("/country/{iso_code}", summary="Movies by production country (TMDB discover)")
+async def get_movies_by_country(iso_code: str, page: int = Query(default=1, ge=1)):
+    """
+    Discover movies produced in a specific country via TMDB.
+    Cached 30 minutes.
+    """
+    cache_key = f"movie:country:{iso_code}:p{page}"
+    cached = await get_cached(cache_key)
+    if cached and cached.get("movies"):
+        return cached
+
+    responses = await asyncio.gather(
+        tmdb._get("/discover/movie", params={
+            "with_origin_country": iso_code,
+            "language": "en-US",
+            "sort_by": "popularity.desc",
+            "page": page,
+            "include_adult": "false",
+        }),
+        tmdb._get("/discover/tv", params={
+            "with_origin_country": iso_code,
+            "language": "en-US",
+            "sort_by": "popularity.desc",
+            "page": page,
+            "include_adult": "false",
+        }),
+        return_exceptions=True,
+    )
+
+    master_list = []
+    for i, resp in enumerate(responses):
+        if isinstance(resp, dict) and "results" in resp:
+            for item in resp["results"]:
+                if "media_type" not in item:
+                    item["media_type"] = "movie" if i == 0 else "tv"
+                master_list.append(item)
+
+    seen = set()
+    deduped = []
+    for item in master_list:
+        key = f"{item['id']}_{item.get('media_type', 'movie')}"
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+
+    deduped.sort(key=lambda x: (x.get("popularity", 0.0)), reverse=True)
+    formatted = [_tmdb_to_search_result(item) for item in deduped[:30]]
+
+    total_results = sum(
+        resp.get("total_results", 0)
+        for resp in responses
+        if isinstance(resp, dict) and "total_results" in resp
+    )
+    if not total_results:
+        total_results = len(formatted)
+
+    data = {"movies": formatted, "total": total_results, "page": page}
+    await set_cached(cache_key, data, 1800)
+    return data
+
+
 # IMPORTANT: must be registered AFTER /{movie_id} because FastAPI matches
 # sub-paths before generic /{movie_id} only when defined first. We add a
 # dedicated nested path so there is no conflict.

@@ -1,15 +1,11 @@
 /**
- * Explore.jsx — Improvement 1.6
+ * Explore.jsx — Filtered movie browse with Infinite Scroll
  *
  * Route: /explore
  * Endpoint: GET /api/v1/movies/explore
- *   ?genres=Action,Drama&min_rating=7&year_from=2000&year_to=2024&sort=popularity&page=1&limit=24
- *
- * Sidebar: genre multi-select pills, rating slider, year range, sort dropdown
- * Main: 4-col responsive poster grid + pagination
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
@@ -20,6 +16,42 @@ const SORT_OPTIONS = [
   { value: 'rating',       label: 'Top Rated' },
   { value: 'release_date', label: 'Newest First' },
   { value: 'title',        label: 'A – Z' },
+]
+
+const COMPANIES = [
+  { id: '420', label: 'Marvel Studios' },
+  { id: '2', label: 'Walt Disney' },
+  { id: '174', label: 'Warner Bros.' },
+  { id: '33', label: 'Universal' },
+  { id: '4', label: 'Paramount' },
+  { id: '34', label: 'Sony Pictures' },
+  { id: '178464', label: 'Netflix Studios' },
+  { id: '41077', label: 'A24' },
+  { id: '3172', label: 'Blumhouse' },
+  { id: '4439', label: 'Yash Raj Films' },
+  { id: '7293', label: 'Dharma Productions' },
+]
+
+const COUNTRIES = [
+  { code: 'US', label: 'USA' },
+  { code: 'IN', label: 'India' },
+  { code: 'GB', label: 'UK' },
+  { code: 'KR', label: 'South Korea' },
+  { code: 'JP', label: 'Japan' },
+  { code: 'FR', label: 'France' },
+  { code: 'ES', label: 'Spain' },
+  { code: 'DE', label: 'Germany' },
+  { code: 'CA', label: 'Canada' },
+]
+
+const PROVIDERS = [
+  { id: '8', label: 'Netflix' },
+  { id: '119', label: 'Prime Video' },
+  { id: '122', label: 'Disney+ Hotstar' },
+  { id: '220', label: 'JioCinema' },
+  { id: '232', label: 'ZEE5' },
+  { id: '237', label: 'SonyLIV' },
+  { id: '350', label: 'Apple TV+' },
 ]
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -55,6 +87,15 @@ export default function Explore() {
   const [selectedGenres, setSelectedGenres] = useState(
     () => searchParams.get('genres')?.split(',').filter(Boolean) ?? []
   )
+  const [selectedCompanies, setSelectedCompanies] = useState(
+    () => searchParams.get('companies')?.split(',').filter(Boolean) ?? []
+  )
+  const [selectedCountries, setSelectedCountries] = useState(
+    () => searchParams.get('countries')?.split(',').filter(Boolean) ?? []
+  )
+  const [selectedProviders, setSelectedProviders] = useState(
+    () => searchParams.get('providers')?.split(',').filter(Boolean) ?? []
+  )
   const [minRating,  setMinRating]  = useState(() => Number(searchParams.get('min_rating') ?? 0))
   const [yearFrom,   setYearFrom]   = useState(() => Number(searchParams.get('year_from') ?? 1900))
   const [yearTo,     setYearTo]     = useState(() => Number(searchParams.get('year_to')   ?? CURRENT_YEAR))
@@ -66,68 +107,123 @@ export default function Explore() {
   const [allGenres, setAllGenres] = useState([])
   const [total,     setTotal]     = useState(0)
   const [loading,   setLoading]   = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore,    setHasMore]   = useState(true)
   const [error,     setError]     = useState(null)
 
   const LIMIT = 24
-  const totalPages = Math.ceil(total / LIMIT) || 1
+  const observerRef = useRef(null)
 
   // ── Fetch ─────────────────────────────────────────────────
-  const fetchMovies = useCallback(async (filters) => {
-    setLoading(true)
+  const fetchMovies = useCallback(async (p, isInitial = false) => {
+    if (isInitial) {
+      setLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
     setError(null)
+
     try {
       const params = {
-        page:  filters.page,
+        page:  p,
         limit: LIMIT,
-        sort:  filters.sort,
+        sort:  sort,
       }
-      if (filters.genres.length)         params.genres     = filters.genres.join(',')
-      if (filters.minRating > 0)         params.min_rating = filters.minRating
-      if (filters.yearFrom > 1900)       params.year_from  = filters.yearFrom
-      if (filters.yearTo < CURRENT_YEAR) params.year_to    = filters.yearTo
+      if (selectedGenres.length)         params.genres     = selectedGenres.join(',')
+      if (selectedCompanies.length)      params.companies  = selectedCompanies.join(',')
+      if (selectedCountries.length)      params.countries  = selectedCountries.join(',')
+      if (selectedProviders.length)      params.providers  = selectedProviders.join(',')
+      if (minRating > 0)                 params.min_rating = minRating
+      if (yearFrom > 1900)               params.year_from  = yearFrom
+      if (yearTo < CURRENT_YEAR)         params.year_to    = yearTo
 
       const r = await api.get('/api/v1/movies/explore', { params })
-      setMovies(r.data.movies ?? [])
-      setTotal(r.data.total ?? 0)
+      const newMovies = r.data.movies ?? []
+      const totalCount = r.data.total ?? 0
+      setTotal(totalCount)
       if (r.data.all_genres?.length) setAllGenres(r.data.all_genres)
+
+      if (isInitial) {
+        setMovies(newMovies)
+      } else {
+        setMovies((prev) => {
+          const existingIds = new Set(prev.map(m => `${m.id}-${m.media_type}`))
+          const uniqueNew = newMovies.filter(m => !existingIds.has(`${m.id}-${m.media_type}`))
+          return [...prev, ...uniqueNew]
+        })
+      }
+
+      if (newMovies.length < LIMIT) {
+        setHasMore(false)
+      } else {
+        setHasMore(true)
+      }
     } catch {
       setError('Failed to load movies')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }, [])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort])
 
-  // Sync URL params → fetch on every filter change
+  // Reset page and movies list when filters change
   useEffect(() => {
-    const filters = { selectedGenres, minRating, yearFrom, yearTo, sort, page }
+    setMovies([])
+    setPage(1)
+    setHasMore(true)
+    fetchMovies(1, true)
 
-    // Update URL params
+    // Sync URL params (excluding page parameter on first load)
     const p = {}
     if (selectedGenres.length)     p.genres     = selectedGenres.join(',')
+    if (selectedCompanies.length)  p.companies  = selectedCompanies.join(',')
+    if (selectedCountries.length)  p.countries  = selectedCountries.join(',')
+    if (selectedProviders.length)  p.providers  = selectedProviders.join(',')
     if (minRating > 0)             p.min_rating = String(minRating)
     if (yearFrom > 1900)           p.year_from  = String(yearFrom)
     if (yearTo < CURRENT_YEAR)     p.year_to    = String(yearTo)
     if (sort !== 'popularity')     p.sort       = sort
-    if (page > 1)                  p.page       = String(page)
     setSearchParams(p, { replace: true })
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort, fetchMovies])
 
-    fetchMovies({
-      genres: selectedGenres,
-      minRating,
-      yearFrom,
-      yearTo,
-      sort,
-      page,
-    })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [selectedGenres, minRating, yearFrom, yearTo, sort, page, fetchMovies])
-
-  // Reset page when filters change (not page itself)
-  const isFirst = useRef(true)
+  // Fetch subsequent pages when page increments
   useEffect(() => {
-    if (isFirst.current) { isFirst.current = false; return }
-    setPage(1)
-  }, [selectedGenres, minRating, yearFrom, yearTo, sort])
+    if (page > 1) {
+      fetchMovies(page, false)
+
+      // Sync URL page parameter
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('page', String(page))
+        return next
+      }, { replace: true })
+    }
+  }, [page, fetchMovies])
+
+  // Infinite scroll trigger
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setPage((prev) => prev + 1)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTrigger = observerRef.current
+    if (currentTrigger) {
+      observer.observe(currentTrigger)
+    }
+
+    return () => {
+      if (currentTrigger) {
+        observer.unobserve(currentTrigger)
+      }
+    }
+  }, [loading, loadingMore, hasMore])
 
   // ── Genre toggle ──────────────────────────────────────────
   const toggleGenre = (g) =>
@@ -135,8 +231,26 @@ export default function Explore() {
       prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
     )
 
+  const toggleCompany = (c) =>
+    setSelectedCompanies((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
+    )
+
+  const toggleCountry = (c) =>
+    setSelectedCountries((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
+    )
+
+  const toggleProvider = (p) =>
+    setSelectedProviders((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    )
+
   const clearAll = () => {
     setSelectedGenres([])
+    setSelectedCompanies([])
+    setSelectedCountries([])
+    setSelectedProviders([])
     setMinRating(0)
     setYearFrom(1900)
     setYearTo(CURRENT_YEAR)
@@ -145,8 +259,14 @@ export default function Explore() {
   }
 
   const hasFilters =
-    selectedGenres.length > 0 || minRating > 0 ||
-    yearFrom > 1900 || yearTo < CURRENT_YEAR || sort !== 'popularity'
+    selectedGenres.length > 0 ||
+    selectedCompanies.length > 0 ||
+    selectedCountries.length > 0 ||
+    selectedProviders.length > 0 ||
+    minRating > 0 ||
+    yearFrom > 1900 ||
+    yearTo < CURRENT_YEAR ||
+    sort !== 'popularity'
 
   return (
     <main className="explore-page page-content">
@@ -163,69 +283,119 @@ export default function Explore() {
             )}
           </div>
 
-          {/* Sort */}
-          <div className="explore-section">
-            <p className="explore-section__label">Sort by</p>
-            <div className="explore-sort">
-              {SORT_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  className={`explore-sort__btn${sort === o.value ? ' explore-sort__btn--active' : ''}`}
-                  onClick={() => setSort(o.value)}
-                >
-                  {o.label}
-                </button>
-              ))}
+          <div className="explore-sidebar__content">
+            {/* Sort */}
+            <div className="explore-section">
+              <p className="explore-section__label">Sort by</p>
+              <div className="explore-sort">
+                {SORT_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    className={`explore-sort__btn${sort === o.value ? ' explore-sort__btn--active' : ''}`}
+                    onClick={() => setSort(o.value)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Genres */}
-          <div className="explore-section">
-            <p className="explore-section__label">Genres</p>
-            <div className="explore-genres">
-              {allGenres.map((g) => (
-                <button
-                  key={g}
-                  className={`explore-genre-pill${selectedGenres.includes(g) ? ' explore-genre-pill--active' : ''}`}
-                  onClick={() => toggleGenre(g)}
-                >
-                  {g}
-                </button>
-              ))}
+            {/* Genres */}
+            <div className="explore-section">
+              <p className="explore-section__label">Genres</p>
+              <div className="explore-genres">
+                {allGenres.map((g) => (
+                  <button
+                    key={g}
+                    className={`explore-genre-pill${selectedGenres.includes(g) ? ' explore-genre-pill--active' : ''}`}
+                    onClick={() => toggleGenre(g)}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Min rating */}
-          <div className="explore-section">
-            <RangeSlider
-              label="Min Rating"
-              min={0} max={10} step={0.5}
-              value={minRating}
-              onChange={setMinRating}
-              format={(v) => v === 0 ? 'Any' : `★ ${v.toFixed(1)}+`}
-            />
-          </div>
+            {/* Production Houses */}
+            <div className="explore-section">
+              <p className="explore-section__label">Production Houses</p>
+              <div className="explore-genres">
+                {COMPANIES.map((c) => (
+                  <button
+                    key={c.id}
+                    className={`explore-genre-pill${selectedCompanies.includes(c.id) ? ' explore-genre-pill--active' : ''}`}
+                    onClick={() => toggleCompany(c.id)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Year from */}
-          <div className="explore-section">
-            <RangeSlider
-              label="Released From"
-              min={1920} max={CURRENT_YEAR} step={1}
-              value={yearFrom}
-              onChange={setYearFrom}
-              format={(v) => v === 1920 ? 'Any' : String(v)}
-            />
-          </div>
+            {/* Countries */}
+            <div className="explore-section">
+              <p className="explore-section__label">Countries</p>
+              <div className="explore-genres">
+                {COUNTRIES.map((c) => (
+                  <button
+                    key={c.code}
+                    className={`explore-genre-pill${selectedCountries.includes(c.code) ? ' explore-genre-pill--active' : ''}`}
+                    onClick={() => toggleCountry(c.code)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Year to */}
-          <div className="explore-section">
-            <RangeSlider
-              label="Released Until"
-              min={1920} max={CURRENT_YEAR} step={1}
-              value={yearTo}
-              onChange={setYearTo}
-              format={(v) => v === CURRENT_YEAR ? 'Now' : String(v)}
-            />
+            {/* OTT Platforms */}
+            <div className="explore-section">
+              <p className="explore-section__label">OTT Platforms</p>
+              <div className="explore-genres">
+                {PROVIDERS.map((p) => (
+                  <button
+                    key={p.id}
+                    className={`explore-genre-pill${selectedProviders.includes(p.id) ? ' explore-genre-pill--active' : ''}`}
+                    onClick={() => toggleProvider(p.id)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Min rating */}
+            <div className="explore-section">
+              <RangeSlider
+                label="Min Rating"
+                min={0} max={10} step={0.5}
+                value={minRating}
+                onChange={setMinRating}
+                format={(v) => v === 0 ? 'Any' : `★ ${v.toFixed(1)}+`}
+              />
+            </div>
+
+            {/* Year from */}
+            <div className="explore-section">
+              <RangeSlider
+                label="Released From"
+                min={1920} max={CURRENT_YEAR} step={1}
+                value={yearFrom}
+                onChange={setYearFrom}
+                format={(v) => v === 1920 ? 'Any' : String(v)}
+              />
+            </div>
+
+            {/* Year to */}
+            <div className="explore-section">
+              <RangeSlider
+                label="Released Until"
+                min={1920} max={CURRENT_YEAR} step={1}
+                value={yearTo}
+                onChange={setYearTo}
+                format={(v) => v === CURRENT_YEAR ? 'Now' : String(v)}
+              />
+            </div>
           </div>
         </aside>
 
@@ -234,18 +404,42 @@ export default function Explore() {
           {/* Header bar */}
           <div className="explore-main__header">
             <p className="explore-main__count">
-              {!loading && !error && (
+              {total > 0 && (
                 <>{total.toLocaleString()} movie{total !== 1 ? 's' : ''}</>
               )}
             </p>
-            {/* Active genre chips */}
-            {selectedGenres.length > 0 && (
+            {/* Active chips */}
+            {(selectedGenres.length > 0 || selectedCompanies.length > 0 || selectedCountries.length > 0 || selectedProviders.length > 0) && (
               <div className="explore-active-chips">
                 {selectedGenres.map((g) => (
                   <button key={g} className="explore-active-chip" onClick={() => toggleGenre(g)}>
                     {g} ×
                   </button>
                 ))}
+                {selectedCompanies.map((cId) => {
+                  const company = COMPANIES.find(c => c.id === cId)
+                  return (
+                    <button key={cId} className="explore-active-chip" onClick={() => toggleCompany(cId)}>
+                      {company ? company.label : cId} ×
+                    </button>
+                  )
+                })}
+                {selectedCountries.map((code) => {
+                  const country = COUNTRIES.find(c => c.code === code)
+                  return (
+                    <button key={code} className="explore-active-chip" onClick={() => toggleCountry(code)}>
+                      {country ? country.label : code} ×
+                    </button>
+                  )
+                })}
+                {selectedProviders.map((pId) => {
+                  const provider = PROVIDERS.find(p => p.id === pId)
+                  return (
+                    <button key={pId} className="explore-active-chip" onClick={() => toggleProvider(pId)}>
+                      {provider ? provider.label : pId} ×
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -261,9 +455,25 @@ export default function Explore() {
               <MovieCardSkeleton count={24} />
             </div>
           ) : movies.length > 0 ? (
-            <div className="explore-grid">
-              {movies.map((m) => <MovieCard key={m.id} movie={m} />)}
-            </div>
+            <>
+              <div className="explore-grid">
+                {movies.map((m) => <MovieCard key={`${m.id}-${m.media_type}`} movie={m} />)}
+              </div>
+
+              {loadingMore && (
+                <div className="explore-grid" style={{ marginTop: '24px' }}>
+                  <MovieCardSkeleton count={8} />
+                </div>
+              )}
+
+              <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
+
+              {!hasMore && (
+                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
+                  No more titles to load.
+                </p>
+              )}
+            </>
           ) : !error && (
             <div className="empty-state">
               <div style={{ fontSize: 48, marginBottom: 16 }}>🎬</div>
@@ -273,43 +483,6 @@ export default function Explore() {
                 Reset filters
               </button>
             </div>
-          )}
-
-          {/* Pagination */}
-          {!loading && totalPages > 1 && (
-            <nav className="explore-pagination">
-              <button
-                className="explore-pagination__btn"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >← Prev</button>
-
-              <div className="explore-pagination__pages">
-                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                  const half = 3
-                  let start = Math.max(1, page - half)
-                  let end = Math.min(totalPages, start + 6)
-                  start = Math.max(1, end - 6)
-                  const p = start + i
-                  if (p > end) return null
-                  return (
-                    <button
-                      key={p}
-                      className={`explore-pagination__page${p === page ? ' active' : ''}`}
-                      onClick={() => setPage(p)}
-                    >
-                      {p}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <button
-                className="explore-pagination__btn"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >Next →</button>
-            </nav>
           )}
         </div>
 

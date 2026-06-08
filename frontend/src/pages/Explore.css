@@ -19,19 +19,59 @@
 .explore-sidebar {
   position: sticky;
   top: calc(var(--navbar-h) + var(--space-6));
+  height: calc(100vh - var(--navbar-h) - var(--space-10));
+  max-height: calc(100vh - var(--navbar-h) - var(--space-10));
+  min-height: 0;
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.explore-sidebar__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll; /* Temporary forced scroll state to validate layout */
+  padding: 0 var(--space-6) var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+/* Custom premium scrollbar for sidebar, visible on hover */
+.explore-sidebar__content::-webkit-scrollbar {
+  width: 6px;
+  background: rgba(0, 0, 0, 0.01); /* Keep layout space but virtually invisible */
+}
+.explore-sidebar__content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.01); /* Near-transparent so layout registers and renders */
+  border-radius: 6px;
+}
+.explore-sidebar__content:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15); /* Subtly visible on hover */
+}
+.explore-sidebar__content:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--accent); /* Fully visible/active on direct interaction */
+}
+
+/* Firefox-only custom scrollbar */
+@supports (-moz-appearance: none) {
+  .explore-sidebar__content {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.01) transparent;
+  }
+  .explore-sidebar__content:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
 }
 
 .explore-sidebar__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: var(--space-6) var(--space-6) var(--space-4);
 }
 
 .explore-sidebar__title {

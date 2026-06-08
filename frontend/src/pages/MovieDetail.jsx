@@ -12,11 +12,13 @@ import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import { movieService } from '../services/movieService'
 import { watchService } from '../services/watchService'
+import { ratingService } from '../services/ratingService'
 import { useAuth } from '../context/AuthContext'
 import MovieCard from '../components/MovieCard'
 import RatingMeter from '../components/RatingMeter'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import CastCrew from '../components/CastCrew'
+import ProductionTags from '../components/ProductionTags'
 import './MovieDetail.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -36,6 +38,23 @@ export default function MovieDetail() {
   const [watchBusy,     setWatchBusy]     = useState(false)
   const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
+  const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
+
+  const handleRequestRating = async () => {
+    if (!movie || reqNeededState.loading || reqNeededState.success) return
+    setReqNeededState({ loading: true, success: false })
+    try {
+      await ratingService.requestRatingNeeded(
+        movieId,
+        movie.title,
+        'movie',
+        movie.release_year
+      )
+      setReqNeededState({ loading: false, success: true })
+    } catch (err) {
+      setReqNeededState({ loading: false, success: false })
+    }
+  }
 
   // ── Fetch movie detail ───────────────────────────────
   useEffect(() => {
@@ -286,13 +305,32 @@ export default function MovieDetail() {
             <RatingMeter
               movieId={movieId}
               onRated={fetchStatus}
+              userRating={watchStatus.user_rating}
+              {...(movie.moctale_rating || {})}
             />
+            {!movie.moctale_rating && (
+              <div className="rating-needed-box">
+                <p className="rating-needed-box__msg">Want to know rating?</p>
+                <button
+                  className={`rating-needed-box__btn ${reqNeededState.success ? 'rating-needed-box__btn--success' : ''}`}
+                  onClick={handleRequestRating}
+                  disabled={reqNeededState.loading || reqNeededState.success}
+                >
+                  {reqNeededState.success ? '✓ Requested' : reqNeededState.loading ? 'Requesting...' : 'Request Rating'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ── Cast & Crew ── */}
         <CastCrew movieId={movieId} />
 
+        {/* ── Production Companies & Countries ── */}
+        <ProductionTags
+          productionCompanies={movie.production_companies || []}
+          productionCountries={movie.production_countries || []}
+        />
         {/* ── Similar Movies ── */}
         <section className="movie-detail__similar">
           <div className="section-header">

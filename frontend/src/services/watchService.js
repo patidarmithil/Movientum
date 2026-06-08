@@ -21,7 +21,7 @@ export const watchService = {
   /**
    * GET /api/v1/watch/history — paginated watch history
    */
-  getHistory: (page = 1, limit = 20) =>
+  getHistory: (page = 1, limit = 1500) =>
     api.get('/api/v1/watch/history', { params: { page, limit } }).then((r) => r.data),
 
   /**
@@ -39,7 +39,7 @@ export const watchService = {
   /**
    * GET /api/v1/watch/watchlist — get watchlist
    */
-  getWatchlist: (page = 1, limit = 20) =>
+  getWatchlist: (page = 1, limit = 1500) =>
     api.get('/api/v1/watch/watchlist', { params: { page, limit } }).then((r) => r.data),
 
   /**

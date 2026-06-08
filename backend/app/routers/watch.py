@@ -115,7 +115,7 @@ async def remove_from_watch_history(
 )
 async def get_watch_history(
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(1500, ge=1, le=1500),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
@@ -187,7 +187,7 @@ async def remove_from_watchlist(
 )
 async def get_watchlist(
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(1500, ge=1, le=1500),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:

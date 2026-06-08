@@ -170,7 +170,8 @@ class TMDBService:
             "with_genres": genres,
             "language": "en-US",
             "sort_by": "popularity.desc",
-            "page": page
+            "page": page,
+            "include_adult": "false",
         })
 
     async def discover_tv(self, genres: str, page: int = 1) -> Optional[dict]:
@@ -181,7 +182,8 @@ class TMDBService:
             "with_genres": genres,
             "language": "en-US",
             "sort_by": "popularity.desc",
-            "page": page
+            "page": page,
+            "include_adult": "false",
         })
 
     async def fetch_top_rated_movies(self, page: int = 1) -> Optional[dict]:

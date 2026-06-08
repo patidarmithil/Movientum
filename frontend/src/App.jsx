@@ -26,6 +26,8 @@ import Explore from './pages/Explore'
 import Analysis from './pages/Analysis'
 import TVDetail from './pages/TVDetail'
 import News from './pages/News'
+import CompanyPage from './pages/CompanyPage'
+import CountryPage from './pages/CountryPage'
 import './index.css'
 import './components/Navbar.css'
 
@@ -87,6 +89,9 @@ function AppRoutes() {
         {/* News */}
         <Route path="/news" element={<News />} />
 
+        {/* Production company & country browse */}
+        <Route path="/company/:id"    element={<CompanyPage />} />
+        <Route path="/country/:iso"   element={<CountryPage />} />
         {/* 404 fallback */}
         <Route
           path="*"

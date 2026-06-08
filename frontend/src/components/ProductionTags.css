@@ -1,0 +1,116 @@
+/* ProductionTags.css */
+
+/* ── Section wrapper ── */
+.prod-tags {
+  padding-top: var(--space-10);
+  padding-bottom: var(--space-6);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* ── Block (companies / countries) ── */
+.prod-tags__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.prod-tags__heading {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+/* ── Tag row ── */
+.prod-tags__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* ── Individual pill tag ── */
+.prod-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-family: var(--font-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 120ms ease,
+    color 150ms ease;
+  white-space: nowrap;
+}
+
+.prod-tag:hover {
+  border-color: var(--accent);
+  background: var(--accent-hover);
+  color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+.prod-tag:active {
+  transform: translateY(0);
+}
+
+/* ── Company logo inside tag ── */
+.prod-tag__logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+  /* invert white logos for dark bg */
+  filter: brightness(0) invert(1);
+  opacity: 0.75;
+  transition: opacity 150ms ease;
+}
+
+.prod-tag:hover .prod-tag__logo {
+  opacity: 1;
+  filter: brightness(0) invert(1) sepia(1) hue-rotate(220deg) saturate(5);
+}
+
+/* ── Country flag emoji ── */
+.prod-tag__flag {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ── Name text ── */
+.prod-tag__name {
+  line-height: 1;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .prod-tags {
+    padding-top: var(--space-8);
+    gap: var(--space-6);
+  }
+
+  .prod-tags__heading {
+    font-size: var(--text-lg);
+  }
+
+  .prod-tag {
+    padding: 7px 14px;
+    font-size: var(--text-xs);
+  }
+}

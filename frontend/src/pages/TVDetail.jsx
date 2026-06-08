@@ -14,11 +14,13 @@ import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import api from '../utils/api'
 import { watchService } from '../services/watchService'
+import { ratingService } from '../services/ratingService'
 import { useAuth } from '../context/AuthContext'
 import CastCrew from '../components/CastCrew'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RatingMeter from '../components/RatingMeter'
+import ProductionTags from '../components/ProductionTags'
 import './MovieDetail.css'   // reuse same layout CSS
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -39,6 +41,23 @@ export default function TVDetail() {
   const [watchBusy,     setWatchBusy]     = useState(false)
   const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
+  const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
+
+  const handleRequestRating = async () => {
+    if (!show || reqNeededState.loading || reqNeededState.success) return
+    setReqNeededState({ loading: true, success: false })
+    try {
+      await ratingService.requestRatingNeeded(
+        tvId,
+        show.title,
+        'show',
+        show.release_year
+      )
+      setReqNeededState({ loading: false, success: true })
+    } catch (err) {
+      setReqNeededState({ loading: false, success: false })
+    }
+  }
 
   // ── Fetch TV detail ──────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +168,8 @@ export default function TVDetail() {
   const genres     = show.genres || []
   const createdBy  = show.created_by || []
   const networks   = show.networks || []
+  const productionCompanies = show.production_companies || []
+  const productionCountries = show.production_countries || []
 
   return (
     <main className="movie-detail page-content">
@@ -299,13 +320,32 @@ export default function TVDetail() {
             <RatingMeter
               movieId={tvId}
               onRated={fetchStatus}
+              userRating={watchStatus.user_rating}
+              {...(show.moctale_rating || {})}
             />
+            {!show.moctale_rating && (
+              <div className="rating-needed-box">
+                <p className="rating-needed-box__msg">Want to know rating?</p>
+                <button
+                  className={`rating-needed-box__btn ${reqNeededState.success ? 'rating-needed-box__btn--success' : ''}`}
+                  onClick={handleRequestRating}
+                  disabled={reqNeededState.loading || reqNeededState.success}
+                >
+                  {reqNeededState.success ? '✓ Requested' : reqNeededState.loading ? 'Requesting...' : 'Request Rating'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ── Cast & Crew (reuse CastCrew with tvId flag) ── */}
         <CastCrew movieId={tvId} isTV />
 
+        {/* ── Production Companies & Countries ── */}
+        <ProductionTags
+          productionCompanies={productionCompanies}
+          productionCountries={productionCountries}
+        />
         {/* ── Similar Items ── */}
         <section className="movie-detail__similar">
           <div className="section-header">

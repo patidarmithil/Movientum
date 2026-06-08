@@ -287,9 +287,10 @@ async def get_watch_status(
     movie_id: int,
 ) -> dict:
     """
-    Return {watched: bool, watchlisted: bool} for a single movie+user pair.
-    Single round-trip via two scalar subqueries.
+    Return {watched: bool, watchlisted: bool, user_rating: str|None} for a single movie+user pair.
     """
+    from app.db.orm_models import Rating
+    
     watched_stmt = select(func.count(WatchHistory.id)).where(
         WatchHistory.user_id == user_id,
         WatchHistory.movie_id == movie_id,
@@ -298,10 +299,16 @@ async def get_watch_status(
         Watchlist.user_id == user_id,
         Watchlist.movie_id == movie_id,
     )
+    rating_stmt = select(Rating.category).where(
+        Rating.user_id == user_id,
+        Rating.movie_id == movie_id,
+    )
     watched_count = (await db.execute(watched_stmt)).scalar_one()
     watchlisted_count = (await db.execute(watchlisted_stmt)).scalar_one()
+    user_rating = (await db.execute(rating_stmt)).scalar_one_or_none()
 
     return {
         "watched": watched_count > 0,
         "watchlisted": watchlisted_count > 0,
+        "user_rating": user_rating,
     }

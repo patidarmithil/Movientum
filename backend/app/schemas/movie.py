@@ -48,6 +48,9 @@ class MovieDetail(MovieListItem):
     directors: List[str] = []
     vote_count: Optional[int] = None
     original_language: Optional[str] = None
+    moctale_rating: Optional[dict] = None
+    production_companies: List[dict] = []
+    production_countries: List[dict] = []
 
 
 class MovieListResponse(BaseModel):
