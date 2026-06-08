@@ -1,11 +1,11 @@
 /**
- * Search.jsx — Search results page (Phase 3.5B)
+ * Search.jsx — Search results page with Infinite Scroll
  *
- * Reads ?q= from URL → GET /api/v1/search?q=...&page=N
+ * Reads ?q= and ?genre= from URL → GET /api/v1/search?q=...&page=N
  * Shows: MovieCard grid | loading skeletons | empty state | error state
- * Pagination: prev/next
+ * Infinite Scrolling uses IntersectionObserver.
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { searchService } from '../services/searchService'
 import MovieCard from '../components/MovieCard'
@@ -18,18 +18,42 @@ export default function Search() {
 
   const query = searchParams.get('q') ?? ''
   const genre = searchParams.get('genre') ?? ''
-  const page  = parseInt(searchParams.get('page') ?? '1', 10)
 
-  const [results, setResults]       = useState([])
-  const [total, setTotal]           = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [isLoading, setIsLoading]   = useState(false)
-  const [error, setError]           = useState(null)
+  const [results, setResults] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [error, setError] = useState(null)
 
-  const doFetch = useCallback(async (q, g, p) => {
-    if (!q.trim() && !g.trim()) return
+  const observerRef = useRef(null)
+
+  // Reset state when query or genre changes
+  useEffect(() => {
+    setResults([])
+    setPage(1)
+    setTotal(0)
+    setHasMore(true)
     setIsLoading(true)
     setError(null)
+  }, [query, genre])
+
+  const doFetch = useCallback(async (q, g, p) => {
+    if (!q.trim() && !g.trim()) {
+      setIsLoading(false)
+      setLoadingMore(false)
+      return
+    }
+
+    const isFirstPage = p === 1
+    if (isFirstPage) {
+      setIsLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
+    setError(null)
+
     try {
       let data
       if (g.trim() && !q.trim()) {
@@ -37,37 +61,73 @@ export default function Search() {
       } else {
         data = await searchService.search(q, p)
       }
-      setResults(data.results ?? [])
-      setTotal(data.total ?? 0)
-      setTotalPages(data.pages ?? 1)
+
+      const newResults = data?.results ?? []
+      const totalCount = data?.total ?? 0
+      setTotal(totalCount)
+
+      if (isFirstPage) {
+        setResults(newResults)
+      } else {
+        setResults((prev) => {
+          const existingIds = new Set(prev.map(m => `${m.id}-${m.media_type}`))
+          const uniqueNew = newResults.filter(m => !existingIds.has(`${m.id}-${m.media_type}`))
+          return [...prev, ...uniqueNew]
+        })
+      }
+
+      // If we received less results than the default limit (20), we reached the end
+      if (newResults.length < 20) {
+        setHasMore(false)
+      } else {
+        setHasMore(true)
+      }
     } catch (err) {
       setError(err?.response?.data?.detail ?? 'Search failed. Try again.')
-      setResults([])
+      if (isFirstPage) setResults([])
     } finally {
       setIsLoading(false)
+      setLoadingMore(false)
     }
   }, [])
 
   useEffect(() => {
     if (query.trim() || genre.trim()) {
       doFetch(query, genre, page)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
       setResults([])
       setTotal(0)
-      setTotalPages(1)
+      setHasMore(false)
+      setIsLoading(false)
     }
   }, [query, genre, page, doFetch])
 
-  const goPage = (p) => {
-    const params = {}
-    if (query) params.q = query
-    if (genre) params.genre = genre
-    params.page = String(p)
-    setSearchParams(params)
-  }
+  // Infinite scroll trigger
+  useEffect(() => {
+    if (isLoading || loadingMore || !hasMore) return
 
-  // ── Empty (no q and no genre) ────────────────────────────
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setPage((prev) => prev + 1)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTrigger = observerRef.current
+    if (currentTrigger) {
+      observer.observe(currentTrigger)
+    }
+
+    return () => {
+      if (currentTrigger) {
+        observer.unobserve(currentTrigger)
+      }
+    }
+  }, [isLoading, loadingMore, hasMore])
+
+  // Empty (no q and no genre)
   if (!query.trim() && !genre.trim()) {
     return (
       <main className="search-page page-content">
@@ -92,11 +152,9 @@ export default function Search() {
             ? <>Movies — <span className="search-page__query">{genre}</span></>
             : <>Results for <span className="search-page__query">"{query}"</span></>}
         </h1>
-        {!isLoading && !error && (
+        {total > 0 && (
           <p className="search-page__count">
-            {total > 0
-              ? `${total.toLocaleString()} movie${total !== 1 ? 's' : ''} found`
-              : ''}
+            {total.toLocaleString()} movie{total !== 1 ? 's' : ''} found
           </p>
         )}
       </div>
@@ -109,7 +167,7 @@ export default function Search() {
             <p>{error}</p>
             <button
               className="search-retry-btn"
-              onClick={() => fetch(query, page)}
+              onClick={() => doFetch(query, genre, 1)}
             >
               Try again
             </button>
@@ -128,67 +186,32 @@ export default function Search() {
           <>
             <div className="movie-grid">
               {results.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} />
+                <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} />
               ))}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <nav className="search-pagination" aria-label="Search pagination">
-                <button
-                  className="search-pagination__btn"
-                  id="search-prev-btn"
-                  disabled={page <= 1}
-                  onClick={() => goPage(page - 1)}
-                  aria-label="Previous page"
-                >
-                  ← Prev
-                </button>
+            {loadingMore && (
+              <div className="movie-grid" style={{ marginTop: '24px' }}>
+                <MovieCardSkeleton count={8} />
+              </div>
+            )}
 
-                <div className="search-pagination__pages">
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    // Show pages around current
-                    const half = 3
-                    let start = Math.max(1, page - half)
-                    let end   = Math.min(totalPages, start + 6)
-                    start = Math.max(1, end - 6)
-                    const p = start + i
-                    if (p > end) return null
-                    return (
-                      <button
-                        key={p}
-                        className={`search-pagination__page${p === page ? ' search-pagination__page--active' : ''}`}
-                        id={`search-page-${p}`}
-                        onClick={() => goPage(p)}
-                        aria-label={`Page ${p}`}
-                        aria-current={p === page ? 'page' : undefined}
-                      >
-                        {p}
-                      </button>
-                    )
-                  })}
-                </div>
+            <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
 
-                <button
-                  className="search-pagination__btn"
-                  id="search-next-btn"
-                  disabled={page >= totalPages}
-                  onClick={() => goPage(page + 1)}
-                  aria-label="Next page"
-                >
-                  Next →
-                </button>
-              </nav>
+            {!hasMore && (
+              <p className="search-page__end-msg" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
+                No more results to load.
+              </p>
             )}
           </>
         )}
 
         {/* Empty results */}
-        {!isLoading && !error && results.length === 0 && query.trim() && (
+        {!isLoading && !error && results.length === 0 && (query.trim() || genre.trim()) && (
           <div className="empty-state">
             <div className="search-empty-icon">🔍</div>
-            <h3>No results for "{query}"</h3>
-            <p>Try a different title or check your spelling.</p>
+            <h3>No results found</h3>
+            <p>Try a different title or check your filters.</p>
             <button
               className="search-home-btn"
               id="search-go-home"

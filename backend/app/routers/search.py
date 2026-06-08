@@ -298,39 +298,87 @@ async def search_movies(
     if not query_str and not genre_str:
         raise HTTPException(status_code=400, detail="Provide q or genre parameter")
 
-    # ── Genre-only path (unchanged) ──────────────────────────────
+    # ── Genre-only path ──────────────────────────────────────────
     if genre_str and not query_str:
         cache_key = key_search(f"genre:{genre_str}:page={page}:limit={limit}")
         cached = await get_cached(cache_key)
         if cached:
             return {"data": cached}
 
-        offset = (page - 1) * limit
-        count_stmt = (
-            select(func.count())
-            .select_from(Movie)
-            .join(Movie.genres)
-            .join(MovieGenre.genre)
-            .where(func.lower(Genre.name) == genre_str.lower())
-        )
-        total = (await db.execute(count_stmt)).scalar_one()
-
-        stmt = (
-            select(Movie)
-            .options(selectinload(Movie.genres).selectinload(MovieGenre.genre))
-            .join(Movie.genres)
-            .join(MovieGenre.genre)
-            .where(func.lower(Genre.name) == genre_str.lower())
-            .order_by(Movie.popularity.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        # Query database to map genre name to TMDB ID
+        stmt = select(Genre.id).where(func.lower(Genre.name) == genre_str.lower())
         result = await db.execute(stmt)
-        movies = result.scalars().unique().all()
+        genre_id = result.scalar_one_or_none()
+
+        # Hardcoded fallback map just in case
+        GENRE_NAME_TO_ID = {
+            "action": 28, "adventure": 12, "animation": 16, "comedy": 35, "crime": 80,
+            "documentary": 99, "drama": 18, "family": 10751, "fantasy": 14, "history": 36,
+            "horror": 27, "music": 10402, "mystery": 9648, "romance": 10749, "science fiction": 878,
+            "tv movie": 10770, "thriller": 53, "war": 10752, "western": 37, "action & adventure": 10759,
+            "kids": 10762, "news": 10763, "reality": 10764, "sci-fi & fantasy": 10765, "soap": 10766,
+            "talk": 10767, "war & politics": 10768
+        }
+        if not genre_id:
+            genre_id = GENRE_NAME_TO_ID.get(genre_str.lower())
+
+        if not genre_id:
+            raise HTTPException(status_code=404, detail=f"Genre '{genre_str}' not found")
+
+        from app.services.tmdb_service import tmdb_service as _tmdb
+        responses = await asyncio.gather(
+            _tmdb._get("/discover/movie", params={
+                "with_genres": str(genre_id),
+                "language": "en-US",
+                "sort_by": "popularity.desc",
+                "page": page,
+                "include_adult": "false",
+            }),
+            _tmdb._get("/discover/tv", params={
+                "with_genres": str(genre_id),
+                "language": "en-US",
+                "sort_by": "popularity.desc",
+                "page": page,
+                "include_adult": "false",
+            }),
+            return_exceptions=True
+        )
+
+        master_list = []
+        for i, resp in enumerate(responses):
+            if isinstance(resp, dict) and "results" in resp:
+                for item in resp["results"]:
+                    if "media_type" not in item:
+                        item["media_type"] = "movie" if i == 0 else "tv"
+                    if not item.get("poster_path") or item.get("adult"):
+                        continue
+                    master_list.append(item)
+
+        seen = set()
+        deduped = []
+        for item in master_list:
+            key = f"{item['id']}_{item.get('media_type', 'movie')}"
+            if key not in seen:
+                seen.add(key)
+                deduped.append(item)
+
+        deduped.sort(key=lambda x: (x.get("popularity", 0.0)), reverse=True)
+        formatted = [_tmdb_to_search_result(item) for item in deduped]
+
+        total_results = sum(
+            resp.get("total_results", 0)
+            for resp in responses
+            if isinstance(resp, dict) and "total_results" in resp
+        )
+        if not total_results:
+            total_results = len(formatted)
+
+        # Slice to limit
+        results = formatted[:limit]
 
         data = {
-            "results": [_movie_to_search_result(m) for m in movies],
-            "total": total,
+            "results": results,
+            "total": total_results,
             "page": page,
             "limit": limit,
             "query": genre_str,

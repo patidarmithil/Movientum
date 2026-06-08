@@ -122,9 +122,21 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
     stmt = select(Movie).where(Movie.id == tv_id, Movie.type == 'tv')
     result = await db.execute(stmt)
     tv_db = result.scalar_one_or_none()
-    if tv_db:
-        # Construct basic data if we only have DB
-        pass # Optional DB fallback formatting can go here, but for now we prioritize TMDB
+
+    from app.db.orm_models import TvRating
+    stmt_moctale = select(TvRating).where(TvRating.id == tv_id)
+    result_moctale = await db.execute(stmt_moctale)
+    moctale_rating = result_moctale.scalar_one_or_none()
+    moctale_data = None
+    if moctale_rating:
+        moctale_data = {
+            "score": moctale_rating.score,
+            "total_votes": moctale_rating.total_votes,
+            "perfection": moctale_rating.perfection,
+            "go_for_it": moctale_rating.go_for_it,
+            "timepass": moctale_rating.timepass,
+            "skip": moctale_rating.skip,
+        }
 
     # Release DB connection before slow TMDB calls
     await db.close()
@@ -152,6 +164,7 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
                 "vote_count": tv_db.vote_count,
                 "popularity": tv_db.popularity,
                 "original_language": tv_db.original_language,
+                "moctale_rating": moctale_data,
             }
             await set_cached(cache_key, data, 600)
             return data
@@ -160,6 +173,16 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
     genres = [g["name"] for g in raw.get("genres", [])]
     created_by = [p["name"] for p in raw.get("created_by", [])]
     networks = [n["name"] for n in raw.get("networks", [])]
+    production_companies = [
+        {"id": c["id"], "name": c["name"], "logo_path": c.get("logo_path")}
+        for c in raw.get("production_companies", [])
+        if c.get("name")
+    ]
+    production_countries = [
+        {"iso_3166_1": c.get("iso_3166_1", ""), "name": c["name"]}
+        for c in raw.get("production_countries", [])
+        if c.get("name")
+    ]
 
     data = {
         "id":               raw["id"],
@@ -185,6 +208,9 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
         "genres":           genres,
         "created_by":       created_by,
         "networks":         networks,
+        "production_companies": production_companies,
+        "production_countries": production_countries,
+        "moctale_rating":   moctale_data,
     }
 
     pop = float(raw.get("popularity", 0.0) or 0.0)

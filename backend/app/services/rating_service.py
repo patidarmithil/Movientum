@@ -20,7 +20,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.orm_models import Rating, Movie, MovieGenre
+from app.db.orm_models import Rating, Movie, MovieGenre, MovieRating, TvRating
 from app.schemas.rating import RatingCategory
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,63 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
         await db.rollback()
         logger.error(f"Failed to insert stub for {media_type} {title_id}: {e}")
 
+async def _update_moctale_rating(db: AsyncSession, movie_id: int, old_cat: Optional[str], new_cat: Optional[str]):
+    if old_cat == new_cat:
+        return
+
+    # Check if the content is a TV show or Movie
+    stmt_item = select(Movie).where(Movie.id == movie_id)
+    item = (await db.execute(stmt_item)).scalar_one_or_none()
+    is_tv = item and item.type == 'tv'
+
+    RatingModel = TvRating if is_tv else MovieRating
+
+    stmt = select(RatingModel).where(RatingModel.id == movie_id)
+    moctale = (await db.execute(stmt)).scalar_one_or_none()
+
+    if not moctale:
+        if new_cat:
+            moctale = RatingModel(
+                id=movie_id,
+                slug=f"{'tv' if is_tv else 'movie'}-{movie_id}",
+                total_votes=1,
+                perfection=100.0 if new_cat == "perfection" else 0.0,
+                go_for_it=100.0 if new_cat == "go_for_it" else 0.0,
+                timepass=100.0 if new_cat == "timepass" else 0.0,
+                skip=100.0 if new_cat == "skip" else 0.0,
+                score=0,
+            )
+            db.add(moctale)
+        return
+    
+    total = moctale.total_votes or 0
+    votes = {
+        "perfection": round((moctale.perfection or 0) / 100.0 * total),
+        "go_for_it": round((moctale.go_for_it or 0) / 100.0 * total),
+        "timepass": round((moctale.timepass or 0) / 100.0 * total),
+        "skip": round((moctale.skip or 0) / 100.0 * total),
+    }
+
+    if old_cat and old_cat in votes:
+        votes[old_cat] = max(0, votes[old_cat] - 1)
+        total = max(0, total - 1)
+        
+    if new_cat and new_cat in votes:
+        votes[new_cat] += 1
+        total += 1
+
+    moctale.total_votes = total
+    if total > 0:
+        moctale.perfection = (votes["perfection"] / total) * 100
+        moctale.go_for_it = (votes["go_for_it"] / total) * 100
+        moctale.timepass = (votes["timepass"] / total) * 100
+        moctale.skip = (votes["skip"] / total) * 100
+    else:
+        moctale.perfection = 0.0
+        moctale.go_for_it = 0.0
+        moctale.timepass = 0.0
+        moctale.skip = 0.0
+
 
 async def upsert_rating(
     db: AsyncSession,
@@ -101,6 +158,10 @@ async def upsert_rating(
     Returns the updated/created Rating ORM object.
     """
     await _ensure_stub_exists(db, movie_id)
+    
+    stmt_check = select(Rating.category).where(Rating.user_id == user_id, Rating.movie_id == movie_id)
+    old_cat = (await db.execute(stmt_check)).scalar_one_or_none()
+
     stmt = (
         pg_insert(Rating)
         .values(
@@ -119,6 +180,18 @@ async def upsert_rating(
     )
     result = await db.execute(stmt)
     row = result.scalar_one()
+
+    await _update_moctale_rating(db, movie_id, old_cat, category.value)
+
+    # Automatically mark as watched if not already
+    from app.db.orm_models import WatchHistory
+    stmt_check_watched = select(WatchHistory.id).where(WatchHistory.user_id == user_id, WatchHistory.movie_id == movie_id)
+    is_watched = (await db.execute(stmt_check_watched)).scalar_one_or_none()
+    
+    if not is_watched:
+        from app.services import watch_service
+        await watch_service.mark_watched(db, user_id=user_id, movie_id=movie_id)
+
     logger.info(
         "RATING_SUBMITTED",
         extra={"user_id": str(user_id), "movie_id": movie_id, "category": category.value},
@@ -203,6 +276,8 @@ async def delete_rating(
             detail="Cannot delete another user's rating",
         )
     await db.delete(rating)
+    await _update_moctale_rating(db, movie_id, rating.category, None)
+    
     logger.info(
         "RATING_DELETED",
         extra={"rating_id": str(rating_id), "user_id": str(user_id)},

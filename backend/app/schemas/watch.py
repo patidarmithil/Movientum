@@ -69,3 +69,4 @@ class WatchStatusResponse(BaseModel):
     movie_id: int
     watched: bool
     watchlisted: bool
+    user_rating: Optional[str] = None

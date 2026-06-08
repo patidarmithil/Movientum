@@ -14,6 +14,7 @@ Cache:
 """
 import logging
 from uuid import UUID
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,7 @@ from app.schemas.rating import (
     RatingResponse,
     RatingUpdateRequest,
     UserRatingsResponse,
+    RatingNeededRequest,
 )
 from app.services import rating_service
 from app.utils.deps import get_current_user
@@ -105,7 +107,7 @@ async def submit_rating(
 )
 async def get_my_ratings(
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(1500, ge=1, le=1500),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
@@ -214,3 +216,43 @@ async def delete_rating(
     deleted = await rating_service.delete_rating(db, rating_id, user_id)
     if deleted:
         await _invalidate_caches(movie_id, str(user_id))
+
+
+# ── POST /ratings/needed ─────────────────────────────────────────
+
+from app.db.orm_models import RatingNeeded
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+@router.post(
+    "/needed",
+    status_code=status.HTTP_201_CREATED,
+    summary="Record content that needs ratings",
+)
+async def request_rating_needed(
+    body: RatingNeededRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Creates a row in rating_needed table for content missing Moctale ratings.
+    """
+    stmt = (
+        pg_insert(RatingNeeded)
+        .values(
+            id=body.id,
+            title=body.title,
+            content=body.content,
+            year=body.year,
+        )
+        .on_conflict_do_update(
+            index_elements=["id"],
+            set_={
+                "title": body.title,
+                "content": body.content,
+                "year": body.year,
+                "fetched_at": datetime.now(timezone.utc)
+            }
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return {"status": "success", "message": "Rating request recorded successfully."}

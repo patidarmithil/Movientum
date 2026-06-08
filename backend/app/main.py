@@ -69,6 +69,25 @@ async def lifespan(app: FastAPI):
 
     if db_ok:
         logger.info("✓ Supabase PostgreSQL connected")
+        # Create rating_needed table if it doesn't exist
+        try:
+            from sqlalchemy import text
+            from app.db.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as db:
+                await db.execute(text("""
+                CREATE TABLE IF NOT EXISTS rating_needed (
+                    id INT PRIMARY KEY,
+                    title TEXT,
+                    content TEXT,
+                    year INT,
+                    fetched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                """))
+                await db.commit()
+            logger.info("✓ Checked/Created table rating_needed")
+        except Exception as e:
+            logger.error(f"Failed to check/create table rating_needed: {e}")
+
         import asyncio
         asyncio.create_task(cleanup_old_movies())
     else:

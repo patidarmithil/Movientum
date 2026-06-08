@@ -282,3 +282,62 @@ class ClickHistory(Base):
 
     def __repr__(self):
         return f"<ClickHistory user={self.user_id} item={self.item_id} type={self.media_type}>"
+
+
+class MovieRating(Base):
+    """Imported ratings from moctale_scrapper for meter display."""
+    __tablename__ = "movie_ratings"
+
+    id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    slug = Column(Text, nullable=False)
+    title = Column(Text, nullable=True)
+    year = Column(Integer, nullable=True)
+    score = Column(Integer, nullable=True)
+    total_votes = Column(Integer, nullable=True)
+    perfection = Column(Float, nullable=True)
+    go_for_it = Column(Float, nullable=True)
+    timepass = Column(Float, nullable=True)
+    skip = Column(Float, nullable=True)
+    fetched_at = Column(DateTime(timezone=True), nullable=True)
+
+    movie = relationship("Movie", backref="movie_rating", uselist=False)
+
+    def __repr__(self):
+        return f"<MovieRating id={self.id} score={self.score}>\n"
+
+
+class TvRating(Base):
+    """Imported TV ratings from moctale_scrapper for meter display."""
+    __tablename__ = "tv_ratings"
+
+    id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    slug = Column(Text, nullable=False)
+    title = Column(Text, nullable=True)
+    year = Column(Integer, nullable=True)
+    score = Column(Integer, nullable=True)
+    total_votes = Column(Integer, nullable=True)
+    perfection = Column(Float, nullable=True)
+    go_for_it = Column(Float, nullable=True)
+    timepass = Column(Float, nullable=True)
+    skip = Column(Float, nullable=True)
+    fetched_at = Column(DateTime(timezone=True), nullable=True)
+
+    movie = relationship("Movie", backref="tv_rating", uselist=False)
+
+    def __repr__(self):
+        return f"<TvRating id={self.id} score={self.score}>\n"
+
+
+class RatingNeeded(Base):
+    """Table to record movies/shows that users want ratings for."""
+    __tablename__ = "rating_needed"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(Text, nullable=True)
+    content = Column(Text, nullable=True)  # show/movie
+    year = Column(Integer, nullable=True)
+    fetched_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    def __repr__(self):
+        return f"<RatingNeeded id={self.id} title={self.title} content={self.content}>"
+

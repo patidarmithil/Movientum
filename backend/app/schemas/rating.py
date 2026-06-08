@@ -59,3 +59,10 @@ class UserRatingsResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class RatingNeededRequest(BaseModel):
+    id: int = Field(..., gt=0)
+    title: str
+    content: str  # "movie" or "show"
+    year: Optional[int] = None
