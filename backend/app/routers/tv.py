@@ -273,21 +273,36 @@ async def get_tv_credits(tv_id: int):
     crew = []
     
     # Inject 'created_by' from TV details into crew
-    tv_detail = await tmdb.fetch_tv_detail(tv_id)
-    if tv_detail and "created_by" in tv_detail:
-        for creator in tv_detail["created_by"]:
-            if not creator.get("profile_path"):
-                continue
-            key = (creator["id"], "Creator")
-            if key not in seen_crew:
-                seen_crew.add(key)
-                crew.append({
-                    "id": creator["id"],
-                    "name": creator.get("name", ""),
-                    "job": "Creator",
-                    "department": "Production",
-                    "profile_path": _member_img(creator.get("profile_path")),
-                })
+    # Read from cache first to avoid duplicate TMDB round trip
+    from app.db.cache import key_tv_detail
+    tv_detail_cached = await get_cached(key_tv_detail(tv_id))
+    if tv_detail_cached and "created_by" in tv_detail_cached:
+        tv_created_by = tv_detail_cached.get("created_by", [])
+        # cached created_by is a list of names (strings), not dicts
+        # check if it's raw TMDB format (dicts) or already serialized (strings)
+        if tv_created_by and isinstance(tv_created_by[0], dict):
+            raw_creators = tv_created_by
+        else:
+            raw_creators = []  # already serialized as strings, skip creator injection
+    else:
+        # Cache miss — fall back to TMDB (only if not already cached)
+        tv_detail_raw = await tmdb.fetch_tv_detail(tv_id)
+        raw_creators = tv_detail_raw.get("created_by", []) if tv_detail_raw else []
+
+    for creator in raw_creators:
+        if not creator.get("profile_path"):
+            continue
+        key = (creator["id"], "Creator")
+        if key not in seen_crew:
+            seen_crew.add(key)
+            crew.append({
+                "id": creator["id"],
+                "name": creator.get("name", ""),
+                "job": "Creator",
+                "department": "Production",
+                "profile_path": _member_img(creator.get("profile_path")),
+            })
+
 
     for m in raw.get("crew", []):
         job = m.get("job", "")

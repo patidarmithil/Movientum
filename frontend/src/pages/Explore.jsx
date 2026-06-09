@@ -82,6 +82,7 @@ function RangeSlider({ min, max, value, onChange, step = 1, label, format = (v) 
 
 export default function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // ── Filter state ──────────────────────────────────────────
   const [selectedGenres, setSelectedGenres] = useState(
@@ -270,17 +271,32 @@ export default function Explore() {
 
   return (
     <main className="explore-page page-content">
+      {/* Mobile sidebar overlay */}
+      <div 
+        className={`explore-sidebar-backdrop${filtersOpen ? ' explore-sidebar-backdrop--open' : ''}`}
+        onClick={() => setFiltersOpen(false)}
+        aria-hidden="true"
+      />
       <div className="explore-page__inner">
 
         {/* ── Sidebar ── */}
-        <aside className="explore-sidebar">
+        <aside className={`explore-sidebar${filtersOpen ? ' explore-sidebar--open' : ''}`}>
           <div className="explore-sidebar__header">
             <h2 className="explore-sidebar__title">Explore</h2>
-            {hasFilters && (
-              <button className="explore-sidebar__clear" onClick={clearAll}>
-                Clear all
+            <div className="explore-sidebar__header-actions">
+              {hasFilters && (
+                <button className="explore-sidebar__clear" onClick={clearAll}>
+                  Clear all
+                </button>
+              )}
+              <button 
+                className="explore-sidebar__close"
+                onClick={() => setFiltersOpen(false)}
+                aria-label="Close filters"
+              >
+                &times;
               </button>
-            )}
+            </div>
           </div>
 
           <div className="explore-sidebar__content">
@@ -403,6 +419,16 @@ export default function Explore() {
         <div className="explore-main">
           {/* Header bar */}
           <div className="explore-main__header">
+            <button 
+              className="explore-mobile-filter-btn"
+              onClick={() => setFiltersOpen(true)}
+              aria-label="Open filters"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+              <span>Filters</span>
+            </button>
             <p className="explore-main__count">
               {total > 0 && (
                 <>{total.toLocaleString()} movie{total !== 1 ? 's' : ''}</>

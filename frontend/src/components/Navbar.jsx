@@ -13,6 +13,7 @@ export default function Navbar() {
   const { isLoggedIn, isLoading, user, logout } = useAuth()
   const navigate = useNavigate()
   const [dropOpen, setDropOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const dropRef = useRef(null)
 
   // Close dropdown on outside click
@@ -28,6 +29,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     setDropOpen(false)
+    setMobileMenuOpen(false)
     await logout()
     navigate('/')
   }
@@ -42,7 +44,7 @@ export default function Navbar() {
       <div className="navbar__inner">
         
         {/* ── Logo + Brand Name + Beta Symbol ── */}
-        <Link to="/" className="navbar__logo" aria-label="Movientum home">
+        <Link to="/" className="navbar__logo" aria-label="Movientum home" onClick={() => setMobileMenuOpen(false)}>
           <img src="/favicon.svg" alt="Movientum Logo" className="navbar__logo-img" />
           <span className="navbar__logo-text">
             MOVI
@@ -202,18 +204,131 @@ export default function Navbar() {
                 )}
               </div>
             ) : (
-              <>
+              <div className="navbar__auth-desktop-buttons">
                 <Link to="/login" className="btn btn--ghost btn--sm" id="nav-login">
                   Login
                 </Link>
                 <Link to="/register" className="btn btn--primary btn--sm" id="nav-register">
                   Sign Up
                 </Link>
-              </>
+              </div>
             )}
+
+            {/* Mobile Hamburger menu toggle button */}
+            <button 
+              className="navbar__hamburger"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
           </div>
         </div>
 
+      </div>
+
+      {/* ── Mobile sliding menu drawer & backdrop ── */}
+      <div 
+        className={`navbar__mobile-backdrop${mobileMenuOpen ? ' navbar__mobile-backdrop--open' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+        aria-hidden="true"
+      />
+      <div className={`navbar__mobile-drawer${mobileMenuOpen ? ' navbar__mobile-drawer--open' : ''}`} role="dialog" aria-label="Mobile navigation">
+        <div className="navbar__mobile-drawer-header">
+          <Link to="/" className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
+            <img src="/favicon.svg" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
+            <span className="navbar__logo-text" style={{ fontSize: '15px' }}>MOVIENTUM</span>
+          </Link>
+          <button 
+            className="navbar__mobile-drawer-close"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            &times;
+          </button>
+        </div>
+        
+        <div className="navbar__mobile-drawer-divider" />
+        
+        <div className="navbar__mobile-drawer-links">
+          <NavLink 
+            to="/" 
+            className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span>🏠</span> Home
+          </NavLink>
+          <NavLink 
+            to="/explore" 
+            className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span>🧭</span> Explore
+          </NavLink>
+          <NavLink 
+            to="/news" 
+            className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span>📰</span> News
+          </NavLink>
+          
+          {isLoggedIn && (
+            <>
+              <NavLink 
+                to="/dashboard" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>📊</span> Dashboard
+              </NavLink>
+              <NavLink 
+                to="/analysis" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>🔮</span> Analysis
+              </NavLink>
+            </>
+          )}
+        </div>
+
+        <div className="navbar__mobile-drawer-divider" />
+
+        <div className="navbar__mobile-drawer-footer">
+          {isLoggedIn ? (
+            <div className="navbar__mobile-drawer-user-section">
+              <div className="navbar__mobile-drawer-user-info">
+                <div className="navbar__avatar" style={{ cursor: 'default' }}>{initials}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span className="navbar__mobile-drawer-username">{user?.username || 'User'}</span>
+                  <span className="navbar__mobile-drawer-email">{user?.email}</span>
+                </div>
+              </div>
+              <button 
+                className="btn btn--secondary btn--md w-full" 
+                style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}
+                onClick={handleLogout}
+              >
+                Log Out
+              </button>
+            </div>
+          ) : (
+            <div className="navbar__mobile-drawer-auth-buttons">
+              <Link to="/login" className="btn btn--secondary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
+                Login
+              </Link>
+              <Link to="/register" className="btn btn--primary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
+                Sign Up
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   )

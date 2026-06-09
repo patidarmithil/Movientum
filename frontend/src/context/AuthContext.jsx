@@ -4,9 +4,9 @@
  * State: { user, accessToken, isLoggedIn, isLoading }
  * Methods: login(), register(), logout(), refreshToken()
  *
- * On mount: reads localStorage → validates token → restores session.
+ * On mount: reads sessionStorage → validates token → restores session.
  * Token storage keys:
- *   localStorage: 'mv_access_token', 'mv_refresh_token', 'mv_user'
+ *   sessionStorage: 'mv_access_token', 'mv_refresh_token', 'mv_user'
  */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authService } from '../services/authService'
@@ -30,18 +30,18 @@ export function AuthProvider({ children }) {
 
   // ── Persist helpers ─────────────────────────────────────────────
   const persist = useCallback((access, refresh, userData) => {
-    localStorage.setItem(KEYS.access,  access)
-    localStorage.setItem(KEYS.refresh, refresh)
-    localStorage.setItem(KEYS.user,    JSON.stringify(userData))
+    sessionStorage.setItem(KEYS.access,  access)
+    sessionStorage.setItem(KEYS.refresh, refresh)
+    sessionStorage.setItem(KEYS.user,    JSON.stringify(userData))
     setAccessToken(access)
     setUser(userData)
     setIsLoggedIn(true)
   }, [])
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem(KEYS.access)
-    localStorage.removeItem(KEYS.refresh)
-    localStorage.removeItem(KEYS.user)
+    sessionStorage.removeItem(KEYS.access)
+    sessionStorage.removeItem(KEYS.refresh)
+    sessionStorage.removeItem(KEYS.user)
     setAccessToken(null)
     setUser(null)
     setIsLoggedIn(false)
@@ -50,16 +50,16 @@ export function AuthProvider({ children }) {
   // ── Session restore on mount ────────────────────────────────────
   useEffect(() => {
     const restore = async () => {
-      const storedAccess  = localStorage.getItem(KEYS.access)
-      const storedRefresh = localStorage.getItem(KEYS.refresh)
-      const storedUser    = localStorage.getItem(KEYS.user)
+      const storedAccess  = sessionStorage.getItem(KEYS.access)
+      const storedRefresh = sessionStorage.getItem(KEYS.refresh)
+      const storedUser    = sessionStorage.getItem(KEYS.user)
 
       if (!storedAccess || !storedRefresh) {
         setIsLoading(false)
         return
       }
 
-      // Optimistically restore from localStorage
+      // Optimistically restore from sessionStorage
       try {
         const parsedUser = JSON.parse(storedUser)
         setAccessToken(storedAccess)
@@ -69,7 +69,7 @@ export function AuthProvider({ children }) {
         // Validate token with backend
         const freshUser = await authService.getMe()
         setUser(freshUser)
-        localStorage.setItem(KEYS.user, JSON.stringify(freshUser))
+        sessionStorage.setItem(KEYS.user, JSON.stringify(freshUser))
       } catch {
         // Token expired — try refresh
         try {
@@ -107,10 +107,10 @@ export function AuthProvider({ children }) {
     if (refreshingRef.current) return null
     refreshingRef.current = true
     try {
-      const storedRefresh = localStorage.getItem(KEYS.refresh)
+      const storedRefresh = sessionStorage.getItem(KEYS.refresh)
       if (!storedRefresh) throw new Error('No refresh token')
       const data = await authService.refreshToken(storedRefresh)
-      const storedUser = localStorage.getItem(KEYS.user)
+      const storedUser = sessionStorage.getItem(KEYS.user)
       persist(data.access_token, data.refresh_token, data.user ?? JSON.parse(storedUser))
       return data.access_token
     } catch {
