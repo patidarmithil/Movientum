@@ -183,3 +183,22 @@
   }
   .dashboard__tabs::-webkit-scrollbar { display: none; }
 }
+
+@media (max-width: 480px) {
+  .dashboard__hero {
+    flex-direction: column;
+    text-align: center;
+    padding: var(--space-4);
+  }
+  .dashboard__avatar {
+    margin: 0 auto;
+  }
+  .dashboard__hero-info {
+    width: 100%;
+    margin-top: var(--space-2);
+  }
+  .dashboard__stats {
+    flex-direction: row;
+    gap: var(--space-4);
+  }
+}

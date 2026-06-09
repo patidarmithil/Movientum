@@ -19,6 +19,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.cache import invalidate
+from app.db.cache import (
+    get_cached, set_cached,
+    key_user_history, TTL_USER_HISTORY,
+    key_user_watchlist, TTL_USER_WATCHLIST,
+    key_user_prefs,
+)
 from app.db.database import get_db
 from app.schemas.watch import (
     WatchHistoryItem,
@@ -65,10 +71,12 @@ async def mark_watched(
         watch_source=body.watch_source,
         rewatched=body.rewatched,
     )
-    # Invalidate recommendation cache — new watch data changes affinity
+    # Invalidate recommendation + history + prefs cache
     await invalidate(_recs_key(str(user_id)))
     await invalidate(f"movie:detail:{body.movie_id}")
     await invalidate(f"movie:similar:{body.movie_id}:movie")
+    await invalidate(key_user_history(str(user_id)))  # dashboard history cache
+    await invalidate(key_user_prefs(str(user_id)))    # news personalization prefs
     logger.info(
         "WATCH_MARKED",
         extra={"user_id": str(user_id), "movie_id": body.movie_id},
@@ -97,10 +105,12 @@ async def remove_from_watch_history(
 ) -> None:
     user_id = UUID(current_user["sub"])
     await watch_service.remove_from_watch_history(db, user_id=user_id, movie_id=movie_id)
-    # Invalidate recommendations
+    # Invalidate recommendations + history + prefs
     await invalidate(_recs_key(str(user_id)))
     await invalidate(f"movie:detail:{movie_id}")
     await invalidate(f"movie:similar:{movie_id}:movie")
+    await invalidate(key_user_history(str(user_id)))  # dashboard history cache
+    await invalidate(key_user_prefs(str(user_id)))    # news personalization prefs
     logger.info(
         "WATCH_REMOVED",
         extra={"user_id": str(user_id), "movie_id": movie_id},
@@ -120,8 +130,12 @@ async def get_watch_history(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     user_id = UUID(current_user["sub"])
+    cache_key = key_user_history(str(user_id))
+    cached = await get_cached(cache_key)
+    if cached:
+        return cached
     history, total = await watch_service.get_watch_history(db, user_id, page, limit)
-    return {
+    result = {
         "items": [
             {
                 "id": r.id,
@@ -137,6 +151,8 @@ async def get_watch_history(
             for r in history
         ]
     }
+    await set_cached(cache_key, result, TTL_USER_HISTORY)
+    return result
 
 
 # ── POST /watch/watchlist ─────────────────────────────────────────
@@ -155,6 +171,7 @@ async def add_to_watchlist(
     """Idempotent: adding a movie already on watchlist is a no-op."""
     user_id = UUID(current_user["sub"])
     entry = await watch_service.add_to_watchlist(db, user_id=user_id, movie_id=body.movie_id)
+    await invalidate(key_user_watchlist(str(user_id)))  # invalidate watchlist cache
     return WatchlistItem(
         id=entry.id,
         movie_id=entry.movie_id,
@@ -177,6 +194,7 @@ async def remove_from_watchlist(
 ) -> None:
     user_id = UUID(current_user["sub"])
     await watch_service.remove_from_watchlist(db, user_id=user_id, movie_id=movie_id)
+    await invalidate(key_user_watchlist(str(user_id)))  # invalidate watchlist cache
 
 
 # ── GET /watch/watchlist ──────────────────────────────────────────
@@ -192,8 +210,12 @@ async def get_watchlist(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     user_id = UUID(current_user["sub"])
+    cache_key = key_user_watchlist(str(user_id))
+    cached = await get_cached(cache_key)
+    if cached:
+        return cached
     watchlist, total = await watch_service.get_watchlist(db, user_id, page, limit)
-    return {
+    result = {
         "items": [
             {
                 "id": r.id,
@@ -209,6 +231,8 @@ async def get_watchlist(
             for r in watchlist
         ]
     }
+    await set_cached(cache_key, result, TTL_USER_WATCHLIST)
+    return result
 
 
 # ── GET /watch/status/{movie_id} ──────────────────────────────────

@@ -47,11 +47,11 @@ def create_access_token(user_id: str, email: str, role: str, username: str = "")
 
 def create_refresh_token(user_id: str) -> str:
     """
-    Create a 30-day refresh JWT.
+    Create a 60-minute refresh JWT.
     Payload: sub (user_id), user_id, jti, type=refresh.
     """
     jti = str(uuid.uuid4())
-    expire = _utcnow() + timedelta(days=settings.refresh_token_expire_days)
+    expire = _utcnow() + timedelta(minutes=settings.refresh_token_expire_minutes)
     payload = {
         "sub": str(user_id),
         "user_id": str(user_id),

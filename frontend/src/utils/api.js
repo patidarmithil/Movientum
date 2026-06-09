@@ -2,7 +2,7 @@
  * api.js — Axios instance (Phase 3.5A)
  *
  * Phase 3.5A adds:
- *  - Request interceptor: attach Bearer token from localStorage
+ *  - Request interceptor: attach Bearer token from sessionStorage
  *  - Response interceptor: handle 401 → refresh → retry (with infinite-loop guard)
  */
 import axios from 'axios'
@@ -32,7 +32,7 @@ const api = axios.create({
 // ── Request interceptor — attach Bearer token ──────────────────
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(KEYS.access)
+    const token = sessionStorage.getItem(KEYS.access)
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -64,9 +64,9 @@ api.interceptors.response.use(
     // Skip retry for refresh endpoint itself — prevents infinite loop
     if (original?.url?.includes('/auth/refresh')) {
       // Refresh failed → force logout
-      localStorage.removeItem(KEYS.access)
-      localStorage.removeItem(KEYS.refresh)
-      localStorage.removeItem('mv_user')
+      sessionStorage.removeItem(KEYS.access)
+      sessionStorage.removeItem(KEYS.refresh)
+      sessionStorage.removeItem('mv_user')
       window.dispatchEvent(new Event('mv:logout'))
       return Promise.reject(error)
     }
@@ -87,7 +87,7 @@ api.interceptors.response.use(
       original._retry = true
       isRefreshing = true
 
-      const storedRefresh = localStorage.getItem(KEYS.refresh)
+      const storedRefresh = sessionStorage.getItem(KEYS.refresh)
 
       if (!storedRefresh) {
         isRefreshing = false
@@ -103,8 +103,8 @@ api.interceptors.response.use(
           { headers: { Authorization: `Bearer ${storedRefresh}` } }
         )
         const { access_token, refresh_token } = response.data.data
-        localStorage.setItem(KEYS.access,  access_token)
-        localStorage.setItem(KEYS.refresh, refresh_token)
+        sessionStorage.setItem(KEYS.access,  access_token)
+        sessionStorage.setItem(KEYS.refresh, refresh_token)
 
         isRefreshing = false
         processQueue(null, access_token)
@@ -117,9 +117,9 @@ api.interceptors.response.use(
         processQueue(refreshError, null)
 
         // Refresh failed → clear session, redirect to login
-        localStorage.removeItem(KEYS.access)
-        localStorage.removeItem(KEYS.refresh)
-        localStorage.removeItem('mv_user')
+        sessionStorage.removeItem(KEYS.access)
+        sessionStorage.removeItem(KEYS.refresh)
+        sessionStorage.removeItem('mv_user')
         window.dispatchEvent(new Event('mv:logout'))
 
         return Promise.reject(refreshError)

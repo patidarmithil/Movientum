@@ -40,6 +40,13 @@ TTL_USER_RECS = 900            # 15 min
 TTL_TMDB_CONFIG = 86400        # 24 hours
 TTL_NEWS_FEED = 7200           # 2 hours
 TTL_TMDB_CREDITS = 86400       # 24 hours
+# ── New TTL constants (Redis plan improvements) ──────────────────
+TTL_USER_RATINGS = 300         # 5 min — dashboard ratings list
+TTL_USER_WATCHLIST = 300       # 5 min — dashboard watchlist
+TTL_USER_HISTORY = 300         # 5 min — dashboard watch history
+TTL_USER_PREFS = 900           # 15 min — news personalization prefs
+TTL_NEWS_FEED_USER = 300       # 5 min — per-user scored news feed
+TTL_NEWS_FEED_LATEST = 120     # 2 min — unpersonalized latest feed
 
 
 def _make_redis_client() -> Redis:
@@ -180,6 +187,29 @@ def key_movie_credits(movie_id: int) -> str:
 def key_tv_credits(tv_id: int) -> str:
     """Cache key for TV show credits: tmdb:tv:{id}:credits  TTL 86400s."""
     return f"tmdb:tv:{tv_id}:credits"
+
+# ── New key builders (Redis plan improvements) ───────────────────
+
+def key_user_ratings(user_id: str) -> str:
+    return f"user:ratings:{user_id}"
+
+def key_user_watchlist(user_id: str) -> str:
+    return f"user:watchlist:{user_id}"
+
+def key_user_history(user_id: str) -> str:
+    return f"user:history:{user_id}"
+
+def key_user_prefs(user_id: str) -> str:
+    """User genre prefs + watch data for news personalization. TTL 15m."""
+    return f"user:prefs:{user_id}"
+
+def key_news_feed_user(user_id: str, page: int) -> str:
+    """Per-user scored news feed page. TTL 5m."""
+    return f"news:feed:{user_id}:p{page}"
+
+def key_news_feed_latest(page: int) -> str:
+    """Unpersonalized latest news feed page. TTL 2m."""
+    return f"news:feed:latest:p{page}"
 
 # ── Cache Stampede Protection ─────────────────────────────────────
 _inflight_locks: dict[str, asyncio.Event] = {}

@@ -290,7 +290,11 @@ async def explore_movies(
     cache_key = f"explore:{md5(params_key.encode()).hexdigest()[:12]}"
     cached = await get_cached(cache_key)
     if cached:
-        return cached
+        return cached  # all_genres already embedded in payload
+
+    # Fetch all genre names for sidebar (DB query — only on cache MISS)
+    genre_names_stmt = select(Genre.name).order_by(Genre.name)
+    all_genres = (await db.execute(genre_names_stmt)).scalars().all()
 
     # Map genre names to IDs
     genre_ids = []
@@ -402,11 +406,6 @@ async def explore_movies(
     if not total_results:
         total_results = len(formatted)
 
-    # Fetch all genre names for sidebar (remains local DB query)
-    genre_names_stmt = select(Genre.name).order_by(Genre.name)
-    all_genres = (await db.execute(genre_names_stmt)).scalars().all()
-
-    # Slice to limit
     results = formatted[:limit]
 
     data = {
@@ -414,7 +413,7 @@ async def explore_movies(
         "total":      total_results,
         "page":       page,
         "limit":      limit,
-        "all_genres": list(all_genres),
+        "all_genres": list(all_genres),  # embedded in cache — avoids DB query on HIT
     }
     await set_cached(cache_key, data, TTL_EXPLORE)
     return data
@@ -434,15 +433,23 @@ async def explore_by_genre(genre_id: int, db: AsyncSession = Depends(get_db)):
     if cached and cached.get("movies"):
         return cached
 
-    # 1. Concurrent fetching (2 pages each for movie and tv)
-    genre_str = str(genre_id)
-    responses = await asyncio.gather(
-        tmdb.discover_movies(genre_str, page=1),
-        tmdb.discover_movies(genre_str, page=2),
-        tmdb.discover_tv(genre_str, page=1),
-        tmdb.discover_tv(genre_str, page=2),
-        return_exceptions=True
-    )
+    async with inflight_lock(cache_key) as waited:
+        if waited:
+            cached = await get_cached(cache_key)
+            if cached and cached.get("movies"):
+                return cached
+
+        # 1. Concurrent fetching (2 pages each for movie and tv)
+        genre_str = str(genre_id)
+        responses = await asyncio.gather(
+            tmdb.discover_movies(genre_str, page=1),
+            tmdb.discover_movies(genre_str, page=2),
+            tmdb.discover_tv(genre_str, page=1),
+            tmdb.discover_tv(genre_str, page=2),
+            return_exceptions=True
+        )
+
+    # ── rest of explore_by_genre runs inside inflight_lock context ──
 
     master_list = []
 
@@ -503,11 +510,17 @@ async def get_top_rated(db: AsyncSession = Depends(get_db)):
     if cached and cached.get("movies"):
         return cached
 
-    responses = await asyncio.gather(
-        tmdb.fetch_top_rated_movies(page=1),
-        tmdb.fetch_top_rated_tv(page=1),
-        return_exceptions=True
-    )
+    async with inflight_lock(cache_key) as waited:
+        if waited:
+            cached = await get_cached(cache_key)
+            if cached and cached.get("movies"):
+                return cached
+
+        responses = await asyncio.gather(
+            tmdb.fetch_top_rated_movies(page=1),
+            tmdb.fetch_top_rated_tv(page=1),
+            return_exceptions=True
+        )
 
     master_list = []
     for i, resp in enumerate(responses):
@@ -560,11 +573,17 @@ async def get_upcoming(filter: str = Query(default="month", description="week|mo
     if cached and cached.get("movies"):
         return cached
 
-    responses = await asyncio.gather(
-        tmdb.fetch_upcoming(page=1),
-        tmdb.fetch_on_the_air(page=1),
-        return_exceptions=True
-    )
+    async with inflight_lock(cache_key) as waited:
+        if waited:
+            cached = await get_cached(cache_key)
+            if cached and cached.get("movies"):
+                return cached
+
+        responses = await asyncio.gather(
+            tmdb.fetch_upcoming(page=1),
+            tmdb.fetch_on_the_air(page=1),
+            return_exceptions=True
+        )
 
     master_list = []
     for i, resp in enumerate(responses):

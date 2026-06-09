@@ -20,6 +20,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.cache import get_cached, invalidate, set_cached
+from app.db.cache import (
+    key_user_ratings, TTL_USER_RATINGS,
+    key_user_prefs,
+)
 from app.db.database import get_db
 from app.schemas.rating import (
     DistributionResponse,
@@ -53,9 +57,11 @@ async def _invalidate_caches(movie_id: int, user_id: str) -> None:
     await invalidate(_recs_key(user_id))
     await invalidate(f"movie:detail:{movie_id}")
     await invalidate(f"movie:similar:{movie_id}:movie")
+    await invalidate(key_user_ratings(user_id))  # dashboard ratings cache
+    await invalidate(key_user_prefs(user_id))    # news personalization prefs
     logger.info(
         "CACHE_INVALIDATED",
-        extra={"keys": [_dist_key(movie_id), _recs_key(user_id), f"movie:detail:{movie_id}", f"movie:similar:{movie_id}:movie"]},
+        extra={"keys": [_dist_key(movie_id), _recs_key(user_id), f"movie:detail:{movie_id}", f"movie:similar:{movie_id}:movie", key_user_ratings(user_id), key_user_prefs(user_id)]},
     )
 
 
@@ -112,8 +118,12 @@ async def get_my_ratings(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     user_id = UUID(current_user["sub"])
+    cache_key = key_user_ratings(str(user_id))
+    cached = await get_cached(cache_key)
+    if cached:
+        return cached
     ratings, total = await rating_service.get_user_ratings(db, user_id, page, limit)
-    return {
+    result = {
         "items": [
             {
                 "id": r.id,
@@ -130,6 +140,8 @@ async def get_my_ratings(
             for r in ratings
         ]
     }
+    await set_cached(cache_key, result, TTL_USER_RATINGS)
+    return result
 
 
 # ── GET /ratings/distribution/{movie_id} ─────────────────────────
