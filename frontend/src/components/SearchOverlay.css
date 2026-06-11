@@ -6,7 +6,7 @@
   width: 90%;
   max-width: 1900px;
 
-  /* FIXED: opacity reduced */
+  /* keep dark but allow blur to show */
   background: rgba(18, 18, 24, 0.3);
 
   backdrop-filter: blur(32px) saturate(160%);
@@ -15,6 +15,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
 
+  /* REMOVE FULL SCREEN BLOCKER */
   box-shadow:
     0 24px 60px rgba(0, 0, 0, 0.7);
 
@@ -24,8 +25,6 @@
   overflow-y: auto;
   padding: 32px 40px;
 }
-
-
 
 @keyframes overlayReveal {
   from { opacity: 0; transform: translate(-50%, -20px) scale(0.98); }
