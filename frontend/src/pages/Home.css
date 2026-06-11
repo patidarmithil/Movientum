@@ -1,6 +1,6 @@
 /* Home Page Layout */
 .home {
-  background-color: var(--bg-void);
+  background-color: transparent;
   min-height: 100vh;
   position: relative;
 }
@@ -15,9 +15,7 @@
   z-index: 0;
   pointer-events: none;
   opacity: 0.45; /* Subtle premium glow */
-  /* NOTE: overflow:hidden removed — it would create a compositing boundary
-     that prevents backdrop-filter from blurring through the WebGL canvas
-     layer on desktop Chrome/Firefox. */
+  overflow: hidden;
 }
 
 .home-aurora-overlay {

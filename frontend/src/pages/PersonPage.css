@@ -3,7 +3,7 @@
 .person-page {
   padding-bottom: var(--space-20);
   position: relative;
-  background-color: var(--bg-void);
+  background-color: transparent;
   min-height: 100vh;
 }
 
@@ -17,6 +17,7 @@
   z-index: 0;
   pointer-events: none;
   opacity: 0.45;
+  overflow: hidden;
 }
 
 .person-page-aurora-overlay {
