@@ -1,7 +1,7 @@
 /* ── News Page ─────────────────────────────────────── */
 .news-page {
   min-height: 100vh;
-  background: var(--bg-void);
+  background: transparent;
   position: relative;
 }
 
@@ -15,6 +15,7 @@
   z-index: 0;
   pointer-events: none;
   opacity: 0.45;
+  overflow: hidden;
 }
 
 .news-aurora-overlay {
