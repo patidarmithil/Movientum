@@ -4,9 +4,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  /* NOTE: No overflow:hidden here — that would promote the WebGL canvas into
-     a clipped compositing layer, preventing backdrop-filter on overlay elements
-     from blurring through it on desktop browsers. */
+  overflow: hidden;
 }
 
 .aurora-container canvas {
