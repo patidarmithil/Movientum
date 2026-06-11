@@ -7,6 +7,7 @@ async def autocomplete_search(db: AsyncSession, prefix: str):
     stmt = (
         select(Movie)
         .where(func.lower(Movie.title).like(prefix_val))
+        .where(Movie.adult == False)
         .order_by(Movie.popularity.desc())
         .limit(8)
     )

@@ -36,15 +36,6 @@ from sqlalchemy.orm import selectinload
 
 from app.db.database import AsyncSessionLocal, get_db
 from app.db.orm_models import Genre, Movie, MovieGenre
-from app.db.cache import (
-    TTL_AUTOCOMPLETE,
-    TTL_SEARCH,
-    get_cached,
-    key_search,
-    key_search_auto,
-    set_cached,
-    inflight_lock,
-)
 from app.utils.persistence import _is_persistable
 from app.schemas.search import (
     AutocompleteItem,
@@ -222,6 +213,7 @@ async def _query_local_db(
         select(func.count())
         .select_from(Movie)
         .where(Movie.search_vector.op("@@")(tsquery))
+        .where(Movie.adult == False)
     )
     total = (await db.execute(count_stmt)).scalar_one()
 
@@ -232,6 +224,7 @@ async def _query_local_db(
             select(Movie)
             .options(selectinload(Movie.genres).selectinload(MovieGenre.genre))
             .where(Movie.search_vector.op("@@")(tsquery))
+            .where(Movie.adult == False)
             .order_by(
                 (ts_rank_expr * func.log(Movie.popularity + 2)).desc(),
                 ts_rank_expr.desc(),
@@ -248,12 +241,41 @@ async def _query_local_db(
 # ── Routes ───────────────────────────────────────────────────────
 
 @router.get(
+    "/instant",
+    summary="Instant predictive search",
+)
+async def search_instant(
+    q: str = Query(..., min_length=1, description="Search query"),
+    type: str = Query("content", description="Search type"),
+    limit: int = Query(default=20, ge=1, le=50, description="Results limit"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Phase 2: Instant Search
+    Returns up to `limit` minimal results for overlay display.
+    """
+    from app.services.search_service import instant_search
+    query_str = q.strip()
+    if not query_str:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    
+    results = await instant_search(db, query_str, limit, type)
+    
+    data = {
+        "results": results,
+        "query": query_str,
+        "total": len(results)
+    }
+    return {"data": data}
+
+@router.get(
     "/autocomplete",
     response_model=WrappedAutocompleteResponse,
     summary="Title autocomplete suggestions",
 )
 async def autocomplete(
     q: str = Query(..., min_length=1, description="Title prefix to autocomplete"),
+    type: str = Query("content", description="Search type"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -266,7 +288,7 @@ async def autocomplete(
     if not prefix:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    data = await get_autocomplete_suggestions(db, prefix)
+    data = await get_autocomplete_suggestions(db, prefix, type)
     return {"data": data}
 
 
@@ -277,6 +299,7 @@ async def autocomplete(
 )
 async def search_movies(
     q:     Optional[str] = Query(default=None, min_length=1, description="Search query"),
+    type:  str           = Query("content", description="Search type"),
     genre: Optional[str] = Query(default=None, description="Genre name filter"),
     page:  int           = Query(default=1,  ge=1,           description="Page number"),
     limit: int           = Query(default=20, ge=1, le=100,   description="Results per page"),
@@ -300,11 +323,6 @@ async def search_movies(
 
     # ── Genre-only path ──────────────────────────────────────────
     if genre_str and not query_str:
-        cache_key = key_search(f"genre:{genre_str}:page={page}:limit={limit}")
-        cached = await get_cached(cache_key)
-        if cached:
-            return {"data": cached}
-
         # Query database to map genre name to TMDB ID
         stmt = select(Genre.id).where(func.lower(Genre.name) == genre_str.lower())
         result = await db.execute(stmt)
@@ -383,51 +401,36 @@ async def search_movies(
             "limit": limit,
             "query": genre_str,
         }
-        await set_cached(cache_key, data, TTL_SEARCH)
         return {"data": data}
 
     # ── Full-text search path ────────────────────────────────────
-    cache_key = key_search(f"{query_str}:page={page}:limit={limit}")
-    cached = await get_cached(cache_key)
-    if cached:
-        logger.info("CACHE_HIT key=%s", cache_key)
-        return {"data": cached}
-
-    logger.info("CACHE_MISS key=%s", cache_key)
-
     # ── Phase 4.0: Supabase + TMDB run CONCURRENTLY ──────────────
     from app.services.tmdb_service import tmdb_service as _tmdb
 
+    # Fire both concurrently
+    local_results_task = asyncio.create_task(
+        _query_local_db(db, query_str, page, limit) if type != "person" else asyncio.sleep(0, result=([], 0))
+    )
+    
     async def _safe_tmdb_search() -> Optional[dict]:
-        """TMDB multi_search with hard 5s timeout. Returns None on timeout/failure."""
+        """TMDB multi_search with hard 10s timeout. Returns None on timeout/failure."""
         try:
             return await asyncio.wait_for(
-                _tmdb.multi_search(query_str),
-                timeout=8.0,
+                _tmdb.search_person(query_str, page) if type == "person" else _tmdb.multi_search(query_str),
+                timeout=10.0,
             )
         except asyncio.TimeoutError:
             logger.warning("TMDB multi_search timeout for q=%r", query_str)
             return None
         except Exception as exc:
-            logger.warning("TMDB multi_search error for q=%r: %s", query_str, exc)
+            logger.warning("TMDB multi_search error for q=%r: %s - %s", query_str, type(exc).__name__, exc)
             return None
 
-    # Fire both concurrently
-    local_results_task = asyncio.create_task(
-        _query_local_db(db, query_str, page, limit)
-    )
     tmdb_task = asyncio.create_task(_safe_tmdb_search())
 
-    async with inflight_lock(cache_key) as waited:
-        if waited:
-            cached = await get_cached(cache_key)
-            if cached:
-                logger.info("CACHE_HIT (after wait) key=%s", cache_key)
-                return {"data": cached}
-
-        (local_results, local_total), tmdb_resp = await asyncio.gather(
-            local_results_task, tmdb_task
-        )
+    (local_results, local_total), tmdb_resp = await asyncio.gather(
+        local_results_task, tmdb_task
+    )
 
     # ── Pre-processing: remove items without poster_path ─────────
     local_results = [r for r in local_results if r.get("poster_path")]
@@ -435,12 +438,16 @@ async def search_movies(
     tmdb_items: list[dict] = []
     if tmdb_resp and "results" in tmdb_resp:
         for item in tmdb_resp["results"]:
-            if item.get("media_type") not in ("movie", "tv"):
-                continue
-            if item.get("adult"):  # pre-filter: no adult content
-                continue
-            if not item.get("poster_path"):  # pre-filter: no poster = skip
-                continue
+            if type == "person":
+                if not item.get("profile_path"):
+                    continue
+            else:
+                if item.get("media_type") not in ("movie", "tv"):
+                    continue
+                if item.get("adult"):  # pre-filter: no adult content
+                    continue
+                if not item.get("poster_path"):  # pre-filter: no poster = skip
+                    continue
             tmdb_items.append(item)
 
     # ── Merge into deduplicated pool ─────────────────────────────
@@ -452,7 +459,16 @@ async def search_movies(
     for item in tmdb_items:
         key = f"{item['id']}_{item.get('media_type', 'movie')}"
         if key not in merged:
-            merged[key] = _tmdb_to_search_result(item)
+            if type == "person":
+                merged[key] = {
+                    "id": item["id"],
+                    "title": item.get("name"),
+                    "name": item.get("name"),
+                    "poster_path": item.get("profile_path"),
+                    "media_type": "person",
+                }
+            else:
+                merged[key] = _tmdb_to_search_result(item)
 
     # ── Sort by relevance score ───────────────────────────────────
     all_results = sorted(
@@ -473,16 +489,10 @@ async def search_movies(
             # Fire-and-forget: don't block response on DB write
             asyncio.create_task(_persist_movie_stub(item))
 
-    # ── Cache and return ─────────────────────────────────────────
+    # ── Return results ───────────────────────────────────────────
     total = max(local_total, len(all_results))
 
     if not results:
-        # Short TTL on empty — lets client retry quickly
-        await set_cached(
-            cache_key,
-            {"results": [], "total": 0, "page": page, "limit": limit, "query": query_str},
-            TTL_SEARCH_EMPTY,
-        )
         return {
             "data": {
                 "results": [],

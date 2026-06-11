@@ -83,7 +83,7 @@ def _movie_to_list_item(movie: Movie) -> dict:
 def _movie_to_detail(movie: Movie) -> dict:
     """Serialize a Movie ORM object to MovieDetail dict."""
     genres    = [mg.genre.name   for mg in (movie.genres    or [])]
-    directors = [md.director.name for md in (movie.directors or [])]
+    directors = [{"id": md.director.id, "name": md.director.name} for md in (movie.directors or []) if md.director]
     return {
         "id": movie.id,
         "title": movie.title,
@@ -91,6 +91,7 @@ def _movie_to_detail(movie: Movie) -> dict:
         "poster_path": movie.poster_path,
         "backdrop_path": movie.backdrop_path,
         "release_year": _release_year(movie),
+        "release_date": str(movie.release_date) if movie.release_date else None,
         "genres": genres,
         "vote_average": movie.vote_average,
         "overview": movie.overview,
@@ -103,6 +104,8 @@ def _movie_to_detail(movie: Movie) -> dict:
         # TMDB path in get_movie_by_id will always populate these
         "production_companies": [],
         "production_countries": [],
+        "budget": movie.budget,
+        "revenue": movie.revenue,
     }
 
 
@@ -668,7 +671,7 @@ def _parse_date(date_str: Optional[str]) -> Optional[date]:
         return None
 
 
-def _tmdb_detail_to_dict(raw: dict, directors: list[str]) -> dict:
+def _tmdb_detail_to_dict(raw: dict, directors: list) -> dict:
     genres = [g["name"] for g in raw.get("genres", [])]
     release_date = raw.get("release_date")
     release_year = None
@@ -693,6 +696,7 @@ def _tmdb_detail_to_dict(raw: dict, directors: list[str]) -> dict:
         "poster_path": raw.get("poster_path"),
         "backdrop_path": raw.get("backdrop_path"),
         "release_year": release_year,
+        "release_date": release_date,
         "genres": genres,
         "vote_average": raw.get("vote_average", 0.0),
         "overview": raw.get("overview"),
@@ -703,6 +707,8 @@ def _tmdb_detail_to_dict(raw: dict, directors: list[str]) -> dict:
         "media_type": "movie",
         "production_companies": production_companies,
         "production_countries": production_countries,
+        "budget": raw.get("budget"),
+        "revenue": raw.get("revenue"),
     }
 
 
@@ -847,6 +853,10 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
                 {"iso_3166_1": c.get("iso_3166_1", ""), "name": c["name"]}
                 for c in raw.get("production_countries", []) if c.get("name")
             ]
+            if raw.get("budget"):
+                data["budget"] = raw.get("budget")
+            if raw.get("revenue"):
+                data["revenue"] = raw.get("revenue")
         data["moctale_rating"] = moctale_data
         await set_cached(cache_key, data, TTL_MOVIE_DETAIL)
         return data
@@ -863,7 +873,7 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
     credits = await tmdb.fetch_movie_credits(movie_id)
     directors = []
     if credits:
-        directors = [d["name"] for d in tmdb.extract_directors(credits)]
+        directors = [{"id": d["id"], "name": d["name"]} for d in tmdb.extract_directors(credits)]
 
     data = _tmdb_detail_to_dict(raw, directors)
 
@@ -916,16 +926,22 @@ async def get_movies_by_company(company_id: int, page: int = Query(default=1, ge
             "page": page,
             "include_adult": "false",
         }),
+        tmdb._get(f"/company/{company_id}"),
         return_exceptions=True,
     )
 
     master_list = []
-    for i, resp in enumerate(responses):
+    # indices: 0=movie, 1=tv
+    for i, resp in enumerate(responses[:2]):
         if isinstance(resp, dict) and "results" in resp:
             for item in resp["results"]:
                 if "media_type" not in item:
                     item["media_type"] = "movie" if i == 0 else "tv"
                 master_list.append(item)
+
+    company_info = responses[2] if len(responses) > 2 and isinstance(responses[2], dict) else None
+    company_name = company_info.get("name") if company_info else None
+    logo_path = company_info.get("logo_path") if company_info else None
 
     seen = set()
     deduped = []
@@ -940,13 +956,19 @@ async def get_movies_by_company(company_id: int, page: int = Query(default=1, ge
 
     total_results = sum(
         resp.get("total_results", 0)
-        for resp in responses
+        for resp in responses[:2]
         if isinstance(resp, dict) and "total_results" in resp
     )
     if not total_results:
         total_results = len(formatted)
 
-    data = {"movies": formatted, "total": total_results, "page": page}
+    data = {
+        "movies": formatted,
+        "total": total_results,
+        "page": page,
+        "company_name": company_name,
+        "logo_path": logo_path
+    }
     await set_cached(cache_key, data, 1800)
     return data
 

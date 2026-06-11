@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────
 REQUEST_DELAY = 0.25        # seconds between requests
-REQUEST_TIMEOUT = 10.0      # seconds per request
-MAX_RETRIES = 3
-RETRY_BASE_DELAY = 1        # seconds (doubles each retry: 1, 2, 4)
+REQUEST_TIMEOUT = 30.0      # seconds per request
+MAX_RETRIES = 5
+RETRY_BASE_DELAY = 2        # seconds (jittered: 2, 4, 8, 16, 32)
 
 
 class TMDBService:
@@ -39,15 +39,31 @@ class TMDBService:
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
-            self._semaphore = asyncio.Semaphore(4)  # max 4 concurrent TMDB calls
+            self._semaphore = asyncio.Semaphore(12)  # max 12 concurrent TMDB calls
         return self._semaphore
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
+            limits = httpx.Limits(
+                max_connections=100,
+                max_keepalive_connections=20,
+                keepalive_expiry=30,
+            )
+            transport = httpx.AsyncHTTPTransport(
+                local_address="0.0.0.0",
+                limits=limits,
+            )
             self._client = httpx.AsyncClient(
                 headers=self.headers,
-                timeout=REQUEST_TIMEOUT,
+                timeout=httpx.Timeout(
+                    connect=10.0,
+                    read=REQUEST_TIMEOUT,
+                    write=10.0,
+                    pool=10.0,
+                ),
                 follow_redirects=True,
+                transport=transport,
+                http2=False,
             )
         return self._client
 
@@ -104,10 +120,12 @@ class TMDBService:
                             continue
                         return None
 
-                except (httpx.TimeoutException, httpx.RequestError) as e:
+                except (httpx.TimeoutException, httpx.RequestError, httpx.ConnectError) as e:
                     logger.warning(f"TMDB FAIL: network error ({type(e).__name__}) for {endpoint}. Attempt {attempt}/{MAX_RETRIES}")
                     if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BASE_DELAY * attempt)
+                        import random
+                        jitter = random.uniform(0.5, 1.5)
+                        await asyncio.sleep(RETRY_BASE_DELAY * (2 ** (attempt - 1)) * jitter)
                         continue
                     return None
 
@@ -264,14 +282,25 @@ class TMDBService:
             "query": query,
             "page": page,
             "language": "en-US",
-            "include_adult": False,
+            "include_adult": "false",
+        })
+
+    async def search_person(self, query: str, page: int = 1) -> Optional[dict]:
+        """
+        GET /search/person?query={q}
+        """
+        return await self._get("/search/person", params={
+            "query": query,
+            "page": page,
+            "language": "en-US",
+            "include_adult": "false",
         })
 
     async def fetch_person_details(self, person_id: int) -> Optional[dict]:
         """
-        GET /person/{id} — biography, birthday, place_of_birth, profile_path.
+        GET /person/{id} — biography, birthday, place_of_birth, profile_path, images.
         """
-        return await self._get(f"/person/{person_id}", params={"language": "en-US"})
+        return await self._get(f"/person/{person_id}", params={"language": "en-US", "append_to_response": "images"})
 
     async def fetch_person_credits(self, person_id: int) -> Optional[dict]:
         """
