@@ -8,12 +8,14 @@
   z-index: 1000;
   height: var(--navbar-h);
 
-  /* GLASS FIX */
+  /* TRUE GLASS BASE */
   background: rgba(20, 20, 30, 0.35);
 
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  /* GLASS BLUR */
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
 
+  /* EDGE + DEPTH */
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
   box-shadow:
@@ -23,15 +25,17 @@
   transition: all 0.3s ease;
 }
 
-/* HOVER */
+
+
+/* OPTIONAL: HOVER ENHANCEMENT */
 .navbar:hover {
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
   background: rgba(20, 20, 30, 0.45);
 }
 
-/* KEEP STRUCTURE SAME */
 .navbar__inner {
+  position: relative; /* Context for absolute children overlays */
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 var(--space-6);
@@ -39,6 +43,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-6);
+  background: rgba(20, 20, 30, 0.35);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
 
 /* ── Logo + Brand Name ── */
