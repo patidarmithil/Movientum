@@ -36,6 +36,7 @@ TTL_MOVIE_LIST = 1800          # 30 min
 TTL_GENRE_LIST = 86400         # 24 hours
 TTL_SEARCH = 600               # 10 min
 TTL_AUTOCOMPLETE = 300         # 5 min
+TTL_INSTANT_SEARCH = 120       # 2 min (live typing cache)
 TTL_USER_RECS = 900            # 15 min
 TTL_TMDB_CONFIG = 86400        # 24 hours
 TTL_NEWS_FEED = 7200           # 2 hours
@@ -145,10 +146,10 @@ async def check_redis_connection() -> bool:
 # Centralise key construction — consistent naming across codebase
 
 def key_movie_detail(movie_id: int) -> str:
-    return f"movie:detail:{movie_id}"
+    return f"movie:detail:v3:{movie_id}"
 
 def key_tv_detail(tv_id: int) -> str:
-    return f"tv:detail:{tv_id}"
+    return f"tv:detail:v2:{tv_id}"
 
 def key_movie_trending() -> str:
     return "movie:trending"
@@ -180,6 +181,10 @@ def key_movie_similar(movie_id: int) -> str:
 def key_search_auto(prefix: str) -> str:
     """Cache key for autocomplete: search:auto:{prefix.lower()}  TTL 300s."""
     return f"search:auto:{prefix.lower().strip()}"
+
+def key_instant_search(query: str) -> str:
+    hash_ = hashlib.md5(query.lower().strip().encode()).hexdigest()[:8]
+    return f"search:instant:{hash_}"
 
 def key_movie_credits(movie_id: int) -> str:
     return f"tmdb:credits:{movie_id}"

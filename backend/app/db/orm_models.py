@@ -341,3 +341,15 @@ class RatingNeeded(Base):
     def __repr__(self):
         return f"<RatingNeeded id={self.id} title={self.title} content={self.content}>"
 
+class RequestedContent(Base):
+    """Content requests from users who couldn't find what they searched for."""
+    __tablename__ = "requested_content"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(500), nullable=False)
+    content_type = Column(String(50), nullable=False)  # Movie / TV Show
+    requested_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    def __repr__(self):
+        return f"<RequestedContent id={self.id} title={self.title} type={self.content_type}>"
+

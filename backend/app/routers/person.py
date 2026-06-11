@@ -32,7 +32,7 @@ def _img(path: Optional[str], size: str = "w300") -> Optional[str]:
 
 
 def _cache_key(person_id: int) -> str:
-    return f"tmdb:person:{person_id}"
+    return f"tmdb:person:v2:{person_id}"
 
 
 @router.get("/{person_id}", summary="Person detail (TMDB)")
@@ -53,6 +53,13 @@ async def get_person(person_id: int):
     # Calculate age
     age = _calc_age(details.get("birthday"), details.get("deathday"))
 
+    # Extract additional profile images
+    images = []
+    if "images" in details and "profiles" in details["images"]:
+        for img in details["images"]["profiles"]:
+            if "file_path" in img:
+                images.append(_img(img["file_path"], "w780")) # Get high quality images
+
     data = {
         "id": details["id"],
         "name": details.get("name", ""),
@@ -61,7 +68,8 @@ async def get_person(person_id: int):
         "deathday": details.get("deathday"),
         "age": age,
         "place_of_birth": details.get("place_of_birth"),
-        "profile_path": _img(details.get("profile_path"), "w300"),
+        "profile_path": _img(details.get("profile_path"), "w500"), # Increased base quality too
+        "images": images,
         "known_for_department": details.get("known_for_department"),
     }
     if data.get("known_for_department"):
@@ -73,36 +81,22 @@ async def get_person(person_id: int):
 
 def _person_credit_score(item: dict) -> float:
     pop = item.get("popularity", 0.0) or 0.0
-    media_type = item.get("media_type", "movie")
     
-    if media_type == "movie":
-        order = item.get("order")
-        if order is None:
+    # Crew weighting
+    if "job" in item:
+        job = item.get("job")
+        if job == "Director":
+            factor = 1.0
+        elif job in ("Writer", "Screenplay", "Creator"):
+            factor = 0.5
+        elif job == "Producer":
+            factor = 0.3
+        else:
             factor = 0.1
-        elif order <= 2:
-            factor = 1.0
-        elif order <= 5:
-            factor = 0.8
-        elif order <= 10:
-            factor = 0.5
-        elif order <= 15:
-            factor = 0.2
-        else:
-            factor = 0.05
-    else:  # tv
-        episodes = item.get("episode_count", 0) or 0
-        if episodes >= 15:
-            factor = 1.0
-        elif episodes >= 8:
-            factor = 0.8
-        elif episodes >= 4:
-            factor = 0.5
-        elif episodes >= 3:
-            factor = 0.2
-        else:
-            factor = 0.05
-            
-    return pop * factor
+        return pop * factor
+        
+    # Cast weighting (no order/episode penalization for pure popularity ranking)
+    return pop
 
 
 @router.get("/{person_id}/credits", summary="Person cast credits (TMDB)")
@@ -111,7 +105,7 @@ async def get_person_credits(person_id: int):
     Fetch person cast credits sorted by prominence-weighted popularity.
     Cached 1 hour in Redis.
     """
-    cache_key = f"person:{person_id}:credits:v3"
+    cache_key = f"person:{person_id}:credits:v5"
     cached = await get_cached(cache_key)
     if cached:
         return cached
@@ -121,10 +115,13 @@ async def get_person_credits(person_id: int):
         return []
 
     cast_credits = credits.get("cast", [])
+    crew_credits = credits.get("crew", [])
+    
+    all_credits = cast_credits + crew_credits
 
     # Deduplicate by id + media_type, keeping highest popularity
     deduped_map = {}
-    for w in cast_credits:
+    for w in all_credits:
         id_ = w.get("id")
         media_type = w.get("media_type", "movie")
         if not id_:
@@ -135,18 +132,20 @@ async def get_person_credits(person_id: int):
             deduped_map[key] = w
     deduped = list(deduped_map.values())
 
-    # Filter out low-quality entries, self appearances, talk/reality/documentary/news genres
+    # Filter out self appearances, minor TV guest roles, and talk/reality/documentary/news genres
     filtered = []
     for w in deduped:
-        pop = w.get("popularity", 0.0) or 0.0
-        if pop < 1.0:
-            continue
-        
         # Exclude self/himself/herself guest appearances
         char_lower = (w.get("character") or "").lower()
         if "self" in char_lower or "himself" in char_lower or "herself" in char_lower:
             continue
             
+        # Exclude minor TV guest appearances (2 or fewer episodes)
+        if w.get("media_type") == "tv":
+            ep_count = w.get("episode_count")
+            if ep_count is not None and ep_count <= 2:
+                continue
+
         # Exclude talk (10767), reality (10764), documentary (99), news (10763)
         genres = w.get("genre_ids", []) or []
         if any(g_id in genres for g_id in [10767, 10764, 99, 10763]):
@@ -157,12 +156,9 @@ async def get_person_credits(person_id: int):
     # Sort by prominence-weighted popularity score
     filtered.sort(key=_person_credit_score, reverse=True)
 
-    # Slice top 16
-    top_credits = filtered[:16]
-
-    # Normalize fields
+    # Normalize fields (filter invalid poster_path first)
     normalized = []
-    for w in top_credits:
+    for w in filtered:
         # Skip items without poster_path
         if not w.get("poster_path"):
             continue
@@ -179,9 +175,12 @@ async def get_person_credits(person_id: int):
             "popularity": w.get("popularity", 0.0) or 0.0
         })
 
-    if normalized:
-        await set_cached(cache_key, normalized, 3600)  # 1 hour
-    return normalized
+    # Slice top 24 valid normalized credits
+    top_credits = normalized[:24]
+
+    if top_credits:
+        await set_cached(cache_key, top_credits, 3600)  # 1 hour
+    return top_credits
 
 
 def _year(date_str: Optional[str]) -> Optional[int]:

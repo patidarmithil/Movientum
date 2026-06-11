@@ -1,0 +1,122 @@
+.request-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(5px);
+}
+
+.request-modal {
+  background: #121212;
+  border-radius: 12px;
+  padding: 32px;
+  width: 400px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.request-modal h2 {
+  font-size: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.request-modal-subtitle {
+  font-size: 16px;
+  color: #ccc;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.request-modal-options {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.request-option {
+  background: transparent;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 8px 24px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.request-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.request-option.selected {
+  background: #333;
+  color: #fff;
+  border-color: #666;
+}
+
+.request-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.submit-request-btn {
+  background: #3a3a40;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.submit-request-btn:hover:not(:disabled) {
+  background: #4a4a50;
+}
+
+.submit-request-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-request-btn {
+  background: transparent;
+  color: #888;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.cancel-request-btn:hover {
+  color: #bbb;
+}
+
+.request-modal-error {
+  color: #ff4d4f;
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.request-modal-success {
+  color: #52c41a;
+  margin-bottom: 24px;
+  font-size: 16px;
+  text-align: center;
+}

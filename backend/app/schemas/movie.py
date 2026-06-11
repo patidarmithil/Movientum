@@ -42,15 +42,22 @@ class MovieListItem(BaseModel):
         return data
 
 
+class DirectorDetail(BaseModel):
+    id: int
+    name: str
+
+
 class MovieDetail(MovieListItem):
     """Full movie data for detail page."""
     runtime: Optional[int] = None
-    directors: List[str] = []
+    directors: List[DirectorDetail] = []
     vote_count: Optional[int] = None
     original_language: Optional[str] = None
     moctale_rating: Optional[dict] = None
     production_companies: List[dict] = []
     production_countries: List[dict] = []
+    budget: Optional[int] = None
+    revenue: Optional[int] = None
 
 
 class MovieListResponse(BaseModel):

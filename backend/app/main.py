@@ -261,3 +261,7 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 from app.db import orm_models_news  # noqa: F401 — side-effect import for Alembic
 from app.routers import news
 app.include_router(news.router, prefix="/api/v1/news", tags=["News"])
+
+# ── Requests Router ───────────────────────────────────────
+from app.routers import requests
+app.include_router(requests.router, prefix="/api/v1/requests", tags=["Requests"])

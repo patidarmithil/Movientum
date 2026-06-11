@@ -211,6 +211,8 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
         "production_companies": production_companies,
         "production_countries": production_countries,
         "moctale_rating":   moctale_data,
+        "seasons":          raw.get("seasons", []),
+        "next_episode_to_air": raw.get("next_episode_to_air"),
     }
 
     pop = float(raw.get("popularity", 0.0) or 0.0)

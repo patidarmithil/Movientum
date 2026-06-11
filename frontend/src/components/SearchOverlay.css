@@ -1,0 +1,200 @@
+.search-overlay {
+  position: fixed;
+  top: calc(var(--navbar-h, 64px) + 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 1900px;
+  background: rgba(18, 18, 24, 0.85);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 100vw rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  animation: overlayReveal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 32px 40px;
+}
+
+@keyframes overlayReveal {
+  from { opacity: 0; transform: translate(-50%, -20px) scale(0.98); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* Horizontal card — like Moctale grid */
+.search-result-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.search-result-card:hover,
+.search-result-card--active {
+  background: rgba(255,255,255,0.06);
+}
+
+.search-result-poster {
+  width: 54px;
+  height: 80px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-card, #222);
+}
+
+.search-result-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.search-result-meta {
+  font-size: 12px;
+  color: var(--text-muted, #999);
+  /* e.g. "2026 • TV Show" */
+}
+
+.search-results-section {
+  animation: fadeInResults 0.15s ease-out;
+}
+
+@keyframes fadeInResults {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+.search-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.search-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted, #999);
+}
+
+.search-empty button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: var(--brand-primary, #e50914);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.trending-chip:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* Base styles for search input container */
+.search-input-container {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 0 16px;
+  width: 240px;
+  transition: width 0.2s ease;
+}
+
+.search-input-container:focus-within {
+  width: 400px;
+  background: rgba(255,255,255,0.15);
+}
+
+.search-input-container input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 8px 0;
+  width: 100%;
+  outline: none;
+}
+
+.search-input-container input::placeholder {
+  color: rgba(255,255,255,0.5);
+}
+
+.searchbar__clear {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.searchbar__clear:hover {
+  color: #fff;
+}
+
+.searchbar__spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.searchbar__icon {
+  margin-right: 8px;
+  color: rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+}
+
+/* Left-aligned input wrapper inside the dropdown panel below navbar */
+.search-overlay-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.search-overlay-input-wrapper .search-input-container {
+  width: 100%;
+  max-width: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(176, 72, 255, 0.4);
+  border-radius: 24px;
+  height: 48px;
+  padding: 0 20px;
+  transition: all 0.2s ease;
+}
+
+.search-overlay-input-wrapper .search-input-container:focus-within {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(176, 72, 255, 0.85);
+  box-shadow: 0 0 16px rgba(176, 72, 255, 0.25);
+}
+
+@media (max-width: 768px) {
+  .search-overlay {
+    padding: 24px 16px;
+    width: 95%;
+  }
+  .search-overlay-input-wrapper {
+    padding: 0;
+    margin-bottom: 16px;
+  }
+  .search-overlay-input-wrapper .search-input-container {
+    max-width: none;
+    height: 40px;
+  }
+}
