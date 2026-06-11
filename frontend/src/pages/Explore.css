@@ -16,7 +16,6 @@
   z-index: 0;
   pointer-events: none;
   opacity: 0.45;
-  overflow: hidden;
 }
 
 .explore-aurora-overlay {
