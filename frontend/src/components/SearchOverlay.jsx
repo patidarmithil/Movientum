@@ -202,7 +202,15 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
       </button>
 
       {isOpen && createPortal(
-        <div className="search-overlay" ref={overlayRef}>
+        <div
+          className="search-overlay"
+          ref={overlayRef}
+          style={{
+            background: 'rgba(18, 18, 24, 0.85)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)'
+          }}
+        >
           <div className="search-overlay-input-wrapper">
             <div className="search-input-container">
               <span className="searchbar__icon" aria-hidden="true">
