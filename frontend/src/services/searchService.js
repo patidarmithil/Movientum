@@ -13,21 +13,34 @@ export const searchService = {
    * Full-text search with pagination.
    * @param {string} query
    * @param {number} page   default 1
+   * @param {string} search_type  default 'content'
    * @returns {Promise<{results: Array, total: number, page: number, pages: number}>}
    */
-  search: (query, page = 1) =>
+  search: (query, page = 1, search_type = 'content') =>
     api
-      .get(BASE, { params: { q: query, page } })
+      .get(BASE, { params: { q: query, page, type: search_type } })
       .then((r) => r.data.data),
 
   /**
-   * Autocomplete — top 8 title matches (cached server-side 5 min).
+   * Autocomplete — top 8 matches (cached server-side 5 min).
    * @param {string} prefix  must be >= 2 chars before calling
-   * @returns {Promise<Array<{id, title, release_year, poster_path}>>}
+   * @param {string} search_type  default 'content'
+   * @returns {Promise<Array>}
    */
-  autocomplete: (prefix) =>
+  autocomplete: (prefix, search_type = 'content') =>
     api
-      .get(`${BASE}/autocomplete`, { params: { q: prefix } })
+      .get(`${BASE}/autocomplete`, { params: { q: prefix, type: search_type } })
+      .then((r) => r.data.data),
+
+  /**
+   * Instant search — top 20 matches.
+   * @param {string} query
+   * @param {string} search_type  default 'content'
+   * @returns {Promise<Array>}
+   */
+  instantSearch: (query, search_type = 'content') =>
+    api
+      .get(`${BASE}/instant`, { params: { q: query, type: search_type } })
       .then((r) => r.data.data),
 
   /**
@@ -39,4 +52,12 @@ export const searchService = {
     api
       .get(BASE, { params: { genre, page } })
       .then((r) => r.data.data),
+
+  /**
+   * Request content that is missing.
+   * @param {string} title
+   * @param {string} contentType Movie | TV Show
+   */
+  requestContent: (title, contentType) =>
+    api.post('/api/v1/requests', { title, content_type: contentType })
 }

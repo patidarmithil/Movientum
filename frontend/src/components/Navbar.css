@@ -367,24 +367,12 @@
 }
 
 @media (max-width: 500px) {
-  :root {
-    --navbar-h: 110px; /* Redefine height globally so it pushes page-content down automatically */
-  }
-
   .navbar__inner {
-    display: grid;
-    grid-template-areas: 
-      "logo actions"
-      "search search";
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    padding: 8px 12px;
+    padding: 0 12px;
     gap: 8px;
   }
 
   .navbar__logo {
-    grid-area: logo;
-    align-self: center;
     gap: 6px;
   }
 
@@ -401,18 +389,6 @@
   .navbar__logo-beta {
     font-size: 11px;
     vertical-align: top;
-  }
-
-  .navbar__search {
-    grid-area: search;
-    display: block !important; /* Ensure search bar is visible on mobile */
-    width: 100%;
-  }
-
-  .navbar__right-group {
-    grid-area: actions;
-    align-self: center;
-    gap: var(--space-2);
   }
 
   .navbar__actions {
@@ -594,4 +570,43 @@
     display: none;
   }
 }
+
+/* Search trigger button custom rules */
+.navbar__search-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 20px;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+
+.navbar__search-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .navbar__search-btn span {
+    display: none;
+  }
+  .navbar__search-btn {
+    display: flex !important;
+    padding: 8px;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    align-items: center;
+  }
+}
+
 

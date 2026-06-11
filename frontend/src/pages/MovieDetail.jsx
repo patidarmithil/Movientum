@@ -23,6 +23,17 @@ import './MovieDetail.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
+const formatUSD = (val) => {
+  if (!val) return 'N/A';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+};
+
+const formatINR = (val) => {
+  if (!val) return 'N/A';
+  const inrVal = val * 83.5;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(inrVal);
+};
+
 export default function MovieDetail() {
   const { id } = useParams()
   const movieId = Number(id)
@@ -38,6 +49,7 @@ export default function MovieDetail() {
   const [watchBusy,     setWatchBusy]     = useState(false)
   const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
+  const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
 
   const handleRequestRating = async () => {
@@ -202,7 +214,8 @@ export default function MovieDetail() {
               <img
                 src={posterUrl}
                 alt={`${movie.title} poster`}
-                className="movie-detail__poster"
+                className="movie-detail__poster clickable-poster"
+                onClick={() => setIsModalOpen(true)}
                 onError={() => setHasImgError(true)}
               />
             ) : (
@@ -216,7 +229,9 @@ export default function MovieDetail() {
 
             {/* Meta */}
             <div className="movie-detail__meta">
-              {movie.release_year && <span>{movie.release_year}</span>}
+              {movie.release_date && (
+                <span>{new Date(movie.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+              )}
               {movie.runtime && (
                 <>
                   <span className="dot">·</span>
@@ -250,7 +265,12 @@ export default function MovieDetail() {
             {directors.length > 0 && (
               <p className="movie-detail__director">
                 <span className="label">Directed by</span>{' '}
-                {directors.join(', ')}
+                {directors.map((d, idx) => (
+                  <span key={d.id}>
+                    <Link to={`/person/${d.id}`} className="director-link">{d.name}</Link>
+                    {idx < directors.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
               </p>
             )}
 
@@ -259,38 +279,77 @@ export default function MovieDetail() {
               <p className="movie-detail__overview">{movie.overview}</p>
             )}
 
-            {/* Actions */}
-            <div className="movie-detail__actions">
-              {isLoggedIn ? (
-                <>
-                  <button
-                    id={`btn-watched-${movieId}`}
-                    className={`btn btn--md ${watchStatus.watched ? 'btn--success' : 'btn--secondary'}`}
-                    onClick={handleWatchedToggle}
-                    disabled={watchBusy}
-                    aria-label={watchStatus.watched ? 'Remove from watched' : 'Mark as watched'}
-                  >
-                    {watchStatus.watched ? '✓ Watched' : '○ Mark Watched'}
-                  </button>
-                  <button
-                    id={`btn-watchlist-${movieId}`}
-                    className={`btn btn--md ${watchStatus.watchlisted ? 'btn--accent' : 'btn--secondary'}`}
-                    onClick={handleWatchlistToggle}
-                    disabled={listBusy}
-                    aria-label={watchStatus.watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
-                  >
-                    {watchStatus.watchlisted ? '★ In Watchlist' : '+ Watchlist'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link to="/login" className="btn btn--secondary btn--md">
-                    + Watchlist
-                  </Link>
-                  <Link to="/login" className="btn btn--secondary btn--md">
-                    ○ Mark Watched
-                  </Link>
-                </>
+            {/* Actions & Financials Container */}
+            <div className="movie-detail__actions-row">
+              {/* Actions */}
+              <div className="movie-detail__actions">
+                {isLoggedIn ? (
+                  <>
+                    <button
+                      id={`btn-watched-${movieId}`}
+                      className={`btn btn--md ${watchStatus.watched ? 'btn--success' : 'btn--secondary'}`}
+                      onClick={handleWatchedToggle}
+                      disabled={watchBusy}
+                      aria-label={watchStatus.watched ? 'Remove from watched' : 'Mark as watched'}
+                    >
+                      {watchStatus.watched ? '✓ Watched' : '○ Mark Watched'}
+                    </button>
+                    <button
+                      id={`btn-watchlist-${movieId}`}
+                      className={`btn btn--md ${watchStatus.watchlisted ? 'btn--accent' : 'btn--secondary'}`}
+                      onClick={handleWatchlistToggle}
+                      disabled={listBusy}
+                      aria-label={watchStatus.watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+                    >
+                      {watchStatus.watchlisted ? '★ In Watchlist' : '+ Watchlist'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className="btn btn--secondary btn--md">
+                      + Watchlist
+                    </Link>
+                    <Link to="/login" className="btn btn--secondary btn--md">
+                      ○ Mark Watched
+                    </Link>
+                  </>
+                )}
+              </div>
+
+              {/* Financial Information (Budget & Revenue) */}
+              {(movie.budget > 0 || movie.revenue > 0) && (
+                <div className="movie-detail__financials">
+                  {movie.budget > 0 && (
+                    <div className="financial-item">
+                      <span className="financial-label">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', opacity: 0.7 }}>
+                          <line x1="12" y1="1" x2="12" y2="23"></line>
+                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        Budget
+                      </span>
+                      <span className="financial-value">
+                        <span className="usd-val">{formatUSD(movie.budget)}</span>
+                        <span className="inr-val"> ({formatINR(movie.budget)})</span>
+                      </span>
+                    </div>
+                  )}
+                  {movie.revenue > 0 && (
+                    <div className="financial-item">
+                      <span className="financial-label">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', opacity: 0.7 }}>
+                          <line x1="12" y1="1" x2="12" y2="23"></line>
+                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        Revenue
+                      </span>
+                      <span className="financial-value">
+                        <span className="usd-val">{formatUSD(movie.revenue)}</span>
+                        <span className="inr-val"> ({formatINR(movie.revenue)})</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -347,6 +406,22 @@ export default function MovieDetail() {
           </div>
         </section>
       </div>
+
+      {/* Full screen modal */}
+      {isModalOpen && posterUrl && (
+        <div 
+          className="person-page-image-modal" 
+          onClick={() => setIsModalOpen(false)}
+        >
+          <button className="person-page-image-modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+          <img 
+            src={movie.poster_path ? `${TMDB_IMAGE_BASE}/w780${movie.poster_path}` : posterUrl} 
+            alt={movie.title} 
+            className="person-page-image-modal-img"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </main>
   )
 }

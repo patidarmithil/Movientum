@@ -1,7 +1,8 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
-import SearchBar from './SearchBar'
+import SearchOverlay from './SearchOverlay'
 import './Navbar.css'
 
 /**
@@ -14,6 +15,7 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [dropOpen, setDropOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const dropRef = useRef(null)
 
   // Close dropdown on outside click
@@ -58,13 +60,11 @@ export default function Navbar() {
           <span className="navbar__logo-beta">β</span>
         </Link>
 
-        {/* ── Search (Shifted left next to logo) ── */}
-        <div className="navbar__search">
-          <SearchBar />
-        </div>
-
         {/* ── Right-Aligned Navigation Icons Group ── */}
         <div className="navbar__right-group">
+          
+          {/* Search Trigger */}
+          <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
           
           {/* News nav button */}
           <NavLink
@@ -232,104 +232,120 @@ export default function Navbar() {
 
       </div>
 
-      {/* ── Mobile sliding menu drawer & backdrop ── */}
-      <div 
-        className={`navbar__mobile-backdrop${mobileMenuOpen ? ' navbar__mobile-backdrop--open' : ''}`}
-        onClick={() => setMobileMenuOpen(false)}
-        aria-hidden="true"
-      />
-      <div className={`navbar__mobile-drawer${mobileMenuOpen ? ' navbar__mobile-drawer--open' : ''}`} role="dialog" aria-label="Mobile navigation">
-        <div className="navbar__mobile-drawer-header">
-          <Link to="/" className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
-            <img src="/favicon.svg" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
-            <span className="navbar__logo-text" style={{ fontSize: '15px' }}>MOVIENTUM</span>
-          </Link>
-          <button 
-            className="navbar__mobile-drawer-close"
+      {/* ── Mobile sliding menu drawer & backdrop (Portalled to document.body) ── */}
+      {createPortal(
+        <>
+          <div 
+            className={`navbar__mobile-backdrop${mobileMenuOpen ? ' navbar__mobile-backdrop--open' : ''}`}
             onClick={() => setMobileMenuOpen(false)}
-            aria-label="Close menu"
-          >
-            &times;
-          </button>
-        </div>
-        
-        <div className="navbar__mobile-drawer-divider" />
-        
-        <div className="navbar__mobile-drawer-links">
-          <NavLink 
-            to="/" 
-            className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span>🏠</span> Home
-          </NavLink>
-          <NavLink 
-            to="/explore" 
-            className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span>🧭</span> Explore
-          </NavLink>
-          <NavLink 
-            to="/news" 
-            className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span>📰</span> News
-          </NavLink>
-          
-          {isLoggedIn && (
-            <>
-              <NavLink 
-                to="/dashboard" 
-                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <span>📊</span> Dashboard
-              </NavLink>
-              <NavLink 
-                to="/analysis" 
-                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <span>🔮</span> Analysis
-              </NavLink>
-            </>
-          )}
-        </div>
-
-        <div className="navbar__mobile-drawer-divider" />
-
-        <div className="navbar__mobile-drawer-footer">
-          {isLoggedIn ? (
-            <div className="navbar__mobile-drawer-user-section">
-              <div className="navbar__mobile-drawer-user-info">
-                <div className="navbar__avatar" style={{ cursor: 'default' }}>{initials}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <span className="navbar__mobile-drawer-username">{user?.username || 'User'}</span>
-                  <span className="navbar__mobile-drawer-email">{user?.email}</span>
-                </div>
-              </div>
+            aria-hidden="true"
+          />
+          <div className={`navbar__mobile-drawer${mobileMenuOpen ? ' navbar__mobile-drawer--open' : ''}`} role="dialog" aria-label="Mobile navigation">
+            <div className="navbar__mobile-drawer-header">
+              <Link to="/" className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
+                <img src="/favicon.svg" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
+                <span className="navbar__logo-text" style={{ fontSize: '15px' }}>MOVIENTUM</span>
+              </Link>
               <button 
-                className="btn btn--secondary btn--md w-full" 
-                style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}
-                onClick={handleLogout}
+                className="navbar__mobile-drawer-close"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
               >
-                Log Out
+                &times;
               </button>
             </div>
-          ) : (
-            <div className="navbar__mobile-drawer-auth-buttons">
-              <Link to="/login" className="btn btn--secondary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
-                Login
-              </Link>
-              <Link to="/register" className="btn btn--primary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
-                Sign Up
-              </Link>
+            
+            <div className="navbar__mobile-drawer-divider" />
+            
+            <div className="navbar__mobile-drawer-links">
+              <NavLink 
+                to="/" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>🏠</span> Home
+              </NavLink>
+              <NavLink 
+                to="/explore" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>🧭</span> Explore
+              </NavLink>
+              <button 
+                className="navbar__mobile-drawer-link"
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  setSearchOpen(true)
+                }}
+                style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                <span>🔍</span> Search
+              </button>
+              
+              <NavLink 
+                to="/news" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>📰</span> News
+              </NavLink>
+              
+              {isLoggedIn && (
+                <>
+                  <NavLink 
+                    to="/dashboard" 
+                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>📊</span> Dashboard
+                  </NavLink>
+                  <NavLink 
+                    to="/analysis" 
+                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>🔮</span> Analysis
+                  </NavLink>
+                </>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+
+            <div className="navbar__mobile-drawer-divider" />
+
+            <div className="navbar__mobile-drawer-footer">
+              {isLoggedIn ? (
+                <div className="navbar__mobile-drawer-user-section">
+                  <div className="navbar__mobile-drawer-user-info">
+                    <div className="navbar__avatar" style={{ cursor: 'default' }}>{initials}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span className="navbar__mobile-drawer-username">{user?.username || 'User'}</span>
+                      <span className="navbar__mobile-drawer-email">{user?.email}</span>
+                    </div>
+                  </div>
+                  <button 
+                    className="btn btn--secondary btn--md w-full" 
+                    style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}
+                    onClick={handleLogout}
+                  >
+                    Log Out
+                  </button>
+                </div>
+              ) : (
+                <div className="navbar__mobile-drawer-auth-buttons">
+                  <Link to="/login" className="btn btn--secondary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
+                    Login
+                  </Link>
+                  <Link to="/register" className="btn btn--primary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </nav>
   )
 }

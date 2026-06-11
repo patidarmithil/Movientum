@@ -183,6 +183,7 @@ button {
   gap: var(--space-4);
   overflow-x: auto;
   overflow-y: hidden;
+  width: 100%;
   padding-top: 6px;
   padding-bottom: var(--space-3);
   scrollbar-width: thin;

@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
+import Aurora from '../components/Aurora'
 import './CompanyPage.css'  // reuse same layout CSS
 
 /** Convert ISO 3166-1 alpha-2 → emoji flag */
@@ -118,6 +119,17 @@ export default function CountryPage() {
 
   return (
     <main className="company-page page-content">
+      {/* ── Background Aurora Animation ── */}
+      <div className="company-page-aurora-bg" aria-hidden="true">
+        <Aurora
+          colorStops={["#FF512F", "#DD2476", "#3B0066"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
+        />
+        <div className="company-page-aurora-overlay" />
+      </div>
+
       <div className="container">
         {/* ── Header ── */}
         <div className="company-page__header">

@@ -3,6 +3,30 @@
 /* ── Layout ── */
 .explore-page {
   padding-bottom: var(--space-20);
+  position: relative;
+}
+
+/* ── Background Aurora Animation ── */
+.explore-aurora-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 500px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  overflow: hidden;
+}
+
+.explore-aurora-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent 30%, var(--bg-void) 100%),
+              linear-gradient(to right, transparent 50%, var(--bg-void) 100%);
 }
 
 .explore-page__inner {

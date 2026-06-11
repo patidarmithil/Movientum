@@ -14,7 +14,7 @@
   height: 600px;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.35; /* Subtle premium glow */
+  opacity: 0.45; /* Subtle premium glow */
   overflow: hidden;
 }
 
