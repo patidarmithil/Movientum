@@ -1,6 +1,6 @@
 /* Home Page Layout */
 .home {
-  background-color: transparent;
+  background-color: var(--bg-void);
   min-height: 100vh;
   position: relative;
 }

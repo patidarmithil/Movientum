@@ -3,7 +3,7 @@
 .person-page {
   padding-bottom: var(--space-20);
   position: relative;
-  background-color: transparent;
+  background-color: var(--bg-void);
   min-height: 100vh;
 }
 

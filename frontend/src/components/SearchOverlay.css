@@ -6,11 +6,11 @@
   width: 90%;
   max-width: 1900px;
 
-  /* keep dark but allow blur to show */
-  background: rgba(18, 18, 24, 0.3);
+  /* simple dark blur background */
+  background: rgba(18, 18, 24, 0.85);
 
-  backdrop-filter: blur(32px) saturate(160%);
-  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
