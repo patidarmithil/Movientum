@@ -42,7 +42,16 @@ export default function Navbar() {
     : '?'
 
   return (
-    <nav className="navbar" role="navigation" aria-label="Main navigation">
+    <nav
+      className="navbar"
+      role="navigation"
+      aria-label="Main navigation"
+      style={{
+        background: 'rgba(13, 14, 18, 0.8)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)'
+      }}
+    >
       <div className="navbar__inner">
         
         {/* ── Logo + Brand Name + Beta Symbol ── */}
