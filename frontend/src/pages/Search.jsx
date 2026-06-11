@@ -10,6 +10,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { searchService } from '../services/searchService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
+import RequestContentModal from '../components/RequestContentModal'
 import './Search.css'
 
 export default function Search() {
@@ -26,6 +27,7 @@ export default function Search() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState(null)
+  const [showRequestModal, setShowRequestModal] = useState(false)
 
   const observerRef = useRef(null)
 
@@ -199,9 +201,17 @@ export default function Search() {
             <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
 
             {!hasMore && (
-              <p className="search-page__end-msg" style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
-                No more results to load.
-              </p>
+              <div style={{ textAlign: 'center', margin: '40px 0 40px', paddingBottom: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', marginBottom: '8px' }}>
+                  Could not find what you're looking for?{' '}
+                  <button 
+                    onClick={() => setShowRequestModal(true)}
+                    style={{ background: 'none', border: 'none', color: 'white', fontWeight: 'bold', cursor: 'pointer', padding: 0, fontSize: '14px' }}
+                  >
+                    Request Content
+                  </button>
+                </p>
+              </div>
             )}
           </>
         )}
@@ -212,16 +222,34 @@ export default function Search() {
             <div className="search-empty-icon">🔍</div>
             <h3>No results found</h3>
             <p>Try a different title or check your filters.</p>
-            <button
+              <button
               className="search-home-btn"
               id="search-go-home"
               onClick={() => navigate('/')}
             >
               Browse all movies
             </button>
+            <div style={{ marginTop: '24px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>
+                Could not find what you're looking for?{' '}
+                <button 
+                  onClick={() => setShowRequestModal(true)}
+                  style={{ background: 'none', border: 'none', color: 'white', fontWeight: 'bold', cursor: 'pointer', padding: 0, fontSize: '14px' }}
+                >
+                  Request Content
+                </button>
+              </p>
+            </div>
           </div>
         )}
       </div>
+
+      {showRequestModal && (
+        <RequestContentModal 
+          query={query || genre} 
+          onClose={() => setShowRequestModal(false)} 
+        />
+      )}
     </main>
   )
 }

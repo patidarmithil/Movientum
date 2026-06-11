@@ -174,9 +174,9 @@ export default function Home() {
       <div className="home-aurora-bg" aria-hidden="true">
         <Aurora
           colorStops={['#5227FF', '#B497CF', '#080808']}
-          blend={0.7}
-          amplitude={1.2}
-          speed={0.5}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
         />
         <div className="home-aurora-overlay" />
       </div>

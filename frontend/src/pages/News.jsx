@@ -93,10 +93,10 @@ export default function News() {
       {/* Aurora bg */}
       <div className="news-aurora-bg" aria-hidden="true">
         <Aurora
-          colorStops={['#B048FF', '#2D1B69', '#080808']}
-          blend={0.6}
+          colorStops={["#FF4E50", "#F9D423", "#E100FF"]}
+          blend={0.5}
           amplitude={1.0}
-          speed={0.4}
+          speed={0.7}
         />
         <div className="news-aurora-overlay" />
       </div>

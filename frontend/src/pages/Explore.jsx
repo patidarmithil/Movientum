@@ -9,6 +9,7 @@ import { useSearchParams } from 'react-router-dom'
 import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
+import Aurora from '../components/Aurora'
 import './Explore.css'
 
 const SORT_OPTIONS = [
@@ -271,6 +272,17 @@ export default function Explore() {
 
   return (
     <main className="explore-page page-content">
+      {/* ── Background Aurora Animation ── */}
+      <div className="explore-aurora-bg" aria-hidden="true">
+        <Aurora
+          colorStops={["#7928CA", "#FF0080", "#00DFD8"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
+        />
+        <div className="explore-aurora-overlay" />
+      </div>
+
       {/* Mobile sidebar overlay */}
       <div 
         className={`explore-sidebar-backdrop${filtersOpen ? ' explore-sidebar-backdrop--open' : ''}`}

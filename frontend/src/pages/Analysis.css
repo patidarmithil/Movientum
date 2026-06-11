@@ -4,6 +4,30 @@
   margin: 0 auto;
   color: #f3f4f6;
   font-family: 'Inter', sans-serif;
+  position: relative;
+}
+
+/* ── Background Aurora Animation ── */
+.analysis-aurora-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 500px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  overflow: hidden;
+}
+
+.analysis-aurora-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent 30%, var(--bg-void) 100%),
+              linear-gradient(to right, transparent 50%, var(--bg-void) 100%);
 }
 
 /* Header & Tags */

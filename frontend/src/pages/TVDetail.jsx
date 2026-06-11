@@ -41,6 +41,7 @@ export default function TVDetail() {
   const [watchBusy,     setWatchBusy]     = useState(false)
   const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
+  const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
 
   const handleRequestRating = async () => {
@@ -192,7 +193,8 @@ export default function TVDetail() {
               <img
                 src={posterUrl}
                 alt={`${show.title} poster`}
-                className="movie-detail__poster"
+                className="movie-detail__poster clickable-poster"
+                onClick={() => setIsModalOpen(true)}
                 onError={() => setHasImgError(true)}
               />
             ) : (
@@ -265,7 +267,12 @@ export default function TVDetail() {
             {createdBy.length > 0 && (
               <p className="movie-detail__director">
                 <span className="label">Created by</span>{' '}
-                {createdBy.join(', ')}
+                {createdBy.map((c, idx) => (
+                  <span key={c.id}>
+                    <Link to={`/person/${c.id}`} className="director-link">{c.name}</Link>
+                    {idx < createdBy.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
               </p>
             )}
 
@@ -312,6 +319,46 @@ export default function TVDetail() {
             {/* Toast */}
             {watchMsg && (
               <p className="movie-detail__toast" aria-live="polite">{watchMsg}</p>
+            )}
+
+            {/* Seasons Details Card */}
+            {show.seasons && show.seasons.length > 0 && (
+              <div className="tv-detail__seasons">
+                <h4 className="tv-detail__seasons-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px', opacity: 0.8, verticalAlign: 'middle' }}>
+                    <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                    <polyline points="17 2 12 7 7 2"></polyline>
+                  </svg>
+                  Season Details
+                </h4>
+                <div className="tv-detail__seasons-list">
+                  {show.seasons.map((s, idx) => (
+                    <div key={s.id} className="tv-season-item">
+                      <span className="tv-season-name">{idx + 1}) {s.name}</span>
+                      <span className="tv-season-info">
+                        <span className="tv-season-episodes">{s.episode_count} Episodes</span>
+                        {s.air_date && (
+                          <>
+                            <span className="dot">·</span>
+                            <span className="tv-season-date">Aired: {new Date(s.air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {show.next_episode_to_air && (
+                  <div className="tv-detail__upcoming">
+                    <span className="tv-upcoming-badge">Upcoming</span>
+                    <span className="tv-upcoming-info">
+                      S{show.next_episode_to_air.season_number}E{show.next_episode_to_air.episode_number} - {show.next_episode_to_air.name || 'TBA'}
+                      {show.next_episode_to_air.air_date && (
+                        <span className="tv-upcoming-date"> ({new Date(show.next_episode_to_air.air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })})</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -362,6 +409,22 @@ export default function TVDetail() {
           </div>
         </section>
       </div>
+
+      {/* Full screen modal */}
+      {isModalOpen && posterUrl && (
+        <div 
+          className="person-page-image-modal" 
+          onClick={() => setIsModalOpen(false)}
+        >
+          <button className="person-page-image-modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+          <img 
+            src={show.poster_path ? `${TMDB_IMAGE_BASE}/w780${show.poster_path}` : posterUrl} 
+            alt={show.title} 
+            className="person-page-image-modal-img"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </main>
   )
 }

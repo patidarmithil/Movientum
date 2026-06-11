@@ -214,3 +214,29 @@
   background: linear-gradient(to top, rgba(176, 72, 255, 0.6) 0%, rgba(176, 72, 255, 0) 100%);
 }
 
+/* Fluid grid overrides for standard card and skeleton inside grids (Explore / browse lists) */
+.explore-grid .movie-card--standard,
+.movie-grid .movie-card--standard {
+  width: 100%;
+}
+
+.explore-grid .movie-card--standard .movie-card__poster-wrap,
+.movie-grid .movie-card--standard .movie-card__poster-wrap {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+}
+
+.explore-grid .movie-card-skeleton,
+.movie-grid .movie-card-skeleton {
+  width: 100%;
+}
+
+.explore-grid .movie-card-skeleton__poster,
+.movie-grid .movie-card-skeleton__poster {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+}
+
+

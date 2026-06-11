@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { userService } from '../services/userService'
+import Aurora from '../components/Aurora'
 import './Analysis.css'
 
 // ── 1. Genre Distribution Donut Chart ──
@@ -448,6 +449,17 @@ export default function Analysis() {
 
   return (
     <div className="analysis-page">
+      {/* ── Background Aurora Animation ── */}
+      <div className="analysis-aurora-bg" aria-hidden="true">
+        <Aurora
+          colorStops={["#00FF87", "#60EFFF", "#0061ff"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
+        />
+        <div className="analysis-aurora-overlay" />
+      </div>
+
       <header className="analysis-header">
         <div className="header-info">
           <h1>Taste Insights Engine</h1>

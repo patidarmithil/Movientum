@@ -16,6 +16,7 @@ import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
+import Aurora from '../components/Aurora'
 import './Dashboard.css'
 
 const TABS = [
@@ -173,6 +174,17 @@ export default function Dashboard() {
 
   return (
     <main className="dashboard page-content" id="dashboard-page">
+      {/* ── Background Aurora Animation ── */}
+      <div className="dashboard-aurora-bg" aria-hidden="true">
+        <Aurora
+          colorStops={["#00F2FE", "#4FACFE", "#6A11CB"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
+        />
+        <div className="dashboard-aurora-overlay" />
+      </div>
+
       <div className="container dashboard__inner">
 
         {/* ── User Hero ── */}

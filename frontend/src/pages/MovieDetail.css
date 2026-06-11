@@ -98,6 +98,7 @@
 .movie-detail__meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   font-size: var(--text-sm);
   color: var(--text-muted);
@@ -119,6 +120,18 @@
 .movie-detail__director {
   font-size: var(--text-sm);
   color: var(--text-muted);
+}
+
+.director-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity var(--ease-hover);
+}
+
+.director-link:hover {
+  text-decoration: underline;
+  opacity: 0.8;
 }
 
 .movie-detail__director .label {
@@ -259,5 +272,191 @@
 
 .rating-needed-box__btn:disabled {
   opacity: 0.7;
+}
+
+/* ── Poster Hover ── */
+.clickable-poster {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.clickable-poster:hover {
+  transform: scale(1.02);
+  box-shadow: 0 12px 40px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Financial Details ── */
+.movie-detail__actions-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  flex-wrap: wrap;
+}
+
+.movie-detail__financials {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-4, 16px);
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  align-items: center;
+}
+
+.financial-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.financial-label {
+  color: var(--text-muted, #9CA3AF);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.financial-value {
+  color: var(--text-primary, #ffffff);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.financial-value .usd-val {
+  color: #10B981; /* emerald green */
+}
+
+.financial-value .inr-val {
+  color: var(--text-muted, #9CA3AF);
+  font-weight: 400;
+  font-size: 10px;
+}
+
+@media (max-width: 500px) {
+  .movie-detail__actions-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3, 12px);
+  }
+  .movie-detail__financials {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2, 8px);
+    padding: var(--space-3, 12px);
+  }
+  .financial-item {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+/* ── TV Seasons Card ── */
+.tv-detail__seasons {
+  margin-top: var(--space-4, 16px);
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 450px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tv-detail__seasons-title {
+  font-size: var(--text-sm, 14px);
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  margin: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
+}
+
+.tv-detail__seasons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Scrollbar for seasons list if very long */
+.tv-detail__seasons-list::-webkit-scrollbar {
+  width: 4px;
+}
+.tv-detail__seasons-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tv-detail__seasons-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.tv-season-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.tv-season-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tv-season-info {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tv-season-info .dot {
+  opacity: 0.4;
+}
+
+.tv-detail__upcoming {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.tv-upcoming-badge {
+  background: rgba(176, 72, 255, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(176, 72, 255, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tv-upcoming-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.tv-upcoming-date {
+  color: #10B981; /* green */
 }
 

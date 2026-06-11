@@ -21,6 +21,7 @@
   display: flex;
   gap: var(--space-4);
   overflow-x: auto;
+  width: 100%;
   padding-bottom: var(--space-2);
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -165,6 +166,7 @@
   display: flex;
   gap: var(--space-4);
   overflow: hidden;
+  width: 100%;
 }
 
 .castcrew__skeleton-card {
@@ -177,5 +179,11 @@
 @media (max-width: 768px) {
   .castcrew__crew-grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .castcrew__crew-grid {
+    grid-template-columns: 1fr;
   }
 }

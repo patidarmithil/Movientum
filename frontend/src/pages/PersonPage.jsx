@@ -30,6 +30,8 @@ export default function PersonPage() {
   const [bioExpanded, setBioExpanded] = useState(false)
   const [credits, setCredits] = useState([])
   const [creditsLoading, setCreditsLoading] = useState(true)
+  const [currentImgIdx, setCurrentImgIdx] = useState(0)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +53,16 @@ export default function PersonPage() {
       .finally(() => { if (!cancelled) setCreditsLoading(false) })
     return () => { cancelled = true }
   }, [personId])
+
+  const images = person?.images?.length ? person.images : (person?.profile_path ? [person.profile_path] : [])
+  
+  useEffect(() => {
+    if (!images.length || isModalOpen) return;
+    const timer = setInterval(() => {
+      setCurrentImgIdx((prev) => (prev + 1) % images.length)
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [images.length, isModalOpen])
 
   if (loading) {
     return (
@@ -94,7 +106,12 @@ export default function PersonPage() {
     <main className="person-page page-content">
       {/* ── Background Aurora Animation ── */}
       <div className="person-page-aurora-bg">
-        <Aurora colorStops={["#3A1C71", "#D76D77", "#FFAF7B"]} speed={0.5} />
+        <Aurora
+          colorStops={["#FFAF7B", "#FF5E62", "#8A2387"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
+        />
         <div className="person-page-aurora-overlay" />
       </div>
 
@@ -105,14 +122,26 @@ export default function PersonPage() {
           <div className="person-page__main-col">
             {/* ── Hero ── */}
             <div className="person-page__hero">
-              {/* Avatar */}
-              <div className="person-page__avatar-wrap">
-                {person.profile_path ? (
-                  <img
-                    src={person.profile_path}
-                    alt={person.name}
-                    className="person-page__avatar"
-                  />
+              {/* Avatar Carousel */}
+              <div 
+                className={`person-page__avatar-wrap ${images.length > 0 ? 'clickable' : ''}`}
+                onClick={() => images.length > 0 && setIsModalOpen(true)}
+              >
+                {images.length > 0 ? (
+                  <div className="person-page__avatar" style={{ position: 'relative', overflow: 'hidden' }}>
+                    {images.map((imgUrl, idx) => (
+                      <img
+                        key={imgUrl}
+                        src={imgUrl}
+                        alt={person.name}
+                        className="person-page__avatar-slide"
+                        style={{
+                          opacity: idx === currentImgIdx ? 1 : 0,
+                          zIndex: idx === currentImgIdx ? 1 : 0
+                        }}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div
                     className="person-page__avatar person-page__avatar--fallback"
@@ -234,6 +263,22 @@ export default function PersonPage() {
           )}
         </div>
       </div>
+
+      {/* Full screen modal */}
+      {isModalOpen && images.length > 0 && (
+        <div 
+          className="person-page-image-modal" 
+          onClick={() => setIsModalOpen(false)}
+        >
+          <button className="person-page-image-modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+          <img 
+            src={images[currentImgIdx]} 
+            alt={person.name} 
+            className="person-page-image-modal-img"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </main>
   )
 }

@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
+import Aurora from '../components/Aurora'
 import './CompanyPage.css'
 
 export default function CompanyPage() {
@@ -17,6 +18,7 @@ export default function CompanyPage() {
   const location = useLocation()
   const companyName = location.state?.companyName || `Company #${id}`
 
+  const [companyInfo, setCompanyInfo] = useState({ name: companyName, logoPath: null })
   const [movies, setMovies] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -35,7 +37,8 @@ export default function CompanyPage() {
     setHasMore(true)
     setLoading(true)
     setError(null)
-  }, [id])
+    setCompanyInfo({ name: location.state?.companyName || `Company #${id}`, logoPath: null })
+  }, [id, location.state?.companyName])
 
   // Fetch page data
   useEffect(() => {
@@ -54,6 +57,10 @@ export default function CompanyPage() {
         const newMovies = r.data?.movies || []
         const totalCount = r.data?.total || 0
         setTotal(totalCount)
+
+        if (r.data?.company_name) {
+          setCompanyInfo({ name: r.data.company_name, logoPath: r.data.logo_path })
+        }
 
         if (isFirstPage) {
           setMovies(newMovies)
@@ -109,13 +116,33 @@ export default function CompanyPage() {
 
   return (
     <main className="company-page page-content">
+      {/* ── Background Aurora Animation ── */}
+      <div className="company-page-aurora-bg" aria-hidden="true">
+        <Aurora
+          colorStops={["#00c6ff", "#0072ff", "#7c3aed"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.7}
+        />
+        <div className="company-page-aurora-overlay" />
+      </div>
+
       <div className="container">
         {/* ── Header ── */}
         <div className="company-page__header">
           <Link to="/" className="company-page__back">← Back</Link>
           <div className="company-page__title-row">
             <span className="company-page__badge">Production House</span>
-            <h1 className="company-page__title">{companyName}</h1>
+            <h1 className="company-page__title">
+              {companyInfo.logoPath && (
+                <img
+                  src={`https://image.tmdb.org/t/p/w92${companyInfo.logoPath}`}
+                  alt={companyInfo.name}
+                  className="company-page__logo"
+                />
+              )}
+              <span>{companyInfo.name}</span>
+            </h1>
             {total > 0 && (
               <p className="company-page__count">
                 {total.toLocaleString()} title{total !== 1 ? 's' : ''}
