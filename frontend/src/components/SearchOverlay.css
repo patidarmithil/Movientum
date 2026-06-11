@@ -1,8 +1,3 @@
-/* ── Search Overlay ─────────────────────────────────────────────────────
-   backdrop-filter can fail on desktop when the Aurora WebGL canvas creates
-   its own GPU compositing layer. Fix: use a solid-enough base background
-   that looks correct even when blur doesn't fire, plus @supports fallback.
-   ─────────────────────────────────────────────────────────────────────── */
 .search-overlay {
   position: fixed;
   top: calc(var(--navbar-h, 64px) + 20px);
@@ -11,41 +6,27 @@
   width: 90%;
   max-width: 1900px;
 
-  /* Solid fallback — always visible even when backdrop-filter is blocked */
-  background: rgba(14, 14, 22, 0.96);
+  /* keep dark but allow blur to show */
+  background: rgba(18, 18, 24, 0.75);
 
-  /* Glass blur — applied on top when the browser supports + renders it */
   backdrop-filter: blur(32px) saturate(160%);
   -webkit-backdrop-filter: blur(32px) saturate(160%);
 
-  border: 1px solid rgba(176, 72, 255, 0.15);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
 
-  /* Wide dim scrim behind the panel so page content recedes visually */
+  /* REMOVE FULL SCREEN BLOCKER */
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.8),
-    0 0 0 100vw rgba(0, 0, 0, 0.55);
+    0 24px 60px rgba(0, 0, 0, 0.7);
 
-  z-index: 1050;
-
-  /* Own stacking context — prevents inheriting transform/will-change
-     from Aurora canvas ancestors that break backdrop-filter */
-  isolation: isolate;
-
+  z-index: 999;
   animation: overlayReveal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   max-height: 85vh;
   overflow-y: auto;
   padding: 32px 40px;
 }
 
-/* When backdrop-filter is NOT supported at all — keep the solid bg */
-@supports not (backdrop-filter: blur(1px)) {
-  .search-overlay {
-    background: rgba(14, 14, 22, 0.98);
-    border-color: rgba(176, 72, 255, 0.3);
-  }
-}
+
 
 @keyframes overlayReveal {
   from { opacity: 0; transform: translate(-50%, -20px) scale(0.98); }
