@@ -256,22 +256,41 @@ class TMDBService:
         data = await self._get(f"/movie/{movie_id}/credits")
         return data
 
-    async def fetch_movie_videos(self, movie_id: int) -> Optional[list]:
-        """
-        GET /movie/{id}/videos — trailers, teasers.
-        Returns list of video objects with YouTube keys.
-        Filter: type == "Trailer", site == "YouTube"
-        """
-        data = await self._get(f"/movie/{movie_id}/videos", params={"language": "en-US"})
-        if not data:
-            return None
-        videos = data.get("results", [])
-        # Filter to YouTube trailers only
-        trailers = [
-            v for v in videos
-            if v.get("site") == "YouTube" and v.get("type") == "Trailer"
+    async def _fetch_videos_with_fallback(self, endpoint: str) -> list:
+        data = await self._get(endpoint, params={"language": "en-US"})
+        results = data.get("results", []) if data else []
+        if not results:
+            data = await self._get(endpoint)
+            results = data.get("results", []) if data else []
+            
+        videos = [
+            v for v in results
+            if v.get("site") == "YouTube" and v.get("type") in {"Trailer", "Teaser", "Clip"}
         ]
-        return trailers
+        
+        # Sort: official True first, then published_at descending
+        videos.sort(
+            key=lambda x: (x.get("official", False), x.get("published_at", "")), 
+            reverse=True
+        )
+        return videos
+
+    async def fetch_movie_videos(self, movie_id: int) -> Optional[list]:
+        return await self._fetch_videos_with_fallback(f"/movie/{movie_id}/videos")
+
+    async def fetch_tv_videos(self, tv_id: int) -> Optional[list]:
+        return await self._fetch_videos_with_fallback(f"/tv/{tv_id}/videos")
+
+    async def fetch_tv_season_videos(self, tv_id: int, season_number: int) -> Optional[list]:
+        return await self._fetch_videos_with_fallback(f"/tv/{tv_id}/season/{season_number}/videos")
+
+    async def fetch_movie_title(self, movie_id: int) -> Optional[str]:
+        data = await self.fetch_movie_detail(movie_id)
+        return data.get("title") if data else None
+
+    async def fetch_tv_title(self, tv_id: int) -> Optional[str]:
+        data = await self.fetch_tv_detail(tv_id)
+        return data.get("name") if data else None
 
     async def search_movies(self, query: str, page: int = 1) -> Optional[dict]:
         """

@@ -15,6 +15,7 @@ import './Explore.css'
 const SORT_OPTIONS = [
   { value: 'popularity',   label: 'Most Popular' },
   { value: 'rating',       label: 'Top Rated' },
+  { value: 'moctale',      label: 'Moctale Score' },
   { value: 'release_date', label: 'Newest First' },
   { value: 'title',        label: 'A – Z' },
 ]

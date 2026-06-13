@@ -1,0 +1,126 @@
+.install-prompt-overlay {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.install-prompt-modal {
+  pointer-events: auto;
+  background: rgba(18, 18, 22, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.install-prompt-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.install-prompt-close:hover {
+  color: #fff;
+}
+
+.install-prompt-title {
+  margin: 0 0 8px 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.25rem;
+  color: #fff;
+}
+
+.install-prompt-desc {
+  margin: 0 0 16px 0;
+  font-size: 0.9rem;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.install-prompt-os-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.install-os-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  padding: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.install-os-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.install-os-btn.active {
+  background: #B048FF;
+  border-color: #B048FF;
+}
+
+.install-prompt-steps {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.install-prompt-steps h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  color: #B048FF;
+}
+
+.install-prompt-steps ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  color: #d1d5db;
+  line-height: 1.6;
+}
+
+.install-prompt-steps li {
+  margin-bottom: 6px;
+}
+
+.install-prompt-steps li:last-child {
+  margin-bottom: 0;
+}

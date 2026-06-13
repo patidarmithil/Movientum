@@ -28,6 +28,12 @@ export const movieService = {
     api.get(`/api/v1/movies/${id}`).then((r) => r.data),
 
   /**
+   * GET /api/v1/movies/{id}/videos — Trailers and teasers
+   */
+  getVideos: (id) =>
+    api.get(`/api/v1/movies/${id}/videos`).then((r) => r.data),
+
+  /**
    * GET /api/v1/movies/trending — top 20 by score
    * @returns {Promise<{ movies }>}
    */

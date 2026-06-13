@@ -235,6 +235,65 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
     return data
 
 
+# ── GET /tv/{tv_id}/videos ───────────────────────────────────────
+
+@router.get("/{tv_id}/videos", summary="TV show trailers and teasers")
+async def get_tv_videos(tv_id: int):
+    cache_key = f"tmdb:videos:tv:{tv_id}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    # Fetch TMDB TV videos
+    videos = await tmdb.fetch_tv_videos(tv_id)
+    title = await tmdb.fetch_tv_title(tv_id) or "TV Show"
+    
+    trailers = [v for v in videos if v.get("type") == "Trailer"]
+    teasers = [v for v in videos if v.get("type") == "Teaser"]
+    
+    response_data = {
+        "trailer_key": trailers[0]["key"] if trailers else None,
+        "teaser_key": teasers[0]["key"] if teasers else None,
+        "fallback_queries": {
+            "trailer": f"{title} official trailer",
+            "teaser": f"{title} teaser",
+            "season_1": f"{title} season 1 trailer"
+        }
+    }
+    
+    await set_cached(cache_key, response_data, 86400)
+    return response_data
+
+
+# ── GET /tv/{tv_id}/season/{season_number}/videos ────────────────
+
+@router.get("/{tv_id}/season/{season_number}/videos", summary="TV season trailers and teasers")
+async def get_tv_season_videos(tv_id: int, season_number: int):
+    cache_key = f"tmdb:videos:tv:{tv_id}:season:{season_number}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    # Fetch TMDB TV season videos
+    videos = await tmdb.fetch_tv_season_videos(tv_id, season_number)
+    title = await tmdb.fetch_tv_title(tv_id) or "TV Show"
+    
+    trailers = [v for v in videos if v.get("type") == "Trailer"]
+    teasers = [v for v in videos if v.get("type") == "Teaser"]
+    
+    response_data = {
+        "trailer_key": trailers[0]["key"] if trailers else None,
+        "teaser_key": teasers[0]["key"] if teasers else None,
+        "fallback_queries": {
+            "trailer": f"{title} season {season_number} official trailer",
+            "teaser": f"{title} season {season_number} teaser"
+        }
+    }
+    
+    await set_cached(cache_key, response_data, 86400)
+    return response_data
+
+
 # ── GET /tv/{tv_id}/credits ───────────────────────────────────────
 
 @router.get("/{tv_id}/credits", summary="TV show cast & crew")

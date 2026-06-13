@@ -75,6 +75,21 @@ export default function Navbar() {
           {/* Search Trigger */}
           <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
           
+          {/* Help nav button */}
+          <NavLink
+            to="/help"
+            className={({ isActive }) =>
+              `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+            }
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span>Help</span>
+          </NavLink>
+
           {/* News nav button */}
           <NavLink
             to="/news"
@@ -291,6 +306,14 @@ export default function Navbar() {
               >
                 <span>🔍</span> Search
               </button>
+              
+              <NavLink 
+                to="/help" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>❓</span> Help
+              </NavLink>
               
               <NavLink 
                 to="/news" 

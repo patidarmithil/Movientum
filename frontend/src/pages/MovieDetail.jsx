@@ -18,6 +18,7 @@ import MovieCard from '../components/MovieCard'
 import RatingMeter from '../components/RatingMeter'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import CastCrew from '../components/CastCrew'
+import TrailerModal from '../components/TrailerModal'
 import ProductionTags from '../components/ProductionTags'
 import ShinyText from '../components/ShinyText'
 import './MovieDetail.css'
@@ -52,6 +53,9 @@ export default function MovieDetail() {
   const [watchMsg,      setWatchMsg]      = useState(null)
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
+  
+  const [videosData,    setVideosData]    = useState(null)
+  const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
 
   const handleRequestRating = async () => {
     if (!movie || reqNeededState.loading || reqNeededState.success) return
@@ -80,6 +84,10 @@ export default function MovieDetail() {
       .then((data) => { if (!cancelled) setMovie(data) })
       .catch(() => { if (!cancelled) setError('Failed to load movie') })
       .finally(() => { if (!cancelled) setLoading(false) })
+      
+    movieService.getVideos(movieId)
+      .then((data) => { if (!cancelled) setVideosData(data) })
+      .catch(() => {})
 
     return () => { cancelled = true }
   }, [movieId])
@@ -304,6 +312,13 @@ export default function MovieDetail() {
                     >
                       {watchStatus.watchlisted ? '★ In Watchlist' : '+ Watchlist'}
                     </button>
+                    <button
+                      className="btn btn--secondary btn--md btn--trailer"
+                      onClick={() => setIsTrailerModalOpen(true)}
+                      aria-label="Play Trailer"
+                    >
+                      ▶ Trailer
+                    </button>
                   </>
                 ) : (
                   <>
@@ -313,6 +328,13 @@ export default function MovieDetail() {
                     <Link to="/login" className="btn btn--secondary btn--md">
                       ○ Mark Watched
                     </Link>
+                    <button
+                      className="btn btn--secondary btn--md btn--trailer"
+                      onClick={() => setIsTrailerModalOpen(true)}
+                      aria-label="Play Trailer"
+                    >
+                      ▶ Trailer
+                    </button>
                   </>
                 )}
               </div>
@@ -428,6 +450,15 @@ export default function MovieDetail() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Trailer Modal */}
+      {videosData && (
+        <TrailerModal
+          isOpen={isTrailerModalOpen}
+          onClose={() => setIsTrailerModalOpen(false)}
+          data={videosData}
+        />
       )}
     </main>
   )
