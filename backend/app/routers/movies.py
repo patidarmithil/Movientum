@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.database import AsyncSessionLocal, get_db
-from app.db.orm_models import Director, Genre, Movie, MovieDirector, MovieGenre
+from app.db.orm_models import Director, Genre, Movie, MovieDirector, MovieGenre, MovieRating, TvRating
 from datetime import datetime, timezone, date
 
 def utcnow():
@@ -58,6 +58,40 @@ router = APIRouter()
 
 
 # ── Helpers ─────────────────────────────────────────────────────
+
+async def _bulk_fetch_moctale(db: AsyncSession, item_ids: list[int], media_types: list[str]) -> dict:
+    """Returns dict: {item_id: {dominant_category, dominant_pct, score, total_votes}}"""
+    movie_ids = [item_ids[i] for i, mt in enumerate(media_types) if mt != "tv"]
+    tv_ids    = [item_ids[i] for i, mt in enumerate(media_types) if mt == "tv"]
+
+    result = {}
+
+    if movie_ids:
+        rows = await db.execute(select(MovieRating).where(MovieRating.id.in_(movie_ids)))
+        for r in rows.scalars().all():
+            result[r.id] = _compute_dominant(r)
+
+    if tv_ids:
+        rows = await db.execute(select(TvRating).where(TvRating.id.in_(tv_ids)))
+        for r in rows.scalars().all():
+            result[r.id] = _compute_dominant(r)
+
+    return result
+
+def _compute_dominant(r) -> dict:
+    cats = {
+        "perfection": r.perfection or 0.0,
+        "go_for_it":  r.go_for_it  or 0.0,
+        "timepass":   r.timepass   or 0.0,
+        "skip":       r.skip       or 0.0,
+    }
+    dominant = max(cats, key=cats.get)
+    return {
+        "dominant_category": dominant,
+        "dominant_pct": round(cats[dominant]),
+        "score": r.score,
+        "total_votes": r.total_votes,
+    }
 
 def _release_year(movie: Movie) -> Optional[int]:
     """Extract year from release_date Date object."""
@@ -207,6 +241,14 @@ async def get_trending(db: AsyncSession = Depends(get_db)):
         formatted = [_movie_to_list_item(m) for m in local_movies]
 
     # We use "movies" key because frontend expects {"movies": [...]} for trending
+    
+    # Attach moctale_rating
+    item_ids = [item["id"] for item in formatted]
+    item_types = [item.get("media_type", "movie") for item in formatted]
+    moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+    for item in formatted:
+        item["moctale_rating"] = moctale_map.get(item["id"])
+
     data = {"movies": formatted}
     
     # Cache for TTL_TRENDING (5 hours), or 10 seconds if fallback
@@ -265,7 +307,7 @@ async def explore_movies(
     min_rating: float         = Query(default=0.0,  ge=0, le=10, description="Minimum vote_average"),
     year_from:  Optional[int] = Query(default=None, ge=1900, description="Release year ≥"),
     year_to:    Optional[int] = Query(default=None, ge=1900, description="Release year ≤"),
-    sort:       str           = Query(default="popularity", description="Sort: popularity|rating|release_date|title"),
+    sort:       str           = Query(default="popularity", description="Sort: popularity|rating|release_date|title|moctale"),
     page:       int           = Query(default=1, ge=1),
     limit:      int           = Query(default=24, ge=1, le=100),
     companies:  Optional[str] = Query(default=None, description="Comma-separated TMDB company IDs"),
@@ -279,7 +321,7 @@ async def explore_movies(
     genres: comma-separated, e.g. "Action,Drama".
     min_rating: floor for vote_average.
     year_from / year_to: inclusive release year range.
-    sort: popularity | rating | release_date | title.
+    sort: popularity | rating | release_date | title | moctale.
     Cached 10 minutes per combo.
     """
     from hashlib import md5
@@ -362,6 +404,9 @@ async def explore_movies(
     elif sort == "title":
         params_movie["sort_by"] = "original_title.asc"
         params_tv["sort_by"] = "original_name.asc"
+    elif sort == "moctale":
+        params_movie["sort_by"] = "popularity.desc"
+        params_tv["sort_by"] = "popularity.desc"
 
     # Fetch based on type filter
     if type == "movie":
@@ -434,6 +479,16 @@ async def explore_movies(
         deduped.sort(key=_get_title)
 
     formatted = [_tmdb_to_list_item(item) for item in deduped]
+
+    # Attach moctale_rating
+    item_ids = [item["id"] for item in formatted]
+    item_types = [item.get("media_type", "movie") for item in formatted]
+    moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+    for item in formatted:
+        item["moctale_rating"] = moctale_map.get(item["id"])
+
+    if sort == "moctale":
+        formatted.sort(key=lambda x: (x.get("moctale_rating") or {}).get("score") or 0, reverse=True)
 
     total_results = sum(
         resp.get("total_results", 0)
@@ -542,12 +597,47 @@ async def explore_by_genre(genre_id: int, db: AsyncSession = Depends(get_db)):
         local_movies = result.scalars().unique().all()
         formatted = [_movie_to_list_item(m) for m in local_movies]
 
+    # Attach moctale_rating
+    item_ids = [item["id"] for item in formatted]
+    item_types = [item.get("media_type", "movie") for item in formatted]
+    moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+    for item in formatted:
+        item["moctale_rating"] = moctale_map.get(item["id"])
+
     data = {"movies": formatted}
     
     # TTL: 30 minutes (1800 seconds), or 10 seconds if fallback
     await set_cached(cache_key, data, 10 if is_fallback else 1800)
     return data
 
+
+# ── GET /movies/{movie_id}/videos ────────────────────────────────
+@router.get("/{movie_id}/videos", summary="Movie trailers and teasers")
+async def get_movie_videos(movie_id: int):
+    cache_key = f"tmdb:videos:movie:{movie_id}"
+    cached = await get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    # Fetch TMDB videos
+    videos = await tmdb.fetch_movie_videos(movie_id)
+    title = await tmdb.fetch_movie_title(movie_id) or "Movie"
+    
+    # Process TMDB primary list
+    trailers = [v for v in videos if v.get("type") == "Trailer"]
+    teasers = [v for v in videos if v.get("type") == "Teaser"]
+    
+    response_data = {
+        "trailer_key": trailers[0]["key"] if trailers else None,
+        "teaser_key": teasers[0]["key"] if teasers else None,
+        "fallback_queries": {
+            "trailer": f"{title} official trailer",
+            "teaser": f"{title} teaser"
+        }
+    }
+    
+    await set_cached(cache_key, response_data, 86400)
+    return response_data
 
 # ── GET /movies/top_rated ────────────────────────────────────────
 @router.get("/top_rated", summary="Top Rated Movies & TV (TMDB dynamic)")
@@ -606,6 +696,13 @@ async def get_top_rated(db: AsyncSession = Depends(get_db)):
         result = await db.execute(stmt)
         local_movies = result.scalars().unique().all()
         formatted = [_movie_to_list_item(m) for m in local_movies]
+
+    # Attach moctale_rating
+    item_ids = [item["id"] for item in formatted]
+    item_types = [item.get("media_type", "movie") for item in formatted]
+    moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+    for item in formatted:
+        item["moctale_rating"] = moctale_map.get(item["id"])
 
     data = {"movies": formatted}
     await set_cached(cache_key, data, 10 if is_fallback else 3600)
@@ -698,6 +795,13 @@ async def get_upcoming(filter: str = Query(default="month", description="week|mo
         result = await db.execute(stmt)
         local_movies = result.scalars().unique().all()
         formatted = [_movie_to_list_item(m) for m in local_movies]
+
+    # Attach moctale_rating
+    item_ids = [item["id"] for item in formatted]
+    item_types = [item.get("media_type", "movie") for item in formatted]
+    moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+    for item in formatted:
+        item["moctale_rating"] = moctale_map.get(item["id"])
 
     data = {"movies": formatted}
     await set_cached(cache_key, data, 10 if is_fallback else 1800)

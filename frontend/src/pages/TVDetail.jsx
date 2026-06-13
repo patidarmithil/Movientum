@@ -21,6 +21,7 @@ import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RatingMeter from '../components/RatingMeter'
 import ProductionTags from '../components/ProductionTags'
+import TrailerModal from '../components/TrailerModal'
 import ShinyText from '../components/ShinyText'
 import './MovieDetail.css'   // reuse same layout CSS
 
@@ -44,6 +45,9 @@ export default function TVDetail() {
   const [watchMsg,      setWatchMsg]      = useState(null)
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
+
+  const [videosData,    setVideosData]    = useState(null)
+  const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
 
   const handleRequestRating = async () => {
     if (!show || reqNeededState.loading || reqNeededState.success) return
@@ -72,6 +76,10 @@ export default function TVDetail() {
       .then((r) => { if (!cancelled) setShow(r.data) })
       .catch(() => { if (!cancelled) setError('Failed to load TV show') })
       .finally(() => { if (!cancelled) setLoading(false) })
+      
+    api.get(`/api/v1/tv/${tvId}/videos`)
+      .then((r) => { if (!cancelled) setVideosData(r.data) })
+      .catch(() => {})
 
     api.get(`/api/v1/recommendations/similar/${tvId}?media_type=tv`)
       .then((r) => {
@@ -304,6 +312,13 @@ export default function TVDetail() {
                   >
                     {watchStatus.watchlisted ? '★ In Watchlist' : '+ Watchlist'}
                   </button>
+                  <button
+                    className="btn btn--secondary btn--md btn--trailer"
+                    onClick={() => setIsTrailerModalOpen(true)}
+                    aria-label="Play Trailer"
+                  >
+                    ▶ Trailer
+                  </button>
                 </>
               ) : (
                 <>
@@ -313,6 +328,13 @@ export default function TVDetail() {
                   <Link to="/login" className="btn btn--secondary btn--md">
                     ○ Mark Watched
                   </Link>
+                  <button
+                    className="btn btn--secondary btn--md btn--trailer"
+                    onClick={() => setIsTrailerModalOpen(true)}
+                    aria-label="Play Trailer"
+                  >
+                    ▶ Trailer
+                  </button>
                 </>
               )}
             </div>
@@ -431,6 +453,17 @@ export default function TVDetail() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Trailer Modal */}
+      {videosData && (
+        <TrailerModal
+          isOpen={isTrailerModalOpen}
+          onClose={() => setIsTrailerModalOpen(false)}
+          data={videosData}
+          seasons={show?.seasons}
+          tvId={tvId}
+        />
       )}
     </main>
   )

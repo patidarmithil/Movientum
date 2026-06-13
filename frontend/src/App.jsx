@@ -13,6 +13,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
+import InstallPrompt from './components/InstallPrompt'
 import ProtectedRoute from './components/ProtectedRoute'
 import Home from './pages/Home'
 import MovieList from './pages/MovieList'
@@ -28,6 +29,7 @@ import TVDetail from './pages/TVDetail'
 import News from './pages/News'
 import CompanyPage from './pages/CompanyPage'
 import CountryPage from './pages/CountryPage'
+import Help from './pages/Help'
 import './index.css'
 import './components/Navbar.css'
 
@@ -47,6 +49,7 @@ function AppRoutes() {
     <>
       <LogoutListener />
       <Navbar />
+      <InstallPrompt />
       <Routes>
         {/* Public */}
         <Route path="/"           element={<Home />} />
@@ -82,6 +85,9 @@ function AppRoutes() {
 
         {/* Improvement 1.6 — Explore */}
         <Route path="/explore" element={<Explore />} />
+
+        {/* Improvement H — Help */}
+        <Route path="/help" element={<Help />} />
 
         {/* Improvement 1.7 — TV Shows */}
         <Route path="/tv/:id" element={<TVDetail />} />

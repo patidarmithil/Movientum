@@ -4,6 +4,19 @@ import { useState } from 'react'
 import BorderGlow from './BorderGlow'
 import './MovieCard.css'
 
+const MOCTALE_COLORS = {
+  perfection: '#A855F7',
+  go_for_it:  '#22C55E',
+  timepass:   '#EAB308',
+  skip:       '#EF4444',
+}
+const MOCTALE_SYMBOLS = {
+  perfection: '★',
+  go_for_it:  '✓',
+  timepass:   '~',
+  skip:       '✗',
+}
+
 /**
  * MovieCard — most reusable component in Phase 2.
  *
@@ -26,6 +39,9 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory 
   const ratingColor =
     movie.vote_average >= 8 ? '#22C55E' :
     movie.vote_average >= 6 ? '#FFC300' : '#EF4444'
+
+  const mr = movie.moctale_rating
+  const hasMoctale = mr && mr.dominant_category && mr.total_votes > 10
 
   return (
     <BorderGlow
@@ -61,15 +77,20 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory 
           <div className={`movie-card__glow movie-card__glow--${ratingCategory}`} />
         )}
 
-        {/* Rating badge (Movies and TV) */}
-        {movie.vote_average > 0 && (
+        {/* Rating badge — Our logo badge preferred over TMDB */}
+        {hasMoctale ? (
           <div
-            className="movie-card__rating"
-            style={{ color: ratingColor }}
+            className="movie-card__rating movie-card__rating--moctale"
+            style={{ color: MOCTALE_COLORS[mr.dominant_category], flexDirection: 'row', gap: '4px' }}
           >
+            <span>{MOCTALE_SYMBOLS[mr.dominant_category]}</span>
+            <span className="movie-card__rating-pct">{Math.round(mr.dominant_pct)}%</span>
+          </div>
+        ) : movie.vote_average > 0 ? (
+          <div className="movie-card__rating" style={{ color: ratingColor }}>
             ★ {movie.vote_average.toFixed(1)}
           </div>
-        )}
+        ) : null}
 
         {/* TV badge */}
         {isTV && (

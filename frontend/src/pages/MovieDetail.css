@@ -57,11 +57,19 @@
 }
 
 .movie-detail__poster {
-  width: 240px;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
-  border: 1px solid var(--border);
+  width: 100%;
+  border-radius: 16px;
+  display: block;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
 }
+
+.movie-detail__poster-wrap {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+
 
 .movie-detail__poster-fallback {
   width: 240px;
@@ -459,4 +467,21 @@
 .tv-upcoming-date {
   color: #10B981; /* green */
 }
+
+.btn--trailer {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn--trailer:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
 
