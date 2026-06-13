@@ -58,7 +58,7 @@ export default function Navbar() {
         <Link to="/" className="navbar__logo" aria-label="Movientum home" onClick={() => setMobileMenuOpen(false)}>
           <img src="/favicon.svg" alt="Movientum Logo" className="navbar__logo-img" />
           <span className="navbar__logo-text">
-            MOVI
+            OVI
             <span className="brand-name__e" aria-label="E">
               <span className="brand-name__e-bar brand-name__e-bar--top"></span>
               <span className="brand-name__e-bar brand-name__e-bar--mid"></span>
@@ -253,7 +253,7 @@ export default function Navbar() {
             <div className="navbar__mobile-drawer-header">
               <Link to="/" className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
                 <img src="/favicon.svg" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
-                <span className="navbar__logo-text" style={{ fontSize: '15px' }}>MOVIENTUM</span>
+                <span className="navbar__logo-text" style={{ fontSize: '15px' }}>OVIENTUM</span>
               </Link>
               <button 
                 className="navbar__mobile-drawer-close"

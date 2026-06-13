@@ -96,18 +96,22 @@ export default function CastCrew({ movieId, isTV = false }) {
       {credits.cast.length > 0 && (
         <>
           <h3 className="castcrew__heading">Cast</h3>
-          <div className="castcrew__cast-row">
-            {credits.cast.map((p) => (
-              <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
-                <div className="cast-avatar">
-                  <Avatar person={p} size={72} />
-                </div>
-                <p className="cast-card__name">{p.name}</p>
-                {p.character && (
-                  <p className="cast-card__character">{p.character}</p>
-                )}
-              </Link>
-            ))}
+          <div className="scroll-row-container">
+            <div className="scroll-row-fade left-fade" />
+            <div className="castcrew__cast-row">
+              {credits.cast.map((p) => (
+                <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
+                  <div className="cast-avatar">
+                    <Avatar person={p} size={72} />
+                  </div>
+                  <p className="cast-card__name">{p.name}</p>
+                  {p.character && (
+                    <p className="cast-card__character">{p.character}</p>
+                  )}
+                </Link>
+              ))}
+            </div>
+            <div className="scroll-row-fade right-fade" />
           </div>
         </>
       )}
@@ -116,18 +120,22 @@ export default function CastCrew({ movieId, isTV = false }) {
       {credits.crew.length > 0 && (
         <>
           <h3 className="castcrew__heading castcrew__heading--crew">Crew</h3>
-          <div className="castcrew__crew-grid">
-            {credits.crew.map((p) => (
-              <Link key={p.id} to={`/person/${p.id}`} className="crew-card">
-                <div className="crew-avatar">
-                  <Avatar person={p} size={48} isCrew={true} />
-                </div>
-                <div className="crew-card__info">
-                  <p className="crew-card__name">{p.name}</p>
-                  <span className="crew-card__job">{p.job}</span>
-                </div>
-              </Link>
-            ))}
+          <div className="scroll-row-container">
+            <div className="scroll-row-fade left-fade" />
+            <div className="castcrew__cast-row">
+              {credits.crew.map((p) => (
+                <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
+                  <div className="cast-avatar">
+                    <Avatar person={p} size={72} />
+                  </div>
+                  <p className="cast-card__name">{p.name}</p>
+                  {p.job && (
+                    <p className="cast-card__character">{p.job}</p>
+                  )}
+                </Link>
+              ))}
+            </div>
+            <div className="scroll-row-fade right-fade" />
           </div>
         </>
       )}

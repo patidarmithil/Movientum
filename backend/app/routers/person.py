@@ -175,8 +175,8 @@ async def get_person_credits(person_id: int):
             "popularity": w.get("popularity", 0.0) or 0.0
         })
 
-    # Slice top 24 valid normalized credits
-    top_credits = normalized[:24]
+    # Slice top 72 valid normalized credits
+    top_credits = normalized[:72]
 
     if top_credits:
         await set_cached(cache_key, top_credits, 3600)  # 1 hour

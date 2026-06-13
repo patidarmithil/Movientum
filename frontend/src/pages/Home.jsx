@@ -22,6 +22,7 @@ import Aurora from '../components/Aurora'
 import BorderGlow from '../components/BorderGlow'
 import HomeNewsStrip from '../components/HomeNewsStrip'
 import api from '../utils/api'
+import ShinyText from '../components/ShinyText'
 import './Home.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -44,7 +45,9 @@ function MovieRow({ title, movies, loading = false, seeAllHref = '/movies', chil
     <div className="movie-row section-sm">
       <div className="section-header">
         <div className="section-header-left">
-          <h2>{title}</h2>
+          <h2>
+            <ShinyText text={title} />
+          </h2>
         </div>
         <Link to={seeAllHref} className="see-all-link">See all →</Link>
       </div>
@@ -244,7 +247,9 @@ export default function Home() {
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2C12 2 12 5.5 10 7.5C8 9.5 5 11.5 5 15C5 18.87 8.13 22 12 22C15.87 22 19 18.87 19 15C19 10.5 15.5 8 15.5 8C15.5 8 13.5 9 12.5 10.5C11.5 12 12 14.5 12 14.5C12 14.5 14 13.5 14.5 11.5C15 9.5 12 2 12 2Z" />
               </svg>
-              <h3>Most Interested</h3>
+              <h3>
+                <ShinyText text="Most Interested" />
+              </h3>
             </div>
             
             <div className="sidebar-select-wrapper">

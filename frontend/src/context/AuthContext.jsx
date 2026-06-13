@@ -10,6 +10,7 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authService } from '../services/authService'
+import { storage } from '../utils/storage'
 
 const AuthContext = createContext(null)
 
@@ -30,18 +31,19 @@ export function AuthProvider({ children }) {
 
   // ── Persist helpers ─────────────────────────────────────────────
   const persist = useCallback((access, refresh, userData) => {
-    sessionStorage.setItem(KEYS.access,  access)
-    sessionStorage.setItem(KEYS.refresh, refresh)
-    sessionStorage.setItem(KEYS.user,    JSON.stringify(userData))
+    storage.setItem(KEYS.access,  access)
+    storage.setItem(KEYS.refresh, refresh)
+    storage.setItem(KEYS.user,    JSON.stringify(userData))
     setAccessToken(access)
     setUser(userData)
     setIsLoggedIn(true)
   }, [])
 
   const clearSession = useCallback(() => {
-    sessionStorage.removeItem(KEYS.access)
-    sessionStorage.removeItem(KEYS.refresh)
-    sessionStorage.removeItem(KEYS.user)
+    storage.removeItem(KEYS.access)
+    storage.removeItem(KEYS.refresh)
+    storage.removeItem(KEYS.user)
+    storage.setRememberMe(false)
     setAccessToken(null)
     setUser(null)
     setIsLoggedIn(false)
@@ -50,16 +52,16 @@ export function AuthProvider({ children }) {
   // ── Session restore on mount ────────────────────────────────────
   useEffect(() => {
     const restore = async () => {
-      const storedAccess  = sessionStorage.getItem(KEYS.access)
-      const storedRefresh = sessionStorage.getItem(KEYS.refresh)
-      const storedUser    = sessionStorage.getItem(KEYS.user)
+      const storedAccess  = storage.getItem(KEYS.access)
+      const storedRefresh = storage.getItem(KEYS.refresh)
+      const storedUser    = storage.getItem(KEYS.user)
 
       if (!storedAccess || !storedRefresh) {
         setIsLoading(false)
         return
       }
 
-      // Optimistically restore from sessionStorage
+      // Optimistically restore from storage
       try {
         const parsedUser = JSON.parse(storedUser)
         setAccessToken(storedAccess)
@@ -69,7 +71,7 @@ export function AuthProvider({ children }) {
         // Validate token with backend
         const freshUser = await authService.getMe()
         setUser(freshUser)
-        sessionStorage.setItem(KEYS.user, JSON.stringify(freshUser))
+        storage.setItem(KEYS.user, JSON.stringify(freshUser))
       } catch {
         // Token expired — try refresh
         try {
@@ -86,13 +88,15 @@ export function AuthProvider({ children }) {
   }, [persist, clearSession])
 
   // ── Public methods ──────────────────────────────────────────────
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, rememberMe) => {
+    storage.setRememberMe(rememberMe)
     const data = await authService.login(email, password)
     persist(data.access_token, data.refresh_token, data.user)
     return data
   }, [persist])
 
   const register = useCallback(async (username, email, password) => {
+    storage.setRememberMe(false)
     const data = await authService.register(username, email, password)
     persist(data.access_token, data.refresh_token, data.user)
     return data
@@ -107,10 +111,10 @@ export function AuthProvider({ children }) {
     if (refreshingRef.current) return null
     refreshingRef.current = true
     try {
-      const storedRefresh = sessionStorage.getItem(KEYS.refresh)
+      const storedRefresh = storage.getItem(KEYS.refresh)
       if (!storedRefresh) throw new Error('No refresh token')
       const data = await authService.refreshToken(storedRefresh)
-      const storedUser = sessionStorage.getItem(KEYS.user)
+      const storedUser = storage.getItem(KEYS.user)
       persist(data.access_token, data.refresh_token, data.user ?? JSON.parse(storedUser))
       return data.access_token
     } catch {

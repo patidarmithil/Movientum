@@ -271,6 +271,7 @@ async def explore_movies(
     companies:  Optional[str] = Query(default=None, description="Comma-separated TMDB company IDs"),
     countries:  Optional[str] = Query(default=None, description="Comma-separated origin country ISO codes"),
     providers:  Optional[str] = Query(default=None, description="Comma-separated watch provider IDs"),
+    type:       Optional[str] = Query(default=None, description="Filter by type: movie|tv|anime"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -288,7 +289,8 @@ async def explore_movies(
         "g": sorted(genre_list), "mr": min_rating,
         "yf": year_from, "yt": year_to,
         "s": sort, "p": page, "l": limit,
-        "comp": companies, "count": countries, "prov": providers
+        "comp": companies, "count": countries, "prov": providers,
+        "t": type
     }, sort_keys=True)
     cache_key = f"explore:{md5(params_key.encode()).hexdigest()[:12]}"
     cached = await get_cached(cache_key)
@@ -361,18 +363,50 @@ async def explore_movies(
         params_movie["sort_by"] = "original_title.asc"
         params_tv["sort_by"] = "original_name.asc"
 
-    responses = await asyncio.gather(
-        tmdb._get("/discover/movie", params=params_movie),
-        tmdb._get("/discover/tv", params=params_tv),
-        return_exceptions=True
-    )
+    # Fetch based on type filter
+    if type == "movie":
+        responses = await asyncio.gather(
+            tmdb._get("/discover/movie", params=params_movie),
+            return_exceptions=True
+        )
+    elif type == "tv":
+        responses = await asyncio.gather(
+            tmdb._get("/discover/tv", params=params_tv),
+            return_exceptions=True
+        )
+    elif type == "anime":
+        anime_genre_ids = list(genre_ids)
+        if "16" not in anime_genre_ids:
+            anime_genre_ids.append("16")
+        params_movie["with_genres"] = ",".join(anime_genre_ids)
+        params_tv["with_genres"] = ",".join(anime_genre_ids)
+        
+        params_movie["with_original_language"] = "ja"
+        params_tv["with_original_language"] = "ja"
+        
+        responses = await asyncio.gather(
+            tmdb._get("/discover/movie", params=params_movie),
+            tmdb._get("/discover/tv", params=params_tv),
+            return_exceptions=True
+        )
+    else:
+        responses = await asyncio.gather(
+            tmdb._get("/discover/movie", params=params_movie),
+            tmdb._get("/discover/tv", params=params_tv),
+            return_exceptions=True
+        )
 
     master_list = []
     for i, resp in enumerate(responses):
         if isinstance(resp, dict) and "results" in resp:
             for item in resp["results"]:
                 if "media_type" not in item:
-                    item["media_type"] = "movie" if i == 0 else "tv"
+                    if type == "movie":
+                        item["media_type"] = "movie"
+                    elif type == "tv":
+                        item["media_type"] = "tv"
+                    else:
+                        item["media_type"] = "movie" if i == 0 else "tv"
                 if not item.get("poster_path") or item.get("adult"):
                     continue
                 master_list.append(item)
@@ -409,6 +443,15 @@ async def explore_movies(
     if not total_results:
         total_results = len(formatted)
 
+    has_more = False
+    for resp in responses:
+        if isinstance(resp, dict):
+            curr_page = resp.get("page", 1)
+            tot_pages = resp.get("total_pages", 1)
+            if curr_page < tot_pages:
+                has_more = True
+                break
+
     results = formatted[:limit]
 
     data = {
@@ -416,6 +459,7 @@ async def explore_movies(
         "total":      total_results,
         "page":       page,
         "limit":      limit,
+        "has_more":   has_more,
         "all_genres": list(all_genres),  # embedded in cache — avoids DB query on HIT
     }
     await set_cached(cache_key, data, TTL_EXPLORE)

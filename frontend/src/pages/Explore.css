@@ -464,9 +464,16 @@
   }
 }
 
+@media (max-width: 768px) {
+  .explore-page__inner {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}
+
 @media (max-width: 640px) {
   .explore-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .explore-genres {

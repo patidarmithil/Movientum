@@ -170,9 +170,6 @@
   max-height: calc(100vh - 180px);
   overflow-y: auto;
   padding-right: 12px;
-  /* Fade effect at the bottom */
-  -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
 }
 
 /* Custom Scrollbar for Known For */

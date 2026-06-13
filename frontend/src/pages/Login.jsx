@@ -21,6 +21,7 @@ export default function Login() {
 
   const [email, setEmail]         = useState('')
   const [password, setPassword]   = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [showPwd, setShowPwd]     = useState(false)
   const [errors, setErrors]       = useState({})
   const [apiError, setApiError]   = useState('')
@@ -51,7 +52,7 @@ export default function Login() {
 
     setSubmitting(true)
     try {
-      await login(email, password)
+      await login(email, password, rememberMe)
       navigate(redirect, { replace: true })
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Login failed. Please try again.'
@@ -143,7 +144,12 @@ export default function Login() {
           {/* Remember me + Forgot */}
           <div className="auth-form__row">
             <label className="auth-check">
-              <input type="checkbox" id="login-remember" />
+              <input
+                type="checkbox"
+                id="login-remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
               Remember me
             </label>
             <span className="auth-form__forgot" style={{ cursor: 'default', color: 'var(--text-muted)' }}>

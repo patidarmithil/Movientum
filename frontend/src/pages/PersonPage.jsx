@@ -213,51 +213,55 @@ export default function PersonPage() {
           {!creditsLoading && credits.length === 0 ? null : (
             <section className="person-page__filmography">
               <h2 className="person-page__section-title">Known For</h2>
-              <div className="person-page__film-grid-wrap">
-                {creditsLoading ? (
-                  <div className="person-page__film-grid">
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <div key={idx} className="film-card skeleton-film-card">
-                        <div className="skeleton film-card__poster" style={{ aspectRatio: '2/3' }} />
-                        <div className="skeleton" style={{ height: 12, marginTop: 6, width: '80%', borderRadius: 4 }} />
-                        <div className="skeleton" style={{ height: 10, marginTop: 4, width: '40%', borderRadius: 4 }} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="person-page__film-grid">
-                    {credits.map((w) => {
-                      const isMovie = w.media_type === 'movie'
-                      const isTV = w.media_type === 'tv'
-                      const CardComponent = (isMovie || isTV) ? Link : 'div'
-                      const cardProps = isMovie ? { to: `/movies/${w.id}` } : (isTV ? { to: `/tv/${w.id}` } : {})
+              <div className="vertical-scroll-container">
+                <div className="vertical-scroll-fade top-fade" />
+                <div className="person-page__film-grid-wrap">
+                  {creditsLoading ? (
+                    <div className="person-page__film-grid">
+                      {Array.from({ length: 6 }).map((_, idx) => (
+                        <div key={idx} className="film-card skeleton-film-card">
+                          <div className="skeleton film-card__poster" style={{ aspectRatio: '2/3' }} />
+                          <div className="skeleton" style={{ height: 12, marginTop: 6, width: '80%', borderRadius: 4 }} />
+                          <div className="skeleton" style={{ height: 10, marginTop: 4, width: '40%', borderRadius: 4 }} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="person-page__film-grid">
+                      {credits.map((w) => {
+                        const isMovie = w.media_type === 'movie'
+                        const isTV = w.media_type === 'tv'
+                        const CardComponent = (isMovie || isTV) ? Link : 'div'
+                        const cardProps = isMovie ? { to: `/movies/${w.id}` } : (isTV ? { to: `/tv/${w.id}` } : {})
 
-                      return (
-                        <CardComponent
-                          key={`${w.media_type}-${w.id}`}
-                          className={`film-card ${(!isMovie && !isTV) ? 'film-card--disabled' : ''}`}
-                          {...cardProps}
-                        >
-                          <div className="film-card__poster-wrap">
-                            <img
-                              src={w.poster_path}
-                              alt={w.title}
-                              className="film-card__poster"
-                              loading="lazy"
-                            />
-                            {w.media_type === 'tv' && (
-                              <span className="film-card__badge">TV</span>
+                        return (
+                          <CardComponent
+                            key={`${w.media_type}-${w.id}`}
+                            className={`film-card ${(!isMovie && !isTV) ? 'film-card--disabled' : ''}`}
+                            {...cardProps}
+                          >
+                            <div className="film-card__poster-wrap">
+                              <img
+                                src={w.poster_path}
+                                alt={w.title}
+                                className="film-card__poster"
+                                loading="lazy"
+                              />
+                              {w.media_type === 'tv' && (
+                                <span className="film-card__badge">TV</span>
+                              )}
+                            </div>
+                            <p className="film-card__title">{w.title}</p>
+                            {w.release_year && (
+                              <p className="film-card__year">{w.release_year}</p>
                             )}
-                          </div>
-                          <p className="film-card__title">{w.title}</p>
-                          {w.release_year && (
-                            <p className="film-card__year">{w.release_year}</p>
-                          )}
-                        </CardComponent>
-                      )
-                    })}
-                  </div>
-                )}
+                          </CardComponent>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="vertical-scroll-fade bottom-fade" />
               </div>
             </section>
           )}
