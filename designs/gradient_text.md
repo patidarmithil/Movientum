@@ -1,0 +1,207 @@
+## Integrate the <GradientText /> component from React Bits
+
+You are helping integrate an open-source React component into an existing application.
+
+### Component: GradientText
+### Variant: JavaScript + CSS
+
+
+---
+
+### Usage Example
+```jsx
+import GradientText from './GradientText'
+
+// For a smoother animation, the gradient should start and end with the same color
+  
+<GradientText
+  colors={["#40ffaa", "#4079ff", "#40ffaa", "#4079ff", "#40ffaa"]}
+  animationSpeed={3}
+  showBorder={false}
+  className="custom-class"
+>
+  Add a splash of color!
+</GradientText>
+```
+
+### Props
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| children | ReactNode | - | The content to be displayed inside the gradient text. |
+| className | string | '' | Adds custom classes to the root element for additional styling. |
+| colors | string[] | ["#5227FF", "#FF9FFC", "#B497CF"] | Array of colors for the gradient effect. |
+| animationSpeed | number | 8 | Duration of one animation cycle in seconds. |
+| direction | 'horizontal' | 'vertical' | 'diagonal' | 'horizontal' | Direction of the gradient animation. |
+| pauseOnHover | boolean | false | Pauses the animation when hovering over the text. |
+| yoyo | boolean | true | Reverses animation direction at the end instead of looping. |
+| showBorder | boolean | false | Displays a gradient border around the text. |
+
+### Full Component Source
+```jsx
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { motion, useMotionValue, useAnimationFrame, useTransform } from 'motion/react';
+import './GradientText.css';
+
+export default function GradientText({
+  children,
+  className = '',
+  colors = ['#5227FF', '#FF9FFC', '#B497CF'],
+  animationSpeed = 8,
+  showBorder = false,
+  direction = 'horizontal',
+  pauseOnHover = false,
+  yoyo = true
+}) {
+  const [isPaused, setIsPaused] = useState(false);
+  const progress = useMotionValue(0);
+  const elapsedRef = useRef(0);
+  const lastTimeRef = useRef(null);
+
+  const animationDuration = animationSpeed * 1000;
+
+  useAnimationFrame(time => {
+    if (isPaused) {
+      lastTimeRef.current = null;
+      return;
+    }
+
+    if (lastTimeRef.current === null) {
+      lastTimeRef.current = time;
+      return;
+    }
+
+    const deltaTime = time - lastTimeRef.current;
+    lastTimeRef.current = time;
+    elapsedRef.current += deltaTime;
+
+    if (yoyo) {
+      const fullCycle = animationDuration * 2;
+      const cycleTime = elapsedRef.current % fullCycle;
+
+      if (cycleTime < animationDuration) {
+        progress.set((cycleTime / animationDuration) * 100);
+      } else {
+        progress.set(100 - ((cycleTime - animationDuration) / animationDuration) * 100);
+      }
+    } else {
+      // Continuously increase position for seamless looping
+      progress.set((elapsedRef.current / animationDuration) * 100);
+    }
+  });
+
+  useEffect(() => {
+    elapsedRef.current = 0;
+    progress.set(0);
+  }, [animationSpeed, progress, yoyo]);
+
+  const backgroundPosition = useTransform(progress, p => {
+    if (direction === 'horizontal') {
+      return `${p}% 50%`;
+    } else if (direction === 'vertical') {
+      return `50% ${p}%`;
+    } else {
+      // For diagonal, move only horizontally to avoid interference patterns
+      return `${p}% 50%`;
+    }
+  });
+
+  const handleMouseEnter = useCallback(() => {
+    if (pauseOnHover) setIsPaused(true);
+  }, [pauseOnHover]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (pauseOnHover) setIsPaused(false);
+  }, [pauseOnHover]);
+
+  const gradientAngle =
+    direction === 'horizontal' ? 'to right' : direction === 'vertical' ? 'to bottom' : 'to bottom right';
+  // Duplicate first color at the end for seamless looping
+  const gradientColors = [...colors, colors[0]].join(', ');
+
+  const gradientStyle = {
+    backgroundImage: `linear-gradient(${gradientAngle}, ${gradientColors})`,
+    backgroundSize: direction === 'horizontal' ? '300% 100%' : direction === 'vertical' ? '100% 300%' : '300% 300%',
+    backgroundRepeat: 'repeat'
+  };
+
+  return (
+    <motion.div
+      className={`animated-gradient-text ${showBorder ? 'with-border' : ''} ${className}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {showBorder && <motion.div className="gradient-overlay" style={{ ...gradientStyle, backgroundPosition }} />}
+      <motion.div className="text-content" style={{ ...gradientStyle, backgroundPosition }}>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+```
+
+### Component CSS
+```css
+.animated-gradient-text {
+  position: relative;
+  margin: 0 auto;
+  display: flex;
+  max-width: fit-content;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.25rem;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  transition: box-shadow 0.5s ease-out;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.animated-gradient-text.with-border {
+  padding: 0.35rem 0.75rem;
+}
+
+.gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gradient-overlay::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: inherit;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #120F17;
+  z-index: -1;
+}
+
+.text-content {
+  display: inline-block;
+  position: relative;
+  z-index: 2;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+```
+
+### Integration Instructions
+1. Install any listed dependencies.
+2. Copy the component source into the appropriate directory in the project.
+3. Import the CSS file alongside the component.
+4. Import and render the component using the usage example above as a starting point.
+5. Adjust props as needed for the specific use case — refer to the props table for all available options.

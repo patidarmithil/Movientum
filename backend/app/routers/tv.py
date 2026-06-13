@@ -171,7 +171,11 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="TV show not found")
 
     genres = [g["name"] for g in raw.get("genres", [])]
-    created_by = [p["name"] for p in raw.get("created_by", [])]
+    created_by = [
+        {"id": p["id"], "name": p.get("name") or "", "profile_path": p.get("profile_path")}
+        for p in raw.get("created_by", [])
+        if p.get("id")
+    ]
     networks = [n["name"] for n in raw.get("networks", [])]
     production_companies = [
         {"id": c["id"], "name": c["name"], "logo_path": c.get("logo_path")}

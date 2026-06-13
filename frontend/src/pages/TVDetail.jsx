@@ -21,6 +21,7 @@ import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RatingMeter from '../components/RatingMeter'
 import ProductionTags from '../components/ProductionTags'
+import ShinyText from '../components/ShinyText'
 import './MovieDetail.css'   // reuse same layout CSS
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -370,7 +371,7 @@ export default function TVDetail() {
               userRating={watchStatus.user_rating}
               {...(show.moctale_rating || {})}
             />
-            {!show.moctale_rating && (
+            {(!show.moctale_rating || !show.moctale_rating.total_votes) && (
               <div className="rating-needed-box">
                 <p className="rating-needed-box__msg">Want to know rating?</p>
                 <button
@@ -396,16 +397,22 @@ export default function TVDetail() {
         {/* ── Similar Items ── */}
         <section className="movie-detail__similar">
           <div className="section-header">
-            <h2>More Like This</h2>
+            <h2>
+              <ShinyText text="More Like This" />
+            </h2>
             <Link to="/explore">See all →</Link>
           </div>
-          <div className="scroll-row">
-            {similarLoading
-              ? <MovieCardSkeleton count={6} />
-              : similar.length > 0
-                ? similar.map((m) => <MovieCard key={m.id} movie={m} />)
-                : <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No similar titles found.</p>
-            }
+          <div className="scroll-row-container">
+            <div className="scroll-row-fade left-fade" />
+            <div className="scroll-row">
+              {similarLoading
+                ? <MovieCardSkeleton count={6} />
+                : similar.length > 0
+                  ? similar.map((m) => <MovieCard key={m.id} movie={m} />)
+                  : <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No similar titles found.</p>
+              }
+            </div>
+            <div className="scroll-row-fade right-fade" />
           </div>
         </section>
       </div>

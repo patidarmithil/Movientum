@@ -89,6 +89,9 @@ export default function Explore() {
   const [selectedGenres, setSelectedGenres] = useState(
     () => searchParams.get('genres')?.split(',').filter(Boolean) ?? []
   )
+  const [selectedType, setSelectedType] = useState(
+    () => searchParams.get('type') ?? ''
+  )
   const [selectedCompanies, setSelectedCompanies] = useState(
     () => searchParams.get('companies')?.split(',').filter(Boolean) ?? []
   )
@@ -138,6 +141,7 @@ export default function Explore() {
       if (minRating > 0)                 params.min_rating = minRating
       if (yearFrom > 1900)               params.year_from  = yearFrom
       if (yearTo < CURRENT_YEAR)         params.year_to    = yearTo
+      if (selectedType)                  params.type       = selectedType
 
       const r = await api.get('/api/v1/movies/explore', { params })
       const newMovies = r.data.movies ?? []
@@ -155,10 +159,10 @@ export default function Explore() {
         })
       }
 
-      if (newMovies.length < LIMIT) {
-        setHasMore(false)
+      if (r.data.has_more !== undefined) {
+        setHasMore(r.data.has_more)
       } else {
-        setHasMore(true)
+        setHasMore(newMovies.length >= LIMIT)
       }
     } catch {
       setError('Failed to load movies')
@@ -166,7 +170,7 @@ export default function Explore() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort, selectedType])
 
   // Reset page and movies list when filters change
   useEffect(() => {
@@ -185,8 +189,9 @@ export default function Explore() {
     if (yearFrom > 1900)           p.year_from  = String(yearFrom)
     if (yearTo < CURRENT_YEAR)     p.year_to    = String(yearTo)
     if (sort !== 'popularity')     p.sort       = sort
+    if (selectedType)              p.type       = selectedType
     setSearchParams(p, { replace: true })
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort, fetchMovies])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort, selectedType, fetchMovies])
 
   // Fetch subsequent pages when page increments
   useEffect(() => {
@@ -257,6 +262,7 @@ export default function Explore() {
     setYearFrom(1900)
     setYearTo(CURRENT_YEAR)
     setSort('popularity')
+    setSelectedType('')
     setPage(1)
   }
 
@@ -268,7 +274,8 @@ export default function Explore() {
     minRating > 0 ||
     yearFrom > 1900 ||
     yearTo < CURRENT_YEAR ||
-    sort !== 'popularity'
+    sort !== 'popularity' ||
+    selectedType !== ''
 
   return (
     <main className="explore-page page-content">
@@ -321,6 +328,27 @@ export default function Explore() {
                     key={o.value}
                     className={`explore-sort__btn${sort === o.value ? ' explore-sort__btn--active' : ''}`}
                     onClick={() => setSort(o.value)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Type */}
+            <div className="explore-section">
+              <p className="explore-section__label">Type</p>
+              <div className="explore-sort">
+                {[
+                  { value: '',      label: 'All Types' },
+                  { value: 'movie', label: 'Movies' },
+                  { value: 'tv',    label: 'TV Shows' },
+                  { value: 'anime', label: 'Anime' },
+                ].map((o) => (
+                  <button
+                    key={o.value}
+                    className={`explore-sort__btn${selectedType === o.value ? ' explore-sort__btn--active' : ''}`}
+                    onClick={() => setSelectedType(o.value)}
                   >
                     {o.label}
                   </button>
@@ -443,12 +471,26 @@ export default function Explore() {
             </button>
             <p className="explore-main__count">
               {total > 0 && (
-                <>{total.toLocaleString()} movie{total !== 1 ? 's' : ''}</>
+                <>
+                  {total.toLocaleString()}{' '}
+                  {selectedType === 'movie'
+                    ? `movie${total !== 1 ? 's' : ''}`
+                    : selectedType === 'tv'
+                    ? `TV show${total !== 1 ? 's' : ''}`
+                    : selectedType === 'anime'
+                    ? 'anime'
+                    : `title${total !== 1 ? 's' : ''}`}
+                </>
               )}
             </p>
             {/* Active chips */}
-            {(selectedGenres.length > 0 || selectedCompanies.length > 0 || selectedCountries.length > 0 || selectedProviders.length > 0) && (
+            {(selectedType !== '' || selectedGenres.length > 0 || selectedCompanies.length > 0 || selectedCountries.length > 0 || selectedProviders.length > 0) && (
               <div className="explore-active-chips">
+                {selectedType && (
+                  <button key="active-chip-type" className="explore-active-chip" onClick={() => setSelectedType('')}>
+                    {selectedType === 'movie' ? 'Movies' : selectedType === 'tv' ? 'TV Shows' : 'Anime'} ×
+                  </button>
+                )}
                 {selectedGenres.map((g) => (
                   <button key={g} className="explore-active-chip" onClick={() => toggleGenre(g)}>
                     {g} ×
@@ -525,6 +567,7 @@ export default function Explore() {
         </div>
 
       </div>
+      <div className="fixed-bottom-fade" />
     </main>
   )
 }

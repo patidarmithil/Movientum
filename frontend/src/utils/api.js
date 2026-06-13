@@ -6,6 +6,7 @@
  *  - Response interceptor: handle 401 → refresh → retry (with infinite-loop guard)
  */
 import axios from 'axios'
+import { storage } from './storage'
 
 const KEYS = {
   access:  'mv_access_token',
@@ -32,7 +33,7 @@ const api = axios.create({
 // ── Request interceptor — attach Bearer token ──────────────────
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem(KEYS.access)
+    const token = storage.getItem(KEYS.access)
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -64,9 +65,9 @@ api.interceptors.response.use(
     // Skip retry for refresh endpoint itself — prevents infinite loop
     if (original?.url?.includes('/auth/refresh')) {
       // Refresh failed → force logout
-      sessionStorage.removeItem(KEYS.access)
-      sessionStorage.removeItem(KEYS.refresh)
-      sessionStorage.removeItem('mv_user')
+      storage.removeItem(KEYS.access)
+      storage.removeItem(KEYS.refresh)
+      storage.removeItem('mv_user')
       window.dispatchEvent(new Event('mv:logout'))
       return Promise.reject(error)
     }
@@ -87,7 +88,7 @@ api.interceptors.response.use(
       original._retry = true
       isRefreshing = true
 
-      const storedRefresh = sessionStorage.getItem(KEYS.refresh)
+      const storedRefresh = storage.getItem(KEYS.refresh)
 
       if (!storedRefresh) {
         isRefreshing = false
@@ -103,8 +104,8 @@ api.interceptors.response.use(
           { headers: { Authorization: `Bearer ${storedRefresh}` } }
         )
         const { access_token, refresh_token } = response.data.data
-        sessionStorage.setItem(KEYS.access,  access_token)
-        sessionStorage.setItem(KEYS.refresh, refresh_token)
+        storage.setItem(KEYS.access,  access_token)
+        storage.setItem(KEYS.refresh, refresh_token)
 
         isRefreshing = false
         processQueue(null, access_token)
@@ -117,9 +118,9 @@ api.interceptors.response.use(
         processQueue(refreshError, null)
 
         // Refresh failed → clear session, redirect to login
-        sessionStorage.removeItem(KEYS.access)
-        sessionStorage.removeItem(KEYS.refresh)
-        sessionStorage.removeItem('mv_user')
+        storage.removeItem(KEYS.access)
+        storage.removeItem(KEYS.refresh)
+        storage.removeItem('mv_user')
         window.dispatchEvent(new Event('mv:logout'))
 
         return Promise.reject(refreshError)

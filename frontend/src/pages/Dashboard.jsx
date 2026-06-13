@@ -242,6 +242,7 @@ export default function Dashboard() {
         </div>
 
       </div>
+      <div className="fixed-bottom-fade" />
     </main>
   )
 }

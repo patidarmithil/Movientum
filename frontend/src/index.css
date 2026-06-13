@@ -219,6 +219,43 @@ button {
   background: linear-gradient(to left, var(--bg-void) 0%, rgba(8, 8, 8, 0) 100%);
 }
 
+/* ── Vertical Scroll Fade Effects ────────────────── */
+.vertical-scroll-container {
+  position: relative;
+  width: 100%;
+}
+
+.vertical-scroll-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.vertical-scroll-fade.top-fade {
+  top: 0;
+  background: linear-gradient(to bottom, var(--bg-void) 0%, rgba(8, 8, 8, 0) 100%);
+}
+
+.vertical-scroll-fade.bottom-fade {
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg-void) 0%, rgba(8, 8, 8, 0) 100%);
+}
+
+/* ── Fixed Bottom Viewport Fade Effect ────────────── */
+.fixed-bottom-fade {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60px;
+  z-index: 100;
+  background: linear-gradient(to top, var(--bg-void) 0%, rgba(8, 8, 8, 0) 100%);
+  pointer-events: none;
+}
+
 /* ── Movie Grid ──────────────────────────────────────── */
 .movie-grid {
   display: grid;
@@ -299,17 +336,33 @@ button {
 }
 
 /* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 900px) {
+  .page-content {
+    overflow-x: hidden;
+  }
+}
+
 @media (max-width: 768px) {
   .container { padding: 0 var(--space-4); }
   .section   { padding: var(--space-10) 0; }
   .section-sm { padding: var(--space-4) 0; }
   h1 { font-size: var(--text-2xl); }
   h2 { font-size: var(--text-xl); }
+
+  /* Prevent browser auto-zooming on mobile inputs */
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 @media (max-width: 480px) {
   .movie-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

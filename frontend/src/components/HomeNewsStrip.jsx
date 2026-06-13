@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { newsService } from '../services/newsService'
 import { useAuth } from '../context/AuthContext'
 import NewsCard from './NewsCard'
+import ShinyText from './ShinyText'
 import './HomeNewsStrip.css'
 
 export default function HomeNewsStrip() {
@@ -34,7 +35,9 @@ export default function HomeNewsStrip() {
     <div className="home-news-strip section-sm">
       <div className="section-header">
         <div className="section-header-left">
-          <h2>📰 In The News</h2>
+          <h2>
+            <ShinyText text="📰 In The News" />
+          </h2>
         </div>
         <Link to="/news" className="see-all-link">All News →</Link>
       </div>
