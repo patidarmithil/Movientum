@@ -67,7 +67,7 @@ export default function Help() {
           <span>✓ Your Ratings</span>
           <span>✓ Personalized Recs</span>
           <span>✓ Episode Notifs</span>
-          <span>✓ Continue Watching</span>
+          <span>✓ Watching</span>
           <span>✓ Your Analytics</span>
           <span>✓ Personalized News</span>
         </div>
@@ -85,10 +85,10 @@ export default function Help() {
       </section>
 
       <section className="help-section">
-        <h2>📖 Tutorial: How to Use Continue Watching</h2>
+        <h2>📖 Tutorial: How to Use Watching</h2>
         <div className="tutorial-list">
           <TutorialStep number="1" title="Open a TV series" description="Open any TV series detail page." />
-          <TutorialStep number="2" title="Mark as Continue Watching" description="Click the Watched button and choose 'Continue Watching' from the dropdown." />
+          <TutorialStep number="2" title="Mark as Watching" description="Click the 'Watching' button on the TV series page." />
           <TutorialStep number="3" title="Wait for new episodes" description="When a new episode airs, you'll see a bell notification icon in the navbar." />
           <TutorialStep number="4" title="Check notifications" description="Click the bell to see which tracked shows dropped a new episode today." />
         </div>

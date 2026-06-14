@@ -19,6 +19,7 @@ celery_app = Celery(
     include=[
         "app.tasks.sync_movies",
         "app.tasks.fetch_news",
+        "app.tasks.check_episodes",
         # "app.tasks.invalidate_cache", # future
     ],
 )
@@ -51,6 +52,11 @@ celery_app.conf.update(
         "news-expire-daily": {
             "task": "app.tasks.fetch_news.expire_news_task",
             "schedule": crontab(hour=2, minute=0),    # 2 AM IST daily
+            "options": {"expires": 3600},
+        },
+        "check-episodes-daily": {
+            "task": "app.tasks.check_episodes.check_today_episodes_task",
+            "schedule": crontab(hour=4, minute=0),    # 4 AM IST daily
             "options": {"expires": 3600},
         },
     },

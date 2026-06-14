@@ -21,6 +21,7 @@ import CastCrew from '../components/CastCrew'
 import TrailerModal from '../components/TrailerModal'
 import ProductionTags from '../components/ProductionTags'
 import ShinyText from '../components/ShinyText'
+import { pageCache } from '../utils/pageCache'
 import './MovieDetail.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -41,11 +42,14 @@ export default function MovieDetail() {
   const movieId = Number(id)
   const { isLoggedIn } = useAuth()
 
-  const [movie,         setMovie]         = useState(null)
-  const [similar,       setSimilar]       = useState([])
-  const [watchStatus,   setWatchStatus]   = useState({ watched: false, watchlisted: false })
-  const [loading,       setLoading]       = useState(true)
-  const [similarLoading,setSimilarLoading]= useState(true)
+  const cacheKey = `movie-detail-${movieId}`
+  const cachedData = pageCache.get(cacheKey)
+
+  const [movie,         setMovie]         = useState(cachedData?.movie || null)
+  const [similar,       setSimilar]       = useState(cachedData?.similar || [])
+  const [watchStatus,   setWatchStatus]   = useState(cachedData?.watchStatus || { watched: false, watchlisted: false })
+  const [loading,       setLoading]       = useState(!cachedData?.movie)
+  const [similarLoading,setSimilarLoading]= useState(!cachedData?.similar)
   const [error,         setError]         = useState(null)
   const [hasImgError,   setHasImgError]   = useState(false)
   const [watchBusy,     setWatchBusy]     = useState(false)
@@ -54,7 +58,7 @@ export default function MovieDetail() {
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
   
-  const [videosData,    setVideosData]    = useState(null)
+  const [videosData,    setVideosData]    = useState(cachedData?.videosData || null)
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
 
   const handleRequestRating = async () => {
@@ -76,17 +80,31 @@ export default function MovieDetail() {
   // ── Fetch movie detail ───────────────────────────────
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    if (!movie) {
+      setLoading(true)
+    }
     setError(null)
     setHasImgError(false)
 
     movieService.getMovieById(movieId)
-      .then((data) => { if (!cancelled) setMovie(data) })
-      .catch(() => { if (!cancelled) setError('Failed to load movie') })
+      .then((data) => {
+        if (!cancelled) {
+          setMovie(data)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, movie: data })
+        }
+      })
+      .catch(() => { if (!cancelled && !movie) setError('Failed to load movie') })
       .finally(() => { if (!cancelled) setLoading(false) })
       
     movieService.getVideos(movieId)
-      .then((data) => { if (!cancelled) setVideosData(data) })
+      .then((data) => {
+        if (!cancelled) {
+          setVideosData(data)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, videosData: data })
+        }
+      })
       .catch(() => {})
 
     return () => { cancelled = true }
@@ -95,11 +113,20 @@ export default function MovieDetail() {
   // ── Fetch similar movies ─────────────────────────────
   useEffect(() => {
     let cancelled = false
-    setSimilarLoading(true)
+    if (similar.length === 0) {
+      setSimilarLoading(true)
+    }
 
     import('../utils/api').then(({ default: api }) =>
       api.get(`/api/v1/recommendations/similar/${movieId}`)
-        .then((r) => { if (!cancelled) setSimilar(r.data?.movies || r.data || []) })
+        .then((r) => {
+          const similarData = r.data?.movies || r.data || []
+          if (!cancelled) {
+            setSimilar(similarData)
+            const curr = pageCache.get(cacheKey) || {}
+            pageCache.set(cacheKey, { ...curr, similar: similarData })
+          }
+        })
         .catch(() => { if (!cancelled) setSimilar([]) })
         .finally(() => { if (!cancelled) setSimilarLoading(false) })
     )
@@ -111,7 +138,11 @@ export default function MovieDetail() {
   const fetchStatus = useCallback(() => {
     if (!isLoggedIn) return
     watchService.getStatus(movieId)
-      .then(setWatchStatus)
+      .then((status) => {
+        setWatchStatus(status)
+        const curr = pageCache.get(cacheKey) || {}
+        pageCache.set(cacheKey, { ...curr, watchStatus: status })
+      })
       .catch(() => {})
   }, [movieId, isLoggedIn])
 
@@ -423,7 +454,7 @@ export default function MovieDetail() {
           </div>
           <div className="scroll-row-container">
             <div className="scroll-row-fade left-fade" />
-            <div className="scroll-row">
+            <div id={`movie-similar-scroll-${movieId}`} className="scroll-row">
               {similarLoading
                 ? <MovieCardSkeleton count={6} />
                 : similar.length > 0

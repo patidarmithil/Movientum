@@ -12,10 +12,11 @@
  *  - Sidebar:
  *    - Most Interested / Upcoming (GET /api/v1/movies/upcoming?filter={week|month|year})
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { movieService } from '../services/movieService'
 import { useAuth } from '../context/AuthContext'
+import { useSessionState } from '../hooks/useSessionState'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
@@ -87,26 +88,34 @@ export default function Home() {
   const navigate = useNavigate()
 
   // Main columns states
-  const [trending, setTrending] = useState([])
-  const [trendLoad, setTrendLoad] = useState(true)
+  const [trending, setTrending] = useSessionState('home_trending', [])
+  const [trendLoad, setTrendLoad] = useState(trending.length === 0)
 
-  const [topRated, setTopRated] = useState([])
-  const [topRatedLoad, setTopRatedLoad] = useState(true)
+  const [topRated, setTopRated] = useSessionState('home_topRated', [])
+  const [topRatedLoad, setTopRatedLoad] = useState(topRated.length === 0)
 
-  const [genreMovies, setGenreMovies] = useState([])
-  const [genreLoad, setGenreLoad] = useState(true)
-  const [selectedGenreId, setSelectedGenreId] = useState(28) // Default: Action
+  const [selectedGenreId, setSelectedGenreId] = useSessionState('home_selectedGenreId', 28) // Default: Action
+  const [genreMovies, setGenreMovies] = useSessionState('home_genreMovies', [])
+  const [genreLoad, setGenreLoad] = useState(genreMovies.length === 0)
 
-  const [forYou, setForYou] = useState([])
-  const [forYouLoad, setForYouLoad] = useState(false)
+  const [forYou, setForYou] = useSessionState('home_forYou', [])
+  const [forYouLoad, setForYouLoad] = useState(isLoggedIn && forYou.length === 0)
 
   // Sidebar states
-  const [upcoming, setUpcoming] = useState([])
-  const [upcomingLoad, setUpcomingLoad] = useState(true)
-  const [upcomingFilter, setUpcomingFilter] = useState('month') // Default: month
+  const [upcomingFilter, setUpcomingFilter] = useSessionState('home_upcomingFilter', 'month') // Default: month
+  const [upcoming, setUpcoming] = useSessionState('home_upcoming', [])
+  const [upcomingLoad, setUpcomingLoad] = useState(upcoming.length === 0)
+
+  // Refs to track if filter changed vs initial mount
+  const lastGenreIdRef = useRef(selectedGenreId)
+  const lastUpcomingFilterRef = useRef(upcomingFilter)
 
   // Fetch Trending
   useEffect(() => {
+    if (trending.length > 0) {
+      setTrendLoad(false)
+      return
+    }
     setTrendLoad(true)
     movieService.getTrending()
       .then((data) => {
@@ -114,10 +123,15 @@ export default function Home() {
       })
       .catch(() => setTrending([]))
       .finally(() => setTrendLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Fetch Top Rated
   useEffect(() => {
+    if (topRated.length > 0) {
+      setTopRatedLoad(false)
+      return
+    }
     setTopRatedLoad(true)
     movieService.getTopRated()
       .then((data) => {
@@ -125,10 +139,16 @@ export default function Home() {
       })
       .catch(() => setTopRated([]))
       .finally(() => setTopRatedLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Fetch Genre Movies
   useEffect(() => {
+    if (lastGenreIdRef.current === selectedGenreId && genreMovies.length > 0) {
+      setGenreLoad(false)
+      return
+    }
+    lastGenreIdRef.current = selectedGenreId
     setGenreLoad(true)
     movieService.getMoviesByGenreId(selectedGenreId)
       .then((data) => {
@@ -136,12 +156,17 @@ export default function Home() {
       })
       .catch(() => setGenreMovies([]))
       .finally(() => setGenreLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGenreId])
 
   // Fetch Recommendations (For You)
   useEffect(() => {
     if (!isLoggedIn) {
       setForYou([])
+      return
+    }
+    if (forYou.length > 0) {
+      setForYouLoad(false)
       return
     }
     setForYouLoad(true)
@@ -151,10 +176,16 @@ export default function Home() {
       })
       .catch(() => setForYou([]))
       .finally(() => setForYouLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 
   // Fetch Upcoming
   useEffect(() => {
+    if (lastUpcomingFilterRef.current === upcomingFilter && upcoming.length > 0) {
+      setUpcomingLoad(false)
+      return
+    }
+    lastUpcomingFilterRef.current = upcomingFilter
     setUpcomingLoad(true)
     movieService.getUpcoming(upcomingFilter)
       .then((data) => {
@@ -162,6 +193,7 @@ export default function Home() {
       })
       .catch(() => setUpcoming([]))
       .finally(() => setUpcomingLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingFilter])
 
   const handleItemClick = (item) => {

@@ -44,6 +44,7 @@ export function AuthProvider({ children }) {
     storage.removeItem(KEYS.refresh)
     storage.removeItem(KEYS.user)
     storage.setRememberMe(false)
+    sessionStorage.clear()
     setAccessToken(null)
     setUser(null)
     setIsLoggedIn(false)
