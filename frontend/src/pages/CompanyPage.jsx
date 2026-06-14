@@ -11,6 +11,7 @@ import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
+import { pageCache } from '../utils/pageCache'
 import './CompanyPage.css'
 
 export default function CompanyPage() {
@@ -18,32 +19,49 @@ export default function CompanyPage() {
   const location = useLocation()
   const companyName = location.state?.companyName || `Company #${id}`
 
-  const [companyInfo, setCompanyInfo] = useState({ name: companyName, logoPath: null })
-  const [movies, setMovies] = useState([])
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `company-${id}`
+  const cachedData = pageCache.get(cacheKey)
+
+  const [companyInfo, setCompanyInfo] = useState(cachedData?.companyInfo || { name: companyName, logoPath: null })
+  const [movies, setMovies] = useState(cachedData?.movies || [])
+  const [loading, setLoading] = useState(cachedData ? false : true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(cachedData?.page || 1)
+  const [total, setTotal] = useState(cachedData?.total || 0)
+  const [hasMore, setHasMore] = useState(cachedData ? cachedData.hasMore : true)
 
   const observerRef = useRef(null)
 
   // Reset page & data when company id changes
   useEffect(() => {
-    setMovies([])
-    setPage(1)
-    setTotal(0)
-    setHasMore(true)
-    setLoading(true)
+    const cached = pageCache.get(`company-${id}`)
+    if (cached) {
+      setMovies(cached.movies)
+      setPage(cached.page)
+      setTotal(cached.total)
+      setHasMore(cached.hasMore)
+      setCompanyInfo(cached.companyInfo)
+      setLoading(false)
+    } else {
+      setMovies([])
+      setPage(1)
+      setTotal(0)
+      setHasMore(true)
+      setCompanyInfo({ name: location.state?.companyName || `Company #${id}`, logoPath: null })
+      setLoading(true)
+    }
     setError(null)
-    setCompanyInfo({ name: location.state?.companyName || `Company #${id}`, logoPath: null })
   }, [id, location.state?.companyName])
 
   // Fetch page data
   useEffect(() => {
     let cancelled = false
     const isFirstPage = page === 1
+
+    if (movies.length >= page * 30) {
+      return
+    }
 
     if (isFirstPage) {
       setLoading(true)
@@ -58,22 +76,38 @@ export default function CompanyPage() {
         const totalCount = r.data?.total || 0
         setTotal(totalCount)
 
+        let nextCompanyInfo = companyInfo
         if (r.data?.company_name) {
-          setCompanyInfo({ name: r.data.company_name, logoPath: r.data.logo_path })
+          nextCompanyInfo = { name: r.data.company_name, logoPath: r.data.logo_path }
+          setCompanyInfo(nextCompanyInfo)
         }
+
+        const nextHasMore = newMovies.length >= 30
+        setHasMore(nextHasMore)
 
         if (isFirstPage) {
           setMovies(newMovies)
+          pageCache.set(cacheKey, {
+            movies: newMovies,
+            page,
+            total: totalCount,
+            hasMore: nextHasMore,
+            companyInfo: nextCompanyInfo
+          })
         } else {
           setMovies((prev) => {
             const existingIds = new Set(prev.map(m => `${m.id}-${m.media_type}`))
             const uniqueNew = newMovies.filter(m => !existingIds.has(`${m.id}-${m.media_type}`))
-            return [...prev, ...uniqueNew]
+            const res = [...prev, ...uniqueNew]
+            pageCache.set(cacheKey, {
+              movies: res,
+              page,
+              total: totalCount,
+              hasMore: nextHasMore,
+              companyInfo: nextCompanyInfo
+            })
+            return res
           })
-        }
-
-        if (newMovies.length < 30) {
-          setHasMore(false)
         }
       })
       .catch(() => {

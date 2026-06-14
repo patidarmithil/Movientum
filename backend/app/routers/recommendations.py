@@ -73,6 +73,15 @@ async def get_recommendations(
     result = await recommendation_service.get_personalized_recommendations(
         db, user_id=user_id
     )
+    movies = result.get("movies", [])
+    if movies:
+        from app.routers.movies import _bulk_fetch_moctale
+        item_ids = [m["id"] for m in movies]
+        item_types = [m.get("media_type", "movie") for m in movies]
+        moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+        for m in movies:
+            m["moctale_rating"] = moctale_map.get(m["id"])
+
     await set_cached(cache_key, result, TTL_USER_RECS)
     logger.info("CACHE_SET key=%s", cache_key)
     return result
@@ -106,6 +115,13 @@ async def get_similar_items(
     
     user_uuid = UUID(current_user["sub"]) if current_user else None
     movies = await recommendation_service.get_similar_items(db, item_id=item_id, media_type=media_type, user_id=user_uuid)
+    if movies:
+        from app.routers.movies import _bulk_fetch_moctale
+        item_ids = [m["id"] for m in movies]
+        item_types = [m.get("media_type", "movie") for m in movies]
+        moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+        for m in movies:
+            m["moctale_rating"] = moctale_map.get(m["id"])
 
     result = {"movies": movies, "movie_id": item_id, "media_type": media_type}
     await set_cached(cache_key, result, _TTL_SIMILAR)

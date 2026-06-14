@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback } from 'react'
 import api from '../utils/api'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
+import { watchingTrackerService } from '../services/watchingTrackerService'
 import { useAuth } from '../context/AuthContext'
 import CastCrew from '../components/CastCrew'
 import MovieCard from '../components/MovieCard'
@@ -23,6 +24,7 @@ import RatingMeter from '../components/RatingMeter'
 import ProductionTags from '../components/ProductionTags'
 import TrailerModal from '../components/TrailerModal'
 import ShinyText from '../components/ShinyText'
+import { pageCache } from '../utils/pageCache'
 import './MovieDetail.css'   // reuse same layout CSS
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -32,21 +34,26 @@ export default function TVDetail() {
   const tvId = Number(id)
   const { isLoggedIn } = useAuth()
 
-  const [show,       setShow]       = useState(null)
-  const [loading,    setLoading]    = useState(true)
+  const cacheKey = `tv-detail-${tvId}`
+  const cachedData = pageCache.get(cacheKey)
+
+  const [show,       setShow]       = useState(cachedData?.show || null)
+  const [loading,    setLoading]    = useState(!cachedData?.show)
   const [error,      setError]      = useState(null)
   const [hasImgError, setHasImgError] = useState(false)
-  const [similar,       setSimilar]       = useState([])
-  const [similarLoading, setSimilarLoading] = useState(true)
+  const [similar,       setSimilar]       = useState(cachedData?.similar || [])
+  const [similarLoading, setSimilarLoading] = useState(!cachedData?.similar)
 
-  const [watchStatus,   setWatchStatus]   = useState({ watched: false, watchlisted: false })
+  const [watchStatus,   setWatchStatus]   = useState(cachedData?.watchStatus || { watched: false, watchlisted: false })
+  const [trackingStatus, setTrackingStatus] = useState(cachedData?.trackingStatus || false)
+  const [trackingBusy, setTrackingBusy] = useState(false)
   const [watchBusy,     setWatchBusy]     = useState(false)
   const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
 
-  const [videosData,    setVideosData]    = useState(null)
+  const [videosData,    setVideosData]    = useState(cachedData?.videosData || null)
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
 
   const handleRequestRating = async () => {
@@ -68,22 +75,44 @@ export default function TVDetail() {
   // ── Fetch TV detail ──────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    if (!show) {
+      setLoading(true)
+    }
     setError(null)
     setHasImgError(false)
 
     api.get(`/api/v1/tv/${tvId}`)
-      .then((r) => { if (!cancelled) setShow(r.data) })
-      .catch(() => { if (!cancelled) setError('Failed to load TV show') })
+      .then((r) => {
+        if (!cancelled) {
+          setShow(r.data)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, show: r.data })
+        }
+      })
+      .catch(() => { if (!cancelled && !show) setError('Failed to load TV show') })
       .finally(() => { if (!cancelled) setLoading(false) })
       
     api.get(`/api/v1/tv/${tvId}/videos`)
-      .then((r) => { if (!cancelled) setVideosData(r.data) })
+      .then((r) => {
+        if (!cancelled) {
+          setVideosData(r.data)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, videosData: r.data })
+        }
+      })
       .catch(() => {})
 
+    if (similar.length === 0) {
+      setSimilarLoading(true)
+    }
     api.get(`/api/v1/recommendations/similar/${tvId}?media_type=tv`)
       .then((r) => {
-        if (!cancelled) setSimilar(r.data.movies || [])
+        const sim = r.data.movies || []
+        if (!cancelled) {
+          setSimilar(sim)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, similar: sim })
+        }
       })
       .catch(() => {
         if (!cancelled) setSimilar([])
@@ -99,33 +128,45 @@ export default function TVDetail() {
   const fetchStatus = useCallback(() => {
     if (!isLoggedIn) return
     watchService.getStatus(tvId)
-      .then(setWatchStatus)
+      .then((status) => {
+        setWatchStatus(status)
+        const curr = pageCache.get(cacheKey) || {}
+        pageCache.set(cacheKey, { ...curr, watchStatus: status })
+      })
+      .catch(() => {})
+    watchingTrackerService.getStatus(tvId)
+      .then(res => {
+        setTrackingStatus(res.tracked)
+        const curr = pageCache.get(cacheKey) || {}
+        pageCache.set(cacheKey, { ...curr, trackingStatus: res.tracked })
+      })
       .catch(() => {})
   }, [tvId, isLoggedIn])
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
-  // ── Toggle watched ───────────────────────────────────
-  const handleWatchedToggle = async () => {
-    if (!isLoggedIn || watchBusy) return
-    setWatchBusy(true)
+  // ── Toggle tracking ───────────────────────────────────
+  const handleTrackingToggle = async () => {
+    if (!isLoggedIn || trackingBusy) return
+    setTrackingBusy(true)
     try {
-      if (watchStatus.watched) {
-        await watchService.removeFromHistory(tvId)
-        setWatchStatus((s) => ({ ...s, watched: false }))
-        setWatchMsg('Removed from watch history')
+      if (trackingStatus) {
+        await watchingTrackerService.untrack(tvId)
+        setTrackingStatus(false)
+        setWatchMsg('Stopped tracking')
         setTimeout(() => setWatchMsg(null), 2500)
       } else {
-        await watchService.markWatched(tvId)
-        setWatchStatus((s) => ({ ...s, watched: true }))
-        setWatchMsg('Added to watch history!')
+        const nextDate = show.next_episode_to_air ? show.next_episode_to_air.air_date : null
+        await watchingTrackerService.track(tvId, nextDate)
+        setTrackingStatus(true)
+        setWatchMsg('Tracking new episodes!')
         setTimeout(() => setWatchMsg(null), 2500)
       }
     } catch {
       setWatchMsg('Failed — try again')
       setTimeout(() => setWatchMsg(null), 2500)
     } finally {
-      setWatchBusy(false)
+      setTrackingBusy(false)
     }
   }
 
@@ -296,12 +337,12 @@ export default function TVDetail() {
                 <>
                   <button
                     id={`btn-watched-${tvId}`}
-                    className={`btn btn--md ${watchStatus.watched ? 'btn--success' : 'btn--secondary'}`}
-                    onClick={handleWatchedToggle}
-                    disabled={watchBusy}
-                    aria-label={watchStatus.watched ? 'Remove from watched' : 'Mark as watched'}
+                    className={`btn btn--md ${trackingStatus ? 'btn--success' : 'btn--secondary'}`}
+                    onClick={handleTrackingToggle}
+                    disabled={trackingBusy}
+                    aria-label={trackingStatus ? 'Untrack show' : 'Track show'}
                   >
-                    {watchStatus.watched ? '✓ Watched' : '○ Mark Watched'}
+                    {trackingStatus ? '✓ Watching' : '▶ Watching'}
                   </button>
                   <button
                     id={`btn-watchlist-${tvId}`}
@@ -326,7 +367,7 @@ export default function TVDetail() {
                     + Watchlist
                   </Link>
                   <Link to="/login" className="btn btn--secondary btn--md">
-                    ○ Mark Watched
+                    ▶ Watching
                   </Link>
                   <button
                     className="btn btn--secondary btn--md btn--trailer"
@@ -426,7 +467,7 @@ export default function TVDetail() {
           </div>
           <div className="scroll-row-container">
             <div className="scroll-row-fade left-fade" />
-            <div className="scroll-row">
+            <div id={`tv-similar-scroll-${tvId}`} className="scroll-row">
               {similarLoading
                 ? <MovieCardSkeleton count={6} />
                 : similar.length > 0

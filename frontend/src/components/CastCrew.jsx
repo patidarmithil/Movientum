@@ -98,7 +98,7 @@ export default function CastCrew({ movieId, isTV = false }) {
           <h3 className="castcrew__heading">Cast</h3>
           <div className="scroll-row-container">
             <div className="scroll-row-fade left-fade" />
-            <div className="castcrew__cast-row">
+            <div id={`cast-scroll-${movieId}`} className="castcrew__cast-row">
               {credits.cast.map((p) => (
                 <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
                   <div className="cast-avatar">
@@ -122,7 +122,7 @@ export default function CastCrew({ movieId, isTV = false }) {
           <h3 className="castcrew__heading castcrew__heading--crew">Crew</h3>
           <div className="scroll-row-container">
             <div className="scroll-row-fade left-fade" />
-            <div className="castcrew__cast-row">
+            <div id={`crew-scroll-${movieId}`} className="castcrew__cast-row">
               {credits.crew.map((p) => (
                 <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
                   <div className="cast-avatar">

@@ -17,6 +17,7 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -83,10 +84,36 @@ async def lifespan(app: FastAPI):
                     fetched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
                 """))
+                
+                await db.execute(text("""
+                CREATE TABLE IF NOT EXISTS watching_tracker (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+                    tv_id INT NOT NULL,
+                    next_episode_date DATE,
+                    last_checked_at TIMESTAMP WITH TIME ZONE,
+                    CONSTRAINT idx_user_tv UNIQUE (user_id, tv_id)
+                );
+                """))
+                
+                await db.execute(text("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+                    tv_id INT NOT NULL,
+                    message TEXT NOT NULL,
+                    seen BOOLEAN DEFAULT FALSE NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                """))
+                
+                await db.execute(text("CREATE INDEX IF NOT EXISTS idx_notif_user_id ON notifications (user_id);"))
+                await db.execute(text("CREATE INDEX IF NOT EXISTS idx_notif_user_seen ON notifications (user_id, seen);"))
+                
                 await db.commit()
-            logger.info("✓ Checked/Created table rating_needed")
+            logger.info("✓ Checked/Created tables rating_needed, watching_tracker, and notifications")
         except Exception as e:
-            logger.error(f"Failed to check/create table rating_needed: {e}")
+            logger.error(f"Failed to check/create dynamic tables: {e}")
 
         import asyncio
         asyncio.create_task(cleanup_old_movies())
@@ -101,6 +128,11 @@ async def lifespan(app: FastAPI):
     yield  # app runs here
 
     logger.info("Shutting down Movientum API...")
+    try:
+        from app.db.cache import close_redis_connection
+        await close_redis_connection()
+    except Exception as e:
+        logger.warning(f"Failed to close Redis connection on shutdown: {e}")
 
 
 # ── FastAPI App ──────────────────────────────────────────────────
@@ -112,6 +144,12 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan,
 )
+
+# Mount static files for uploads
+import os
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 # ── CORS ────────────────────────────────────────────────────────
 app.add_middleware(
@@ -265,3 +303,15 @@ app.include_router(news.router, prefix="/api/v1/news", tags=["News"])
 # ── Requests Router ───────────────────────────────────────
 from app.routers import requests
 app.include_router(requests.router, prefix="/api/v1/requests", tags=["Requests"])
+
+# ── Watching Tracker Router ─────────────────────────────────
+from app.routers import watching_tracker
+app.include_router(watching_tracker.router, prefix="/api/v1/watching-tracker", tags=["Watching Tracker"])
+
+# ── Notifications Router ────────────────────────────────────
+from app.routers import notifications
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+
+# ── Feedback Router ─────────────────────────────────────────
+from app.routers import feedback
+app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["Feedback"])

@@ -9,6 +9,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import api from '../utils/api'
 import Aurora from '../components/Aurora'
+import { pageCache } from '../utils/pageCache'
 import './PersonPage.css'
 
 const FALLBACK_COLORS = [
@@ -24,31 +25,50 @@ export default function PersonPage() {
   const { id } = useParams()
   const personId = Number(id)
 
-  const [person,  setPerson]  = useState(null)
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `person-detail-${personId}`
+  const cachedData = pageCache.get(cacheKey)
+
+  const [person,  setPerson]  = useState(cachedData?.person || null)
+  const [loading, setLoading] = useState(!cachedData?.person)
   const [error,   setError]   = useState(null)
   const [bioExpanded, setBioExpanded] = useState(false)
-  const [credits, setCredits] = useState([])
-  const [creditsLoading, setCreditsLoading] = useState(true)
+  const [credits, setCredits] = useState(cachedData?.credits || [])
+  const [creditsLoading, setCreditsLoading] = useState(!cachedData?.credits)
   const [currentImgIdx, setCurrentImgIdx] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    if (!person) {
+      setLoading(true)
+    }
     setError(null)
     api.get(`/api/v1/person/${personId}`)
-      .then((r) => { if (!cancelled) setPerson(r.data) })
-      .catch(() => { if (!cancelled) setError('Person not found') })
+      .then((r) => {
+        if (!cancelled) {
+          setPerson(r.data)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, person: r.data })
+        }
+      })
+      .catch(() => { if (!cancelled && !person) setError('Person not found') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [personId])
 
   useEffect(() => {
     let cancelled = false
-    setCreditsLoading(true)
+    if (credits.length === 0) {
+      setCreditsLoading(true)
+    }
     api.get(`/api/v1/person/${personId}/credits`)
-      .then((r) => { if (!cancelled) setCredits(r.data) })
+      .then((r) => {
+        if (!cancelled) {
+          setCredits(r.data)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, credits: r.data })
+        }
+      })
       .catch((err) => console.error('Error fetching credits:', err))
       .finally(() => { if (!cancelled) setCreditsLoading(false) })
     return () => { cancelled = true }
@@ -215,7 +235,7 @@ export default function PersonPage() {
               <h2 className="person-page__section-title">Known For</h2>
               <div className="vertical-scroll-container">
                 <div className="vertical-scroll-fade top-fade" />
-                <div className="person-page__film-grid-wrap">
+                <div id={`person-known-for-${personId}`} className="person-page__film-grid-wrap">
                   {creditsLoading ? (
                     <div className="person-page__film-grid">
                       {Array.from({ length: 6 }).map((_, idx) => (

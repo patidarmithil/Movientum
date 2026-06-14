@@ -19,6 +19,7 @@ class MovieListItem(BaseModel):
     popularity: Optional[float] = None
     media_type: Optional[str] = "movie"
     release_date: Optional[str] = None
+    moctale_rating: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 
@@ -38,6 +39,7 @@ class MovieListItem(BaseModel):
                 "release_date": str(data.release_date) if getattr(data, "release_date", None) else None,
                 "genres": genres,
                 "vote_average": data.vote_average,
+                "moctale_rating": getattr(data, "moctale_rating", None),
             }
         return data
 

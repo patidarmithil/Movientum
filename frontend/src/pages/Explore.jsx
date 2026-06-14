@@ -6,10 +6,14 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import axios from 'axios'
 import api from '../utils/api'
+import { useAuth } from '../context/AuthContext'
+import { useSessionState } from '../hooks/useSessionState'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
+import FilterDropdown from '../components/FilterDropdown'
 import './Explore.css'
 
 const SORT_OPTIONS = [
@@ -18,6 +22,19 @@ const SORT_OPTIONS = [
   { value: 'moctale',      label: 'Moctale Score' },
   { value: 'release_date', label: 'Newest First' },
   { value: 'title',        label: 'A – Z' },
+]
+
+const WATCH_OPTIONS = [
+  { value: '',          label: 'All Titles' },
+  { value: 'unwatched', label: 'Unwatched' },
+  { value: 'watched',   label: 'Watched Only' },
+]
+
+const TYPE_OPTIONS = [
+  { value: '',      label: 'All' },
+  { value: 'movie', label: 'Movies' },
+  { value: 'tv',    label: 'Series' },
+  { value: 'anime', label: 'Anime' },
 ]
 
 const COMPANIES = [
@@ -84,7 +101,7 @@ function RangeSlider({ min, max, value, onChange, step = 1, label, format = (v) 
 
 export default function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [filtersOpen, setFiltersOpen] = useState(false)
+  const { isLoggedIn } = useAuth()
 
   // ── Filter state ──────────────────────────────────────────
   const [selectedGenres, setSelectedGenres] = useState(
@@ -106,22 +123,74 @@ export default function Explore() {
   const [yearFrom,   setYearFrom]   = useState(() => Number(searchParams.get('year_from') ?? 1900))
   const [yearTo,     setYearTo]     = useState(() => Number(searchParams.get('year_to')   ?? CURRENT_YEAR))
   const [sort,       setSort]       = useState(() => searchParams.get('sort') ?? 'popularity')
-  const [page,       setPage]       = useState(() => Number(searchParams.get('page') ?? 1))
+  const [watchFilter, setWatchFilter] = useState(() => searchParams.get('watch_filter') ?? '')
+  const [page,       setPage]       = useSessionState('explore_page', () => Number(searchParams.get('page') ?? 1))
+
+  // ── Debounced state for sliders/inputs ────────────────────
+  const [debouncedMinRating, setDebouncedMinRating] = useState(minRating)
+  const [debouncedYearFrom, setDebouncedYearFrom] = useState(yearFrom)
+  const [debouncedYearTo, setDebouncedYearTo] = useState(yearTo)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedMinRating(minRating)
+    }, 400)
+    return () => clearTimeout(handler)
+  }, [minRating])
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedYearFrom(yearFrom)
+      setDebouncedYearTo(yearTo)
+    }, 400)
+    return () => clearTimeout(handler)
+  }, [yearFrom, yearTo])
 
   // ── Data ──────────────────────────────────────────────────
-  const [movies,    setMovies]    = useState([])
-  const [allGenres, setAllGenres] = useState([])
-  const [total,     setTotal]     = useState(0)
-  const [loading,   setLoading]   = useState(true)
+  const [movies,    setMovies]    = useSessionState('explore_movies', [])
+  const [allGenres, setAllGenres] = useSessionState('explore_allGenres', [])
+  const [total,     setTotal]     = useSessionState('explore_total', 0)
+  const [hasMore,    setHasMore]   = useSessionState('explore_hasMore', true)
+  
+  const [loading,   setLoading]   = useState(movies.length === 0)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore,    setHasMore]   = useState(true)
   const [error,     setError]     = useState(null)
+
+  const [lastExploreQuery, setLastExploreQuery] = useSessionState('explore_query', '')
+
+  const currentQueryStr = [
+    selectedGenres.join(','),
+    selectedCompanies.join(','),
+    selectedCountries.join(','),
+    selectedProviders.join(','),
+    debouncedMinRating,
+    debouncedYearFrom,
+    debouncedYearTo,
+    sort,
+    selectedType,
+    watchFilter
+  ].join('|')
+
+  const isMounted = useRef(false)
+  const isPageMounted = useRef(false)
+  const initialQueryMatch = useRef(currentQueryStr === lastExploreQuery)
 
   const LIMIT = 24
   const observerRef = useRef(null)
+  const abortControllerRef = useRef(null)
+  const isFetchingRef = useRef(false)
 
   // ── Fetch ─────────────────────────────────────────────────
   const fetchMovies = useCallback(async (p, isInitial = false) => {
+    if (isFetchingRef.current && !isInitial) return
+    isFetchingRef.current = true
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     if (isInitial) {
       setLoading(true)
     } else {
@@ -139,12 +208,16 @@ export default function Explore() {
       if (selectedCompanies.length)      params.companies  = selectedCompanies.join(',')
       if (selectedCountries.length)      params.countries  = selectedCountries.join(',')
       if (selectedProviders.length)      params.providers  = selectedProviders.join(',')
-      if (minRating > 0)                 params.min_rating = minRating
-      if (yearFrom > 1900)               params.year_from  = yearFrom
-      if (yearTo < CURRENT_YEAR)         params.year_to    = yearTo
+      if (debouncedMinRating > 0)        params.min_rating = debouncedMinRating
+      if (debouncedYearFrom > 1900)      params.year_from  = debouncedYearFrom
+      if (debouncedYearTo < CURRENT_YEAR) params.year_to    = debouncedYearTo
       if (selectedType)                  params.type       = selectedType
+      if (watchFilter)                   params.watch_filter = watchFilter
 
-      const r = await api.get('/api/v1/movies/explore', { params })
+      const r = await api.get('/api/v1/movies/explore', { 
+        params,
+        signal: controller.signal 
+      })
       const newMovies = r.data.movies ?? []
       const totalCount = r.data.total ?? 0
       setTotal(totalCount)
@@ -165,16 +238,36 @@ export default function Explore() {
       } else {
         setHasMore(newMovies.length >= LIMIT)
       }
-    } catch {
-      setError('Failed to load movies')
+    } catch (err) {
+      if (!axios.isCancel(err) && err.name !== 'AbortError') {
+        setError('Failed to load movies')
+      }
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      isFetchingRef.current = false
+      if (abortControllerRef.current === controller) {
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort, selectedType])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, watchFilter])
 
   // Reset page and movies list when filters change
   useEffect(() => {
+    console.log('[Explore Mount/Update] isMounted:', isMounted.current, 'initialQueryMatch:', initialQueryMatch.current, 'moviesCount:', movies?.length, 'currentQueryStr:', currentQueryStr, 'lastExploreQuery:', lastExploreQuery)
+    
+    if (!isMounted.current) {
+      isMounted.current = true
+      if (initialQueryMatch.current && movies.length > 0) {
+        console.log('[Explore Mount] Cache hit! Keeping cached movies and skipping fetch')
+        setLoading(false)
+        return // Skip initial reset/fetch since cache matches URL
+      }
+      console.log('[Explore Mount] Cache miss or empty movies. Resetting states and fetching page 1')
+    }
+
+    setLastExploreQuery(currentQueryStr)
+
+    isFetchingRef.current = false
     setMovies([])
     setPage(1)
     setHasMore(true)
@@ -186,16 +279,25 @@ export default function Explore() {
     if (selectedCompanies.length)  p.companies  = selectedCompanies.join(',')
     if (selectedCountries.length)  p.countries  = selectedCountries.join(',')
     if (selectedProviders.length)  p.providers  = selectedProviders.join(',')
-    if (minRating > 0)             p.min_rating = String(minRating)
-    if (yearFrom > 1900)           p.year_from  = String(yearFrom)
-    if (yearTo < CURRENT_YEAR)     p.year_to    = String(yearTo)
+    if (debouncedMinRating > 0)    p.min_rating = String(debouncedMinRating)
+    if (debouncedYearFrom > 1900)  p.year_from  = String(debouncedYearFrom)
+    if (debouncedYearTo < CURRENT_YEAR) p.year_to = String(debouncedYearTo)
     if (sort !== 'popularity')     p.sort       = sort
     if (selectedType)              p.type       = selectedType
+    if (watchFilter)               p.watch_filter = watchFilter
     setSearchParams(p, { replace: true })
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, minRating, yearFrom, yearTo, sort, selectedType, fetchMovies])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, watchFilter])
 
   // Fetch subsequent pages when page increments
   useEffect(() => {
+    if (!isPageMounted.current) {
+      isPageMounted.current = true
+      if (initialQueryMatch.current && movies.length > 0) {
+        return // Skip fetching subsequent pages on mount if cached
+      }
+    }
+
     if (page > 1) {
       fetchMovies(page, false)
 
@@ -206,7 +308,8 @@ export default function Explore() {
         return next
       }, { replace: true })
     }
-  }, [page, fetchMovies])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
 
   // Infinite scroll trigger
   useEffect(() => {
@@ -214,7 +317,7 @@ export default function Explore() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0].isIntersecting && !isFetchingRef.current && hasMore) {
           setPage((prev) => prev + 1)
         }
       },
@@ -233,7 +336,7 @@ export default function Explore() {
     }
   }, [loading, loadingMore, hasMore])
 
-  // ── Genre toggle ──────────────────────────────────────────
+  // ── Toggles ──────────────────────────────────────────────
   const toggleGenre = (g) =>
     setSelectedGenres((prev) =>
       prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
@@ -264,6 +367,7 @@ export default function Explore() {
     setYearTo(CURRENT_YEAR)
     setSort('popularity')
     setSelectedType('')
+    setWatchFilter('')
     setPage(1)
   }
 
@@ -276,7 +380,18 @@ export default function Explore() {
     yearFrom > 1900 ||
     yearTo < CURRENT_YEAR ||
     sort !== 'popularity' ||
-    selectedType !== ''
+    selectedType !== '' ||
+    watchFilter !== ''
+
+  const getHeroTitle = () => {
+    if (selectedGenres.length === 1) {
+      return selectedGenres[0]
+    }
+    if (selectedType === 'movie') return 'Movies'
+    if (selectedType === 'tv') return 'Series'
+    if (selectedType === 'anime') return 'Anime'
+    return 'Explore'
+  }
 
   return (
     <main className="explore-page page-content">
@@ -291,284 +406,359 @@ export default function Explore() {
         <div className="explore-aurora-overlay" />
       </div>
 
-      {/* Mobile sidebar overlay */}
-      <div 
-        className={`explore-sidebar-backdrop${filtersOpen ? ' explore-sidebar-backdrop--open' : ''}`}
-        onClick={() => setFiltersOpen(false)}
-        aria-hidden="true"
-      />
       <div className="explore-page__inner">
+        {/* Category Hero Title */}
+        <header className="explore-header-section">
+          <span className="explore-category-tag">Category</span>
+          <h1 className="explore-hero-title">{getHeroTitle()}</h1>
+        </header>
 
-        {/* ── Sidebar ── */}
-        <aside className={`explore-sidebar${filtersOpen ? ' explore-sidebar--open' : ''}`}>
-          <div className="explore-sidebar__header">
-            <h2 className="explore-sidebar__title">Explore</h2>
-            <div className="explore-sidebar__header-actions">
-              {hasFilters && (
-                <button className="explore-sidebar__clear" onClick={clearAll}>
-                  Clear all
+        {/* ── Horizontal Filter Bar ── */}
+        <div className="explore-filter-bar">
+          <div className="explore-filter-row">
+            {/* Type Pills */}
+            <div className="filter-pills">
+              {TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  className={`filter-pill ${selectedType === opt.value ? 'active' : ''}`}
+                  onClick={() => setSelectedType(opt.value)}
+                  type="button"
+                >
+                  {opt.label}
                 </button>
-              )}
-              <button 
-                className="explore-sidebar__close"
-                onClick={() => setFiltersOpen(false)}
-                aria-label="Close filters"
-              >
-                &times;
-              </button>
-            </div>
-          </div>
-
-          <div className="explore-sidebar__content">
-            {/* Sort */}
-            <div className="explore-section">
-              <p className="explore-section__label">Sort by</p>
-              <div className="explore-sort">
-                {SORT_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    className={`explore-sort__btn${sort === o.value ? ' explore-sort__btn--active' : ''}`}
-                    onClick={() => setSort(o.value)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
 
-            {/* Type */}
-            <div className="explore-section">
-              <p className="explore-section__label">Type</p>
-              <div className="explore-sort">
-                {[
-                  { value: '',      label: 'All Types' },
-                  { value: 'movie', label: 'Movies' },
-                  { value: 'tv',    label: 'TV Shows' },
-                  { value: 'anime', label: 'Anime' },
-                ].map((o) => (
-                  <button
-                    key={o.value}
-                    className={`explore-sort__btn${selectedType === o.value ? ' explore-sort__btn--active' : ''}`}
-                    onClick={() => setSelectedType(o.value)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Genres */}
-            <div className="explore-section">
-              <p className="explore-section__label">Genres</p>
-              <div className="explore-genres">
-                {allGenres.map((g) => (
-                  <button
-                    key={g}
-                    className={`explore-genre-pill${selectedGenres.includes(g) ? ' explore-genre-pill--active' : ''}`}
-                    onClick={() => toggleGenre(g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Production Houses */}
-            <div className="explore-section">
-              <p className="explore-section__label">Production Houses</p>
-              <div className="explore-genres">
-                {COMPANIES.map((c) => (
-                  <button
-                    key={c.id}
-                    className={`explore-genre-pill${selectedCompanies.includes(c.id) ? ' explore-genre-pill--active' : ''}`}
-                    onClick={() => toggleCompany(c.id)}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Countries */}
-            <div className="explore-section">
-              <p className="explore-section__label">Countries</p>
-              <div className="explore-genres">
-                {COUNTRIES.map((c) => (
-                  <button
-                    key={c.code}
-                    className={`explore-genre-pill${selectedCountries.includes(c.code) ? ' explore-genre-pill--active' : ''}`}
-                    onClick={() => toggleCountry(c.code)}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* OTT Platforms */}
-            <div className="explore-section">
-              <p className="explore-section__label">OTT Platforms</p>
-              <div className="explore-genres">
-                {PROVIDERS.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`explore-genre-pill${selectedProviders.includes(p.id) ? ' explore-genre-pill--active' : ''}`}
-                    onClick={() => toggleProvider(p.id)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Min rating */}
-            <div className="explore-section">
-              <RangeSlider
-                label="Min Rating"
-                min={0} max={10} step={0.5}
-                value={minRating}
-                onChange={setMinRating}
-                format={(v) => v === 0 ? 'Any' : `★ ${v.toFixed(1)}+`}
-              />
-            </div>
-
-            {/* Year from */}
-            <div className="explore-section">
-              <RangeSlider
-                label="Released From"
-                min={1920} max={CURRENT_YEAR} step={1}
-                value={yearFrom}
-                onChange={setYearFrom}
-                format={(v) => v === 1920 ? 'Any' : String(v)}
-              />
-            </div>
-
-            {/* Year to */}
-            <div className="explore-section">
-              <RangeSlider
-                label="Released Until"
-                min={1920} max={CURRENT_YEAR} step={1}
-                value={yearTo}
-                onChange={setYearTo}
-                format={(v) => v === CURRENT_YEAR ? 'Now' : String(v)}
-              />
-            </div>
-          </div>
-        </aside>
-
-        {/* ── Main ── */}
-        <div className="explore-main">
-          {/* Header bar */}
-          <div className="explore-main__header">
-            <button 
-              className="explore-mobile-filter-btn"
-              onClick={() => setFiltersOpen(true)}
-              aria-label="Open filters"
+            {/* Genre Dropdown */}
+            <FilterDropdown 
+              label={selectedGenres.length > 0 ? `Genre (${selectedGenres.length})` : 'Genre'}
+              active={selectedGenres.length > 0}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-              </svg>
-              <span>Filters</span>
-            </button>
-            <p className="explore-main__count">
-              {total > 0 && (
-                <>
-                  {total.toLocaleString()}{' '}
-                  {selectedType === 'movie'
-                    ? `movie${total !== 1 ? 's' : ''}`
-                    : selectedType === 'tv'
-                    ? `TV show${total !== 1 ? 's' : ''}`
-                    : selectedType === 'anime'
-                    ? 'anime'
-                    : `title${total !== 1 ? 's' : ''}`}
-                </>
-              )}
-            </p>
-            {/* Active chips */}
-            {(selectedType !== '' || selectedGenres.length > 0 || selectedCompanies.length > 0 || selectedCountries.length > 0 || selectedProviders.length > 0) && (
-              <div className="explore-active-chips">
-                {selectedType && (
-                  <button key="active-chip-type" className="explore-active-chip" onClick={() => setSelectedType('')}>
-                    {selectedType === 'movie' ? 'Movies' : selectedType === 'tv' ? 'TV Shows' : 'Anime'} ×
-                  </button>
-                )}
-                {selectedGenres.map((g) => (
-                  <button key={g} className="explore-active-chip" onClick={() => toggleGenre(g)}>
-                    {g} ×
-                  </button>
+              <div className="filter-dropdown__menu-list">
+                {allGenres.map((g) => (
+                  <label key={g} className={`filter-dropdown__menu-item ${selectedGenres.includes(g) ? 'filter-dropdown__menu-item--active' : ''}`}>
+                    <input
+                      type="checkbox"
+                      className="filter-dropdown__checkbox"
+                      checked={selectedGenres.includes(g)}
+                      onChange={() => toggleGenre(g)}
+                    />
+                    <span>{g}</span>
+                  </label>
                 ))}
-                {selectedCompanies.map((cId) => {
-                  const company = COMPANIES.find(c => c.id === cId)
-                  return (
-                    <button key={cId} className="explore-active-chip" onClick={() => toggleCompany(cId)}>
-                      {company ? company.label : cId} ×
-                    </button>
-                  )
-                })}
-                {selectedCountries.map((code) => {
-                  const country = COUNTRIES.find(c => c.code === code)
-                  return (
-                    <button key={code} className="explore-active-chip" onClick={() => toggleCountry(code)}>
-                      {country ? country.label : code} ×
-                    </button>
-                  )
-                })}
-                {selectedProviders.map((pId) => {
-                  const provider = PROVIDERS.find(p => p.id === pId)
-                  return (
-                    <button key={pId} className="explore-active-chip" onClick={() => toggleProvider(pId)}>
-                      {provider ? provider.label : pId} ×
-                    </button>
-                  )
-                })}
               </div>
+            </FilterDropdown>
+
+            {/* Sort Dropdown */}
+            <FilterDropdown
+              label={`Sort: ${SORT_OPTIONS.find(o => o.value === sort)?.label || 'Most Popular'}`}
+              active={sort !== 'popularity'}
+            >
+              <div className="filter-dropdown__menu-list">
+                {SORT_OPTIONS.map((o) => (
+                  <label key={o.value} className={`filter-dropdown__menu-item ${sort === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="sort-option"
+                      className="filter-dropdown__radio"
+                      checked={sort === o.value}
+                      onChange={() => setSort(o.value)}
+                    />
+                    <span>{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
+
+            {/* Year Dropdown */}
+            <FilterDropdown
+              label={(yearFrom > 1900 || yearTo < CURRENT_YEAR) ? `Year: ${yearFrom}–${yearTo}` : 'Year'}
+              active={yearFrom > 1900 || yearTo < CURRENT_YEAR}
+            >
+              <div className="filter-dropdown__custom-container">
+                <div className="filter-dropdown__input-group">
+                  <div className="filter-dropdown__input-field">
+                    <label>From</label>
+                    <input
+                      type="number"
+                      min="1900"
+                      max={CURRENT_YEAR}
+                      value={yearFrom}
+                      onChange={(e) => setYearFrom(Number(e.target.value) || 1900)}
+                    />
+                  </div>
+                  <div className="filter-dropdown__input-field">
+                    <label>To</label>
+                    <input
+                      type="number"
+                      min="1900"
+                      max={CURRENT_YEAR}
+                      value={yearTo}
+                      onChange={(e) => setYearTo(Number(e.target.value) || CURRENT_YEAR)}
+                    />
+                  </div>
+                </div>
+                
+                {/* Preset Decades */}
+                <div className="filter-dropdown__presets">
+                  {[
+                    { label: '2020s', start: 2020, end: CURRENT_YEAR },
+                    { label: '2010s', start: 2010, end: 2019 },
+                    { label: '2000s', start: 2000, end: 2009 },
+                    { label: '1990s', start: 1990, end: 1999 },
+                    { label: '1980s', start: 1980, end: 1989 },
+                    { label: 'Clear', start: 1900, end: CURRENT_YEAR },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      className="filter-dropdown__preset-btn"
+                      onClick={() => {
+                        setYearFrom(preset.start)
+                        setYearTo(preset.end)
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </FilterDropdown>
+
+            {/* Rating Dropdown */}
+            <FilterDropdown
+              label={minRating > 0 ? `Rating: ★ ${minRating.toFixed(1)}+` : 'Rating'}
+              active={minRating > 0}
+            >
+              <div className="filter-dropdown__custom-container" style={{ minWidth: '220px' }}>
+                <RangeSlider
+                  label="Min Rating"
+                  min={0} max={10} step={0.5}
+                  value={minRating}
+                  onChange={setMinRating}
+                  format={(v) => v === 0 ? 'Any' : `★ ${v.toFixed(1)}+`}
+                />
+              </div>
+            </FilterDropdown>
+
+            {/* Watch Status Dropdown (only for logged-in users) */}
+            {isLoggedIn && (
+              <FilterDropdown
+                label={`Watch Status: ${WATCH_OPTIONS.find(o => o.value === watchFilter)?.label || 'All'}`}
+                active={watchFilter !== ''}
+              >
+                <div className="filter-dropdown__menu-list">
+                  {WATCH_OPTIONS.map((o) => (
+                    <label key={o.value} className={`filter-dropdown__menu-item ${watchFilter === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="watch-option"
+                        className="filter-dropdown__radio"
+                        checked={watchFilter === o.value}
+                        onChange={() => setWatchFilter(o.value)}
+                      />
+                      <span>{o.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </FilterDropdown>
+            )}
+
+            {/* More Filters Dropdown */}
+            <FilterDropdown
+              label={
+                (selectedCompanies.length + selectedCountries.length + selectedProviders.length) > 0 
+                  ? `More (${selectedCompanies.length + selectedCountries.length + selectedProviders.length})` 
+                  : 'More'
+              }
+              active={(selectedCompanies.length + selectedCountries.length + selectedProviders.length) > 0}
+            >
+              <div className="filter-dropdown__custom-container filter-dropdown__custom-container--scrollable" style={{ minWidth: '280px', maxHeight: '380px', overflowY: 'auto', gap: '16px' }}>
+                {/* Production Companies */}
+                <div>
+                  <span className="filter-section-header">Production Houses</span>
+                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
+                    {COMPANIES.map((c) => (
+                      <label key={c.id} className={`filter-dropdown__menu-item ${selectedCompanies.includes(c.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
+                        <input
+                          type="checkbox"
+                          className="filter-dropdown__checkbox"
+                          checked={selectedCompanies.includes(c.id)}
+                          onChange={() => toggleCompany(c.id)}
+                        />
+                        <span>{c.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Countries */}
+                <div>
+                  <span className="filter-section-header">Countries</span>
+                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
+                    {COUNTRIES.map((c) => (
+                      <label key={c.code} className={`filter-dropdown__menu-item ${selectedCountries.includes(c.code) ? 'filter-dropdown__menu-item--active' : ''}`}>
+                        <input
+                          type="checkbox"
+                          className="filter-dropdown__checkbox"
+                          checked={selectedCountries.includes(c.code)}
+                          onChange={() => toggleCountry(c.code)}
+                        />
+                        <span>{c.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Providers */}
+                <div>
+                  <span className="filter-section-header">OTT Platforms</span>
+                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
+                    {PROVIDERS.map((p) => (
+                      <label key={p.id} className={`filter-dropdown__menu-item ${selectedProviders.includes(p.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
+                        <input
+                          type="checkbox"
+                          className="filter-dropdown__checkbox"
+                          checked={selectedProviders.includes(p.id)}
+                          onChange={() => toggleProvider(p.id)}
+                        />
+                        <span>{p.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </FilterDropdown>
+
+            {/* Clear All Button */}
+            {hasFilters && (
+              <button 
+                type="button" 
+                className="filter-clear-all-btn"
+                onClick={clearAll}
+              >
+                Reset Filters
+              </button>
             )}
           </div>
+        </div>
 
-          {/* Error */}
-          {error && (
-            <div className="error-state">{error}</div>
-          )}
+        {/* ── Results Meta & Active Chips ── */}
+        <div className="explore-results-meta">
+          <p className="explore-main__count">
+            {total > 0 && (
+              <>
+                {total.toLocaleString()}{' '}
+                {selectedType === 'movie'
+                  ? `movie${total !== 1 ? 's' : ''}`
+                  : selectedType === 'tv'
+                  ? `TV show${total !== 1 ? 's' : ''}`
+                  : selectedType === 'anime'
+                  ? 'anime'
+                  : `title${total !== 1 ? 's' : ''}`}
+              </>
+            )}
+          </p>
 
-          {/* Grid */}
-          {loading ? (
-            <div className="explore-grid">
-              <MovieCardSkeleton count={24} />
-            </div>
-          ) : movies.length > 0 ? (
-            <>
-              <div className="explore-grid">
-                {movies.map((m) => <MovieCard key={`${m.id}-${m.media_type}`} movie={m} />)}
-              </div>
-
-              {loadingMore && (
-                <div className="explore-grid" style={{ marginTop: '24px' }}>
-                  <MovieCardSkeleton count={8} />
-                </div>
+          {hasFilters && (
+            <div className="explore-active-chips">
+              {selectedType && (
+                <button key="active-chip-type" className="explore-active-chip" onClick={() => setSelectedType('')}>
+                  {selectedType === 'movie' ? 'Movies' : selectedType === 'tv' ? 'TV Shows' : 'Anime'} ×
+                </button>
               )}
-
-              <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
-
-              {!hasMore && (
-                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
-                  No more titles to load.
-                </p>
+              {selectedGenres.map((g) => (
+                <button key={g} className="explore-active-chip" onClick={() => toggleGenre(g)}>
+                  {g} ×
+                </button>
+              ))}
+              {(yearFrom > 1900 || yearTo < CURRENT_YEAR) && (
+                <button className="explore-active-chip" onClick={() => { setYearFrom(1900); setYearTo(CURRENT_YEAR) }}>
+                  Year: {yearFrom > 1900 ? yearFrom : 'Any'}–{yearTo < CURRENT_YEAR ? yearTo : 'Now'} ×
+                </button>
               )}
-            </>
-          ) : !error && (
-            <div className="empty-state">
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🎬</div>
-              <h3>No movies match these filters</h3>
-              <p>Try removing some filters</p>
-              <button className="explore-sidebar__clear" style={{ marginTop: 16 }} onClick={clearAll}>
-                Reset filters
-              </button>
+              {minRating > 0 && (
+                <button className="explore-active-chip" onClick={() => setMinRating(0)}>
+                  Rating: ★ {minRating.toFixed(1)}+ ×
+                </button>
+              )}
+              {selectedCompanies.map((cId) => {
+                const company = COMPANIES.find(c => c.id === cId)
+                return (
+                  <button key={cId} className="explore-active-chip" onClick={() => toggleCompany(cId)}>
+                    {company ? company.label : cId} ×
+                  </button>
+                )
+              })}
+              {selectedCountries.map((code) => {
+                const country = COUNTRIES.find(c => c.code === code)
+                return (
+                  <button key={code} className="explore-active-chip" onClick={() => toggleCountry(code)}>
+                    {country ? country.label : code} ×
+                  </button>
+                )
+              })}
+              {selectedProviders.map((pId) => {
+                const provider = PROVIDERS.find(p => p.id === pId)
+                return (
+                  <button key={pId} className="explore-active-chip" onClick={() => toggleProvider(pId)}>
+                    {provider ? provider.label : pId} ×
+                  </button>
+                )
+              })}
+              {watchFilter && (
+                <button key="active-chip-watch" className="explore-active-chip" onClick={() => setWatchFilter('')}>
+                  {watchFilter === 'watched' ? 'Watched Only' : 'Unwatched'} ×
+                </button>
+              )}
             </div>
           )}
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="error-state">{error}</div>
+        )}
+
+        {/* Grid */}
+        {loading ? (
+          <div className="explore-grid">
+            <MovieCardSkeleton count={24} />
+          </div>
+        ) : movies.length > 0 ? (
+          <>
+            <div className="explore-grid">
+              {movies.map((m) => <MovieCard key={`${m.id}-${m.media_type}`} movie={m} />)}
+            </div>
+
+            {loadingMore && (
+              <div className="explore-grid" style={{ marginTop: '24px' }}>
+                <MovieCardSkeleton count={8} />
+              </div>
+            )}
+
+            <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
+
+            {!hasMore && (
+              <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
+                No more titles to load.
+              </p>
+            )}
+          </>
+        ) : !error && (
+          <div className="empty-state">
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎬</div>
+            <h3>No movies match these filters</h3>
+            <p>Try removing some filters</p>
+            <button className="filter-clear-all-btn" style={{ marginTop: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }} onClick={clearAll}>
+              Reset filters
+            </button>
+          </div>
+        )}
       </div>
       <div className="fixed-bottom-fade" />
     </main>
   )
 }
+

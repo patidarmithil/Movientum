@@ -48,6 +48,7 @@ TTL_USER_HISTORY = 300         # 5 min — dashboard watch history
 TTL_USER_PREFS = 900           # 15 min — news personalization prefs
 TTL_NEWS_FEED_USER = 300       # 5 min — per-user scored news feed
 TTL_NEWS_FEED_LATEST = 120     # 2 min — unpersonalized latest feed
+TTL_EXPLORE = 600              # 10 min — explore page filters cache
 
 
 def _make_redis_client() -> Redis:
@@ -216,6 +217,14 @@ def key_news_feed_latest(page: int) -> str:
     """Unpersonalized latest news feed page. TTL 2m."""
     return f"news:feed:latest:p{page}"
 
+def key_explore_page(params_dict: dict) -> str:
+    """Cache key for explore page filters. TTL 10m."""
+    # Clean parameter dict to ignore None and empty values
+    clean = {k: v for k, v in params_dict.items() if v is not None and v != ""}
+    param_str = json.dumps(clean, sort_keys=True)
+    hash_ = hashlib.md5(param_str.encode()).hexdigest()[:12]
+    return f"explore:{hash_}"
+
 # ── Cache Stampede Protection ─────────────────────────────────────
 _inflight_locks: dict[str, asyncio.Event] = {}
 
@@ -238,3 +247,13 @@ async def inflight_lock(key: str):
         finally:
             event.set()
             _inflight_locks.pop(key, None)
+
+
+async def close_redis_connection() -> None:
+    """Close Redis client connection pool on shutdown."""
+    try:
+        await redis_client.aclose()
+        logger.info("✓ Redis connection closed")
+    except Exception as e:
+        logger.warning(f"Error closing Redis connection: {e}")
+

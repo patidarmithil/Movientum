@@ -353,3 +353,57 @@ class RequestedContent(Base):
     def __repr__(self):
         return f"<RequestedContent id={self.id} title={self.title} type={self.content_type}>"
 
+
+class WatchingTracker(Base):
+    __tablename__ = "watching_tracker"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    tv_id = Column(Integer, nullable=False)
+
+    next_episode_date = Column(Date, nullable=True)
+    last_checked_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_user_tv", "user_id", "tv_id", unique=True),
+    )
+
+    def __repr__(self):
+        return f"<WatchingTracker user={self.user_id} tv={self.tv_id}>"
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    tv_id = Column(Integer, nullable=False)
+    message = Column(Text, nullable=False)
+    seen = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        Index("idx_notif_user_id", "user_id"),
+        Index("idx_notif_user_seen", "user_id", "seen"),
+    )
+
+    def __repr__(self):
+        return f"<Notification user={self.user_id} tv={self.tv_id} seen={self.seen}>"
+
+
+class Feedback(Base):
+    """User feedback and bug reports."""
+    __tablename__ = "feedback"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    category = Column(String(50), nullable=False)       # error, improvement, other
+    content = Column(Text, nullable=False)
+    image_url = Column(Text, nullable=True)             # Path to compressed local image
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    user = relationship("User", backref="feedbacks")
+
+    def __repr__(self):
+        return f"<Feedback id={self.id} category={self.category}>"
+

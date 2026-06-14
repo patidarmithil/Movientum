@@ -11,6 +11,7 @@ import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
+import { pageCache } from '../utils/pageCache'
 import './CompanyPage.css'  // reuse same layout CSS
 
 /** Convert ISO 3166-1 alpha-2 → emoji flag */
@@ -27,23 +28,35 @@ export default function CountryPage() {
   const location = useLocation()
   const countryName = location.state?.countryName || iso
 
-  const [movies, setMovies] = useState([])
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `country-${iso}`
+  const cachedData = pageCache.get(cacheKey)
+
+  const [movies, setMovies] = useState(cachedData?.movies || [])
+  const [loading, setLoading] = useState(cachedData ? false : true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(cachedData?.page || 1)
+  const [total, setTotal] = useState(cachedData?.total || 0)
+  const [hasMore, setHasMore] = useState(cachedData ? cachedData.hasMore : true)
 
   const observerRef = useRef(null)
 
   // Reset page & data when country (iso) changes
   useEffect(() => {
-    setMovies([])
-    setPage(1)
-    setTotal(0)
-    setHasMore(true)
-    setLoading(true)
+    const cached = pageCache.get(`country-${iso}`)
+    if (cached) {
+      setMovies(cached.movies)
+      setPage(cached.page)
+      setTotal(cached.total)
+      setHasMore(cached.hasMore)
+      setLoading(false)
+    } else {
+      setMovies([])
+      setPage(1)
+      setTotal(0)
+      setHasMore(true)
+      setLoading(true)
+    }
     setError(null)
   }, [iso])
 
@@ -51,6 +64,10 @@ export default function CountryPage() {
   useEffect(() => {
     let cancelled = false
     const isFirstPage = page === 1
+
+    if (movies.length >= page * 30) {
+      return
+    }
 
     if (isFirstPage) {
       setLoading(true)
@@ -65,18 +82,30 @@ export default function CountryPage() {
         const totalCount = r.data?.total || 0
         setTotal(totalCount)
 
+        const nextHasMore = newMovies.length >= 30
+        setHasMore(nextHasMore)
+
         if (isFirstPage) {
           setMovies(newMovies)
+          pageCache.set(cacheKey, {
+            movies: newMovies,
+            page,
+            total: totalCount,
+            hasMore: nextHasMore
+          })
         } else {
           setMovies((prev) => {
             const existingIds = new Set(prev.map(m => `${m.id}-${m.media_type}`))
             const uniqueNew = newMovies.filter(m => !existingIds.has(`${m.id}-${m.media_type}`))
-            return [...prev, ...uniqueNew]
+            const res = [...prev, ...uniqueNew]
+            pageCache.set(cacheKey, {
+              movies: res,
+              page,
+              total: totalCount,
+              hasMore: nextHasMore
+            })
+            return res
           })
-        }
-
-        if (newMovies.length < 30) {
-          setHasMore(false)
         }
       })
       .catch(() => {

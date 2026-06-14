@@ -34,11 +34,13 @@ from app.db.cache import (
     TTL_MOVIE_LIST,
     TTL_TRENDING,
     TTL_TMDB_CREDITS,
+    TTL_EXPLORE,
     get_cached,
     key_movie_detail,
     key_movie_list,
     key_movie_trending,
     key_movie_credits,
+    key_explore_page,
     set_cached,
     inflight_lock,
 )
@@ -51,6 +53,7 @@ from app.schemas.movie import (
 from app.services.tmdb_service import tmdb_service as tmdb
 from app.routers.search import _tmdb_to_search_result
 from app.utils.persistence import _is_persistable, get_ttl_for_popularity
+from app.utils.deps import get_optional_user
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +317,9 @@ async def explore_movies(
     countries:  Optional[str] = Query(default=None, description="Comma-separated origin country ISO codes"),
     providers:  Optional[str] = Query(default=None, description="Comma-separated watch provider IDs"),
     type:       Optional[str] = Query(default=None, description="Filter by type: movie|tv|anime"),
+    watch_filter: Optional[str] = Query(default=None, description="Filter by watch status: watched|unwatched"),
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[dict] = Depends(get_optional_user),
 ):
     """
     Rich filtered browse for the Explore page, powered by TMDB discover.
@@ -324,17 +329,21 @@ async def explore_movies(
     sort: popularity | rating | release_date | title | moctale.
     Cached 10 minutes per combo.
     """
-    from hashlib import md5
-    import json as _json
+    user_uuid = None
+    if current_user:
+        from uuid import UUID
+        user_uuid = UUID(current_user["sub"])
+
     genre_list = [g.strip() for g in genres.split(",")] if genres else []
-    params_key = _json.dumps({
+    cache_key = key_explore_page({
         "g": sorted(genre_list), "mr": min_rating,
         "yf": year_from, "yt": year_to,
         "s": sort, "p": page, "l": limit,
         "comp": companies, "count": countries, "prov": providers,
-        "t": type
-    }, sort_keys=True)
-    cache_key = f"explore:{md5(params_key.encode()).hexdigest()[:12]}"
+        "t": type,
+        "wf": watch_filter,
+        "u": str(user_uuid) if user_uuid else None
+    })
     cached = await get_cached(cache_key)
     if cached:
         return cached  # all_genres already embedded in payload
@@ -490,12 +499,24 @@ async def explore_movies(
     if sort == "moctale":
         formatted.sort(key=lambda x: (x.get("moctale_rating") or {}).get("score") or 0, reverse=True)
 
+    # ── Watch Status Filtering ──
+    if watch_filter in ("watched", "unwatched") and user_uuid:
+        from app.db.orm_models import WatchHistory
+        watched_stmt = select(WatchHistory.movie_id).where(WatchHistory.user_id == user_uuid)
+        watched_result = await db.execute(watched_stmt)
+        watched_ids = set(watched_result.scalars().all())
+        
+        if watch_filter == "watched":
+            formatted = [m for m in formatted if m["id"] in watched_ids]
+        elif watch_filter == "unwatched":
+            formatted = [m for m in formatted if m["id"] not in watched_ids]
+
     total_results = sum(
         resp.get("total_results", 0)
         for resp in responses
         if isinstance(resp, dict) and "total_results" in resp
     )
-    if not total_results:
+    if not total_results or watch_filter in ("watched", "unwatched"):
         total_results = len(formatted)
 
     has_more = False

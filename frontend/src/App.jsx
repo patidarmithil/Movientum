@@ -31,6 +31,9 @@ import News from './pages/News'
 import CompanyPage from './pages/CompanyPage'
 import CountryPage from './pages/CountryPage'
 import Help from './pages/Help'
+import Feedback from './pages/Feedback'
+import AdminDashboard from './pages/AdminDashboard'
+import ScrollRestore from './components/ScrollRestore'
 import './index.css'
 import './components/Navbar.css'
 
@@ -49,6 +52,7 @@ function AppRoutes() {
   return (
     <>
       <LogoutListener />
+      <ScrollRestore />
       <Navbar />
       <InstallPrompt />
       <Routes>
@@ -99,6 +103,24 @@ function AppRoutes() {
         {/* Production company & country browse */}
         <Route path="/company/:id"    element={<CompanyPage />} />
         <Route path="/country/:iso"   element={<CountryPage />} />
+
+        {/* Feedback & Admin */}
+        <Route
+          path="/feedback"
+          element={
+            <ProtectedRoute>
+              <Feedback />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
         {/* 404 fallback */}
         <Route
           path="*"

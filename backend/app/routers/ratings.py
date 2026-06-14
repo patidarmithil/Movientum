@@ -123,22 +123,33 @@ async def get_my_ratings(
     if cached:
         return cached
     ratings, total = await rating_service.get_user_ratings(db, user_id, page, limit)
-    result = {
-        "items": [
-            {
-                "id": r.id,
-                "movie_id": r.movie_id,
-                "category": r.category,
-                "movie": {
-                    "id": r.movie.id,
-                    "title": r.movie.title,
-                    "poster_path": r.movie.poster_path,
-                    "release_year": r.movie.release_date.year if r.movie.release_date else None,
-                    "vote_average": r.movie.vote_average,
-                }
+    items = [
+        {
+            "id": r.id,
+            "movie_id": r.movie_id,
+            "category": r.category,
+            "movie": {
+                "id": r.movie.id,
+                "title": r.movie.title,
+                "poster_path": r.movie.poster_path,
+                "release_year": r.movie.release_date.year if r.movie.release_date else None,
+                "vote_average": r.movie.vote_average,
+                "media_type": getattr(r.movie, "type", "movie"),
+                "moctale_rating": None,
             }
-            for r in ratings
-        ]
+        }
+        for r in ratings
+    ]
+    if items:
+        from app.routers.movies import _bulk_fetch_moctale
+        item_ids = [it["movie"]["id"] for it in items]
+        item_types = [it["movie"]["media_type"] for it in items]
+        moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+        for it in items:
+            it["movie"]["moctale_rating"] = moctale_map.get(it["movie"]["id"])
+
+    result = {
+        "items": items
     }
     await set_cached(cache_key, result, TTL_USER_RATINGS)
     return result

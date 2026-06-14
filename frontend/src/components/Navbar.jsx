@@ -2,6 +2,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
+import { notificationService } from '../services/notificationService'
 import SearchOverlay from './SearchOverlay'
 import './Navbar.css'
 
@@ -17,12 +18,19 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const dropRef = useRef(null)
+  
+  const [notifications, setNotifications] = useState([])
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifRef = useRef(null)
 
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (dropRef.current && !dropRef.current.contains(e.target)) {
         setDropOpen(false)
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -34,6 +42,27 @@ export default function Navbar() {
     setMobileMenuOpen(false)
     await logout()
     navigate('/')
+  }
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      notificationService.getNotifications()
+        .then(setNotifications)
+        .catch(() => {})
+    } else {
+      setNotifications([])
+    }
+  }, [isLoggedIn])
+
+  const unreadCount = notifications.filter(n => !n.seen).length
+
+  const handleNotifClick = () => {
+    setNotifOpen(!notifOpen)
+    if (!notifOpen && unreadCount > 0) {
+      notificationService.markAllSeen().then(() => {
+        setNotifications(notifications.map(n => ({...n, seen: true})))
+      })
+    }
   }
 
   // Avatar initials from user name/email
@@ -160,11 +189,69 @@ export default function Navbar() {
                 </svg>
                 <span>Analysis</span>
               </NavLink>
+
+              {/* Feedback nav button */}
+              <NavLink
+                to="/feedback"
+                className={({ isActive }) =>
+                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Feedback</span>
+              </NavLink>
             </>
           )}
 
           {/* Auth Actions (Avatar dropdown or Login / SignUp buttons) */}
           <div className="navbar__actions">
+            {isLoggedIn && (
+              <div className="navbar__user" ref={notifRef} style={{ marginRight: '8px' }}>
+                <button
+                  className="navbar__notif-btn"
+                  onClick={handleNotifClick}
+                  aria-label="Notifications"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="navbar__notif-badge">{unreadCount}</span>
+                  )}
+                </button>
+                {notifOpen && (
+                  <div className="navbar__notif-dropdown">
+                    <div className="navbar__notif-header">Notifications</div>
+                    <div className="navbar__notif-list">
+                      {notifications.length === 0 ? (
+                        <div className="navbar__notif-empty">No notifications</div>
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            className="navbar__notif-item"
+                            style={{ opacity: n.seen ? 0.6 : 1 }}
+                          >
+                            <span className="navbar__notif-message">{n.message}</span>
+                            <span className="navbar__notif-date">
+                              {new Date(n.created_at).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {isLoading ? (
               <div className="navbar__avatar-skeleton" aria-hidden="true" />
             ) : isLoggedIn ? (
@@ -216,6 +303,26 @@ export default function Navbar() {
                     >
                       <span>🔮</span> Analysis
                     </Link>
+                    <Link
+                      to="/feedback"
+                      className="navbar__dropdown-item"
+                      role="menuitem"
+                      id="nav-feedback"
+                      onClick={() => setDropOpen(false)}
+                    >
+                      <span>💡</span> Feedback
+                    </Link>
+                    {user?.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-admin"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <span>🛡️</span> Admin Panel
+                      </Link>
+                    )}
                     <button
                       className="navbar__dropdown-item navbar__dropdown-item--danger"
                       role="menuitem"
@@ -339,6 +446,22 @@ export default function Navbar() {
                   >
                     <span>🔮</span> Analysis
                   </NavLink>
+                  <NavLink 
+                    to="/feedback" 
+                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>💡</span> Feedback
+                  </NavLink>
+                  {user?.role === 'admin' && (
+                    <NavLink 
+                      to="/admin" 
+                      className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <span>🛡️</span> Admin Panel
+                    </NavLink>
+                  )}
                 </>
               )}
             </div>
