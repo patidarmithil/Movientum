@@ -24,10 +24,10 @@ const SORT_OPTIONS = [
   { value: 'title',        label: 'A – Z' },
 ]
 
-const WATCH_OPTIONS = [
-  { value: '',          label: 'All Titles' },
-  { value: 'unwatched', label: 'Unwatched' },
-  { value: 'watched',   label: 'Watched Only' },
+const AGE_RATING_OPTIONS = [
+  { value: '', label: 'Any Age' },
+  { value: 'kids', label: 'Kids & Family (PG and below)' },
+  { value: 'teens', label: 'Teens (PG-13 and below)' },
 ]
 
 const TYPE_OPTIONS = [
@@ -49,6 +49,15 @@ const COMPANIES = [
   { id: '3172', label: 'Blumhouse' },
   { id: '4439', label: 'Yash Raj Films' },
   { id: '7293', label: 'Dharma Productions' },
+  { id: '194232', label: 'Apple Studios' },
+  { id: '20580', label: 'Amazon Studios' },
+  { id: '3268', label: 'HBO' },
+  { id: '14439', label: 'Lionsgate' },
+  { id: '25', label: '20th Century Studios' },
+  { id: '10146', label: 'Focus Features' },
+  { id: '1088', label: 'Illumination' },
+  { id: '3', label: 'Pixar' },
+  { id: '56', label: 'Amblin Entertainment' },
 ]
 
 const COUNTRIES = [
@@ -123,7 +132,7 @@ export default function Explore() {
   const [yearFrom,   setYearFrom]   = useState(() => Number(searchParams.get('year_from') ?? 1900))
   const [yearTo,     setYearTo]     = useState(() => Number(searchParams.get('year_to')   ?? CURRENT_YEAR))
   const [sort,       setSort]       = useState(() => searchParams.get('sort') ?? 'popularity')
-  const [watchFilter, setWatchFilter] = useState(() => searchParams.get('watch_filter') ?? '')
+  const [ageRating,  setAgeRating]  = useState(() => searchParams.get('age_rating') ?? '')
   const [page,       setPage]       = useSessionState('explore_page', () => Number(searchParams.get('page') ?? 1))
 
   // ── Debounced state for sliders/inputs ────────────────────
@@ -168,7 +177,7 @@ export default function Explore() {
     debouncedYearTo,
     sort,
     selectedType,
-    watchFilter
+    ageRating
   ].join('|')
 
   const isMounted = useRef(false)
@@ -212,7 +221,7 @@ export default function Explore() {
       if (debouncedYearFrom > 1900)      params.year_from  = debouncedYearFrom
       if (debouncedYearTo < CURRENT_YEAR) params.year_to    = debouncedYearTo
       if (selectedType)                  params.type       = selectedType
-      if (watchFilter)                   params.watch_filter = watchFilter
+      if (ageRating)                     params.age_rating = ageRating
 
       const r = await api.get('/api/v1/movies/explore', { 
         params,
@@ -249,7 +258,7 @@ export default function Explore() {
         setLoadingMore(false)
       }
     }
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, watchFilter])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating])
 
   // Reset page and movies list when filters change
   useEffect(() => {
@@ -263,6 +272,9 @@ export default function Explore() {
         return // Skip initial reset/fetch since cache matches URL
       }
       console.log('[Explore Mount] Cache miss or empty movies. Resetting states and fetching page 1')
+    } else {
+      // Scroll to top when filters are modified
+      window.scrollTo(0, 0)
     }
 
     setLastExploreQuery(currentQueryStr)
@@ -284,10 +296,10 @@ export default function Explore() {
     if (debouncedYearTo < CURRENT_YEAR) p.year_to = String(debouncedYearTo)
     if (sort !== 'popularity')     p.sort       = sort
     if (selectedType)              p.type       = selectedType
-    if (watchFilter)               p.watch_filter = watchFilter
+    if (ageRating)                 p.age_rating = ageRating
     setSearchParams(p, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, watchFilter])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating])
 
   // Fetch subsequent pages when page increments
   useEffect(() => {
@@ -306,7 +318,7 @@ export default function Explore() {
         const next = new URLSearchParams(prev)
         next.set('page', String(page))
         return next
-      }, { replace: true })
+      }, { replace: true, preventScrollReset: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
@@ -367,7 +379,7 @@ export default function Explore() {
     setYearTo(CURRENT_YEAR)
     setSort('popularity')
     setSelectedType('')
-    setWatchFilter('')
+    setAgeRating('')
     setPage(1)
   }
 
@@ -381,7 +393,7 @@ export default function Explore() {
     yearTo < CURRENT_YEAR ||
     sort !== 'popularity' ||
     selectedType !== '' ||
-    watchFilter !== ''
+    ageRating !== ''
 
   const getHeroTitle = () => {
     if (selectedGenres.length === 1) {
@@ -471,6 +483,26 @@ export default function Explore() {
               </div>
             </FilterDropdown>
 
+            {/* Countries Dropdown */}
+            <FilterDropdown
+              label={selectedCountries.length > 0 ? `Countries (${selectedCountries.length})` : 'Countries'}
+              active={selectedCountries.length > 0}
+            >
+              <div className="filter-dropdown__menu-list filter-dropdown__custom-container--scrollable" style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                {COUNTRIES.map((c) => (
+                  <label key={c.code} className={`filter-dropdown__menu-item ${selectedCountries.includes(c.code) ? 'filter-dropdown__menu-item--active' : ''}`}>
+                    <input
+                      type="checkbox"
+                      className="filter-dropdown__checkbox"
+                      checked={selectedCountries.includes(c.code)}
+                      onChange={() => toggleCountry(c.code)}
+                    />
+                    <span>{c.label}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
+
             {/* Year Dropdown */}
             <FilterDropdown
               label={(yearFrom > 1900 || yearTo < CURRENT_YEAR) ? `Year: ${yearFrom}–${yearTo}` : 'Year'}
@@ -542,37 +574,35 @@ export default function Explore() {
               </div>
             </FilterDropdown>
 
-            {/* Watch Status Dropdown (only for logged-in users) */}
-            {isLoggedIn && (
-              <FilterDropdown
-                label={`Watch Status: ${WATCH_OPTIONS.find(o => o.value === watchFilter)?.label || 'All'}`}
-                active={watchFilter !== ''}
-              >
-                <div className="filter-dropdown__menu-list">
-                  {WATCH_OPTIONS.map((o) => (
-                    <label key={o.value} className={`filter-dropdown__menu-item ${watchFilter === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="watch-option"
-                        className="filter-dropdown__radio"
-                        checked={watchFilter === o.value}
-                        onChange={() => setWatchFilter(o.value)}
-                      />
-                      <span>{o.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </FilterDropdown>
-            )}
+            {/* Age Rating Dropdown */}
+            <FilterDropdown
+              label={`Age Rating: ${AGE_RATING_OPTIONS.find(o => o.value === ageRating)?.label || 'Any Age'}`}
+              active={ageRating !== ''}
+            >
+              <div className="filter-dropdown__menu-list">
+                {AGE_RATING_OPTIONS.map((o) => (
+                  <label key={o.value} className={`filter-dropdown__menu-item ${ageRating === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="age-rating-option"
+                      className="filter-dropdown__radio"
+                      checked={ageRating === o.value}
+                      onChange={() => setAgeRating(o.value)}
+                    />
+                    <span>{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
 
             {/* More Filters Dropdown */}
             <FilterDropdown
               label={
-                (selectedCompanies.length + selectedCountries.length + selectedProviders.length) > 0 
-                  ? `More (${selectedCompanies.length + selectedCountries.length + selectedProviders.length})` 
+                (selectedCompanies.length + selectedProviders.length) > 0 
+                  ? `More (${selectedCompanies.length + selectedProviders.length})` 
                   : 'More'
               }
-              active={(selectedCompanies.length + selectedCountries.length + selectedProviders.length) > 0}
+              active={(selectedCompanies.length + selectedProviders.length) > 0}
             >
               <div className="filter-dropdown__custom-container filter-dropdown__custom-container--scrollable" style={{ minWidth: '280px', maxHeight: '380px', overflowY: 'auto', gap: '16px' }}>
                 {/* Production Companies */}
@@ -586,24 +616,6 @@ export default function Explore() {
                           className="filter-dropdown__checkbox"
                           checked={selectedCompanies.includes(c.id)}
                           onChange={() => toggleCompany(c.id)}
-                        />
-                        <span>{c.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Countries */}
-                <div>
-                  <span className="filter-section-header">Countries</span>
-                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                    {COUNTRIES.map((c) => (
-                      <label key={c.code} className={`filter-dropdown__menu-item ${selectedCountries.includes(c.code) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                        <input
-                          type="checkbox"
-                          className="filter-dropdown__checkbox"
-                          checked={selectedCountries.includes(c.code)}
-                          onChange={() => toggleCountry(c.code)}
                         />
                         <span>{c.label}</span>
                       </label>
@@ -707,9 +719,9 @@ export default function Explore() {
                   </button>
                 )
               })}
-              {watchFilter && (
-                <button key="active-chip-watch" className="explore-active-chip" onClick={() => setWatchFilter('')}>
-                  {watchFilter === 'watched' ? 'Watched Only' : 'Unwatched'} ×
+              {ageRating && (
+                <button key="active-chip-age" className="explore-active-chip" onClick={() => setAgeRating('')}>
+                  {AGE_RATING_OPTIONS.find(o => o.value === ageRating)?.label} ×
                 </button>
               )}
             </div>

@@ -18,6 +18,9 @@ export const authService = {
   login: (email, password) =>
     api.post(`${BASE}/login`, { email, password }).then((r) => r.data.data),
 
+  resetPassword: (email, new_password) =>
+    api.post(`${BASE}/reset-password`, { email, new_password }).then((r) => r.data.data),
+
   logout: () =>
     api.post(`${BASE}/logout`).then((r) => r.data.data),
 

@@ -9,10 +9,10 @@
 /* ── Backdrop ── */
 .movie-detail__backdrop {
   position: fixed;
-  top: 0;
+  top: var(--navbar-h);
   left: 0;
   right: 0;
-  height: 55vh;
+  height: 70vh;
   background-size: cover;
   background-position: center 20%;
   background-repeat: no-repeat;
@@ -22,13 +22,15 @@
 
 .movie-detail__backdrop-overlay {
   position: fixed;
-  top: 0;
+  top: var(--navbar-h);
   left: 0;
   right: 0;
-  height: 55vh;
+  height: 70vh;
   background: linear-gradient(
     to bottom,
-    rgba(8, 8, 8, 0.55) 0%,
+    rgba(8, 8, 8, 0.15) 0%,
+    rgba(8, 8, 8, 0.5) 50%,
+    rgba(8, 8, 8, 0.8) 85%,
     rgba(8, 8, 8, 1) 100%
   );
   z-index: 1;
@@ -47,7 +49,7 @@
   grid-template-columns: 240px 1fr 280px;
   gap: var(--space-8);
   align-items: start;
-  padding-top: var(--space-10);
+  padding-top: 30vh;
   padding-bottom: var(--space-10);
 }
 
@@ -200,6 +202,7 @@
   .movie-detail__top {
     grid-template-columns: 1fr;
     gap: var(--space-6);
+    padding-top: 18vh;
   }
 
   .movie-detail__poster-col {

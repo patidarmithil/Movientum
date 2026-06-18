@@ -317,7 +317,7 @@ async def explore_movies(
     countries:  Optional[str] = Query(default=None, description="Comma-separated origin country ISO codes"),
     providers:  Optional[str] = Query(default=None, description="Comma-separated watch provider IDs"),
     type:       Optional[str] = Query(default=None, description="Filter by type: movie|tv|anime"),
-    watch_filter: Optional[str] = Query(default=None, description="Filter by watch status: watched|unwatched"),
+    age_rating: Optional[str] = Query(default=None, description="Filter by age rating: kids|teens"),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[dict] = Depends(get_optional_user),
 ):
@@ -341,7 +341,7 @@ async def explore_movies(
         "s": sort, "p": page, "l": limit,
         "comp": companies, "count": countries, "prov": providers,
         "t": type,
-        "wf": watch_filter,
+        "ar": age_rating,
         "u": str(user_uuid) if user_uuid else None
     })
     cached = await get_cached(cache_key)
@@ -397,6 +397,17 @@ async def explore_movies(
     if year_to:
         params_movie["primary_release_date.lte"] = f"{year_to}-12-31"
         params_tv["first_air_date.lte"] = f"{year_to}-12-31"
+        
+    if age_rating == "kids":
+        params_movie["certification_country"] = "US"
+        params_movie["certification.lte"] = "PG"
+        params_tv["certification_country"] = "US"
+        params_tv["certification.lte"] = "TV-PG"
+    elif age_rating == "teens":
+        params_movie["certification_country"] = "US"
+        params_movie["certification.lte"] = "PG-13"
+        params_tv["certification_country"] = "US"
+        params_tv["certification.lte"] = "TV-14"
     
     # Sort mapping
     if sort == "popularity":
@@ -499,24 +510,14 @@ async def explore_movies(
     if sort == "moctale":
         formatted.sort(key=lambda x: (x.get("moctale_rating") or {}).get("score") or 0, reverse=True)
 
-    # ── Watch Status Filtering ──
-    if watch_filter in ("watched", "unwatched") and user_uuid:
-        from app.db.orm_models import WatchHistory
-        watched_stmt = select(WatchHistory.movie_id).where(WatchHistory.user_id == user_uuid)
-        watched_result = await db.execute(watched_stmt)
-        watched_ids = set(watched_result.scalars().all())
-        
-        if watch_filter == "watched":
-            formatted = [m for m in formatted if m["id"] in watched_ids]
-        elif watch_filter == "unwatched":
-            formatted = [m for m in formatted if m["id"] not in watched_ids]
+    # Removed Watch Status Filtering
 
     total_results = sum(
         resp.get("total_results", 0)
         for resp in responses
         if isinstance(resp, dict) and "total_results" in resp
     )
-    if not total_results or watch_filter in ("watched", "unwatched"):
+    if not total_results:
         total_results = len(formatted)
 
     has_more = False

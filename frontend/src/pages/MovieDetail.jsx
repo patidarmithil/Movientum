@@ -112,6 +112,9 @@ export default function MovieDetail() {
 
   // ── Fetch similar movies ─────────────────────────────
   useEffect(() => {
+    // Wait for the main movie detail to load before fetching recommendations
+    if (!movie) return
+
     let cancelled = false
     if (similar.length === 0) {
       setSimilarLoading(true)
@@ -132,7 +135,7 @@ export default function MovieDetail() {
     )
 
     return () => { cancelled = true }
-  }, [movieId])
+  }, [movieId, movie])
 
   // ── Fetch watch status (auth-gated) ─────────────────
   const fetchStatus = useCallback(() => {

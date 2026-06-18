@@ -8,8 +8,10 @@ from datetime import date
 from uuid import UUID
 
 from app.db.database import get_db
-from app.db.orm_models import WatchingTracker
+from app.db.orm_models import WatchingTracker, Notification
 from app.utils.deps import get_current_user
+from app.services.tmdb_service import tmdb_service
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -45,6 +47,34 @@ async def track_show(
             next_episode_date=request.next_episode_date
         )
         db.add(tracker)
+
+    # Immediate notification check
+    if request.next_episode_date:
+        today = datetime.now(timezone.utc).date()
+        if request.next_episode_date <= today:
+            # Check if we already notified today to prevent spam
+            notif_query = select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.tv_id == request.tv_id,
+                # We do a basic check by seeing if an unseen notif already exists 
+                # or we just blindly create one since they just clicked "watch"
+            )
+            result = await db.execute(notif_query)
+            existing_notifs = result.scalars().all()
+            
+            # Simple check: if they don't have an unseen notif for this show, create one
+            unseen = [n for n in existing_notifs if not n.seen]
+            if not unseen:
+                tv_data = await tmdb_service.fetch_tv_detail(request.tv_id)
+                show_name = tv_data.get("name", f"Show {request.tv_id}") if tv_data else f"Show {request.tv_id}"
+                notif = Notification(
+                    user_id=user_id,
+                    tv_id=request.tv_id,
+                    message=f"New Episode Released: {show_name}",
+                    seen=False,
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.add(notif)
 
     await db.commit()
     return {"message": "Show tracked successfully"}

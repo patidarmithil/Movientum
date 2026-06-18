@@ -99,3 +99,28 @@ async def authenticate_user(
     if not verify_password(password, user.password_hash):
         return None
     return user
+
+
+async def reset_user_password(
+    db: AsyncSession,
+    email: str,
+    new_password: str,
+) -> Optional[User]:
+    """
+    Directly update a user's password using their email.
+    """
+    if not new_password or len(new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long",
+        )
+        
+    user = await get_user_by_email(db, email)
+    if not user:
+        return None
+        
+    user.password_hash = hash_password(new_password)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
