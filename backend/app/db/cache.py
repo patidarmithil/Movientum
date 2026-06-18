@@ -225,6 +225,51 @@ def key_explore_page(params_dict: dict) -> str:
     hash_ = hashlib.md5(param_str.encode()).hexdigest()[:12]
     return f"explore:{hash_}"
 
+
+# ── Phase 8: Recommendation Engine Cache Keys ────────────────────
+# New key builders and TTLs for all endpoints added in Phases 5–7.
+
+# TTL constants
+TTL_SIMILAR_USER   = 1800  # 30 min — personalised similar (excludes watch/watchlist)
+TTL_SIMILAR_ANON   = 1800  # 30 min — anonymous similar (stable; item similarity rarely changes)
+TTL_TASTE_PROFILE  = 120   # 2 min  — taste profile: short TTL because feedback updates frequently
+TTL_CATALOG_ITEM   = 86400 # 24 hr  — catalog features rarely change
+
+
+def key_recs_similar(tmdb_id: int, media_type: str, user_id: Optional[str] = None) -> str:
+    """
+    Cache key for similar-items blended result.
+    Personalised when user_id provided (excludes watch/watchlist), anonymous otherwise.
+    TTL: 30 min for both variants.
+    """
+    user_suffix = f":user:{user_id}" if user_id else ":anonymous"
+    return f"recs:similar:{media_type}:{tmdb_id}{user_suffix}"
+
+
+def key_taste_profile(user_id: str) -> str:
+    """
+    Cache key for a user's UserTasteProfile serialised weights.
+    TTL: 2 min (bust on every feedback write via feedback_service.apply_feedback).
+    """
+    return f"taste:profile:{user_id}"
+
+
+def key_catalog_item(tmdb_id: int, media_type: str) -> str:
+    """
+    Cache key for a single ContentCatalog feature row.
+    TTL: 24 hr (features don't change between seeds / on-demand ingests).
+    """
+    return f"catalog:{media_type}:{tmdb_id}"
+
+
+async def invalidate_cache(key: str) -> bool:
+    """
+    Alias for `invalidate()` — preferred name in service-layer code so the
+    caller doesn't need to import the lower-level `invalidate` function.
+    """
+    return await invalidate(key)
+
+
 # ── Cache Stampede Protection ─────────────────────────────────────
 _inflight_locks: dict[str, asyncio.Event] = {}
 

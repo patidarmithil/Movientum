@@ -458,7 +458,7 @@ export default function MovieDetail() {
               {similarLoading
                 ? <MovieCardSkeleton count={6} />
                 : similar.length > 0
-                  ? similar.map((m) => <MovieCard key={m.id} movie={m} />)
+                  ? similar.map((m) => <MovieCard key={m.id} movie={m} showFeedback={true} />)
                   : <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No similar movies found.</p>
               }
             </div>

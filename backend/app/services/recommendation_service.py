@@ -233,3 +233,87 @@ async def get_similar_items(
     final_list.extend(buckets.get("bucket_2", []))
     final_list.extend(buckets.get("bucket_3", []))
     return final_list
+
+
+# ── Phase 5 Baseline Adapters ─────────────────────────────────────
+# These thin wrappers expose a consistent interface for the TDI blending layer.
+
+async def get_baseline_recommendations(
+    db: AsyncSession,
+    user_id: Optional[UUID] = None,
+    limit: int = 30,
+) -> list[dict]:
+    """
+    Phase 5 adapter: returns a flat list of up to `limit` baseline recommendations.
+    Delegates to get_personalized_recommendations() when user_id is provided,
+    or fetches trending for anonymous users.
+    """
+    if user_id is None:
+        # Anonymous fallback — trending
+        try:
+            from app.routers.movies import get_trending
+            data = await get_trending(db=None)
+            return data.get("movies", [])[:limit]
+        except Exception as e:
+            logger.warning("Baseline trending fallback failed: %s", e)
+            return []
+
+    result = await get_personalized_recommendations(db, user_id=user_id)
+    movies = result.get("movies", [])
+    return movies[:limit]
+
+
+async def get_baseline_similar_items(
+    db: AsyncSession,
+    item_id: int,
+    media_type: str = "movie",
+    user_id: Optional[UUID] = None,
+    limit: int = 80,
+) -> list[dict]:
+    """
+    Phase 5 adapter: returns a flat list of up to `limit` baseline similar items.
+    Delegates to get_similar_items() (the existing TMDB-based pipeline).
+    """
+    items = await get_similar_items(db, item_id=item_id, media_type=media_type, user_id=user_id)
+    return items[:limit]
+
+
+async def get_user_watch_seed(
+    db: AsyncSession,
+    user_id: UUID,
+) -> Optional[dict]:
+    """
+    Returns the most recently watched/rated ContentCatalog-compatible item for a user.
+    Used as the origin item for ML pipeline personalised recs.
+
+    Returns a dict with {tmdb_id, media_type} or None if no history.
+    Falls back to most recently watched movie from `watch_history` table.
+    """
+    from app.db.orm_models import WatchHistory, Movie
+
+    try:
+        stmt = (
+            select(WatchHistory.movie_id)
+            .where(WatchHistory.user_id == user_id)
+            .order_by(WatchHistory.watched_at.desc())
+            .limit(1)
+        )
+        result = await db.execute(stmt)
+        movie_id = result.scalar_one_or_none()
+
+        if movie_id is None:
+            return None
+
+        # Fetch media_type from movies table
+        movie_stmt = select(Movie.id, Movie.type).where(Movie.id == movie_id)
+        movie_result = await db.execute(movie_stmt)
+        row = movie_result.first()
+
+        if row is None:
+            return None
+
+        return {"tmdb_id": row.id, "media_type": row.type or "movie"}
+
+    except Exception as e:
+        logger.warning("get_user_watch_seed failed for user %s: %s", user_id, e)
+        return None
