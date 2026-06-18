@@ -407,3 +407,126 @@ class Feedback(Base):
     def __repr__(self):
         return f"<Feedback id={self.id} category={self.category}>"
 
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 1: Advanced Recommendation Engine Tables
+# ═══════════════════════════════════════════════════════════════
+
+class ContentCatalog(Base):
+    __tablename__ = "content_catalog"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    tmdb_id        = Column(Integer, nullable=False)
+    media_type     = Column(String(10), nullable=False)         # "movie" | "tv"
+
+    # ── Categorical Feature Vectors ──────────────────────────────────────
+    genre_ids      = Column(ARRAY(Integer), default=[])         # TMDB genre integer IDs
+    keyword_ids    = Column(ARRAY(Integer), default=[])         # TMDB keyword IDs (top 15)
+    studio_ids     = Column(ARRAY(Integer), default=[])         # Production company IDs
+
+    # ── Talent Dimension ─────────────────────────────────────────────────
+    cast_ids       = Column(ARRAY(Integer), default=[])         # Top 10 cast person IDs
+    crew_ids       = Column(JSONB, default={})
+    # crew_ids structure: {"director": [id], "writer": [id], "producer": [id]}
+
+    # ── Demographic Metadata ─────────────────────────────────────────────
+    original_language = Column(String(10))                      # e.g. "en", "ja", "hi"
+    origin_countries  = Column(ARRAY(String(5)), default=[])    # e.g. ["US","IN","KR"]
+    release_era       = Column(String(20))                      # e.g. "1990s", "2020s"
+    release_year      = Column(Integer)
+
+    # ── Performance Indices ───────────────────────────────────────────────
+    vote_average   = Column(Float, default=0.0)
+    vote_count     = Column(Integer, default=0)
+    popularity     = Column(Float, default=0.0)
+
+    # ── Metadata ─────────────────────────────────────────────────────────
+    title          = Column(String(500))
+    poster_path    = Column(String(500))
+    is_seed        = Column(Boolean, default=False)  # True = part of 20K seed, False = on-demand
+    ingested_at    = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("tmdb_id", "media_type", name="uq_catalog_tmdb_media"),
+    )
+
+
+class UserTasteProfile(Base):
+    __tablename__ = "user_taste_profiles"
+
+    id      = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+
+    # ── Affinity Weight Vectors (JSONB float maps) ────────────────────────
+    genre_weights    = Column(JSONB, default={})
+    # e.g. {"28": 42.5, "878": 18.2, "27": -25.0}  (TMDB genre IDs as string keys)
+
+    cast_weights     = Column(JSONB, default={})
+    # e.g. {"500": 15.4, "1136406": 8.2}            (TMDB person IDs as string keys)
+
+    crew_weights     = Column(JSONB, default={})
+    # e.g. {"525": 20.0}                             (director/writer person IDs)
+
+    keyword_weights  = Column(JSONB, default={})
+    # e.g. {"9715": 12.0, "180547": -8.0}           (TMDB keyword IDs)
+
+    language_weights = Column(JSONB, default={})
+    # e.g. {"en": 1.2, "ja": 0.9, "ko": 1.5}       (float multipliers, neutral = 1.0)
+
+    era_weights      = Column(JSONB, default={})
+    # e.g. {"1990s": -5.0, "2010s": 22.0, "2020s": 35.0}
+
+    # ── Global Interaction Statistics ─────────────────────────────────────
+    total_interactions = Column(Integer, default=0)
+    avg_rating_given   = Column(Float, default=0.0)
+    last_updated       = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user = relationship("User", backref="taste_profile", uselist=False)
+
+
+# ═══════════════════════════════════════════════════════════════
+# PHASE 6: Feedback Loop — Interaction Log Table
+# ═══════════════════════════════════════════════════════════════
+
+class InteractionLog(Base):
+    """
+    Records every recommendation feedback signal per user.
+
+    Signals:
+        thumbs_up   → label  3, delta +10.0 (genres/cast/crew/era)
+        click       → label  2, delta  +2.0 (genres only, time-decayed)
+        ignore      → label  0, delta  -0.5 (genres only, time-decayed)
+        thumbs_down → label -1, delta -15.0 (genres/cast/crew/era)
+
+    feature_snapshot stores the 16-dim feature vector from Phase 4 at the
+    time the item was shown — used as training data for nightly XGBRanker retrain.
+    """
+    __tablename__ = "interaction_log"
+
+    id          = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id     = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    tmdb_id     = Column(Integer, nullable=False)
+    media_type  = Column(String(10), nullable=False)  # "movie" | "tv"
+    signal_type = Column(String(20), nullable=False)   # "thumbs_up" | "thumbs_down" | "click" | "ignore"
+    label       = Column(Integer, nullable=False)       # -1 | 0 | 2 | 3
+
+    # Pre-computed feature vector at the time of interaction (for training)
+    feature_snapshot = Column(JSONB, default={})
+    # Keys match Phase 4 FEATURE_COLUMNS:
+    # ppr_score, ppr_rank_norm, vote_average, vote_count_log, popularity_log,
+    # recency_score, user_genre_score, user_cast_score, user_crew_score,
+    # user_keyword_score, user_era_score, user_language_mult,
+    # genre_overlap_count, cast_overlap_count, same_language, same_era
+
+    timestamp = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    user = relationship("User", backref="interaction_logs")
+
+    __table_args__ = (
+        Index("idx_interaction_log_user_id", "user_id"),
+        Index("idx_interaction_log_user_ts", "user_id", "timestamp"),
+        Index("idx_interaction_log_signal", "signal_type"),
+    )
+
+    def __repr__(self):
+        return f"<InteractionLog user={self.user_id} tmdb={self.tmdb_id} signal={self.signal_type}>"

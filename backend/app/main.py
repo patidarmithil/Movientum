@@ -117,6 +117,15 @@ async def lifespan(app: FastAPI):
 
         import asyncio
         asyncio.create_task(cleanup_old_movies())
+
+        # ── Phase 3: Warm up in-memory content graph ─────────────
+        try:
+            from app.services.graph_cache import get_or_build_graph
+            async with AsyncSessionLocal() as graph_db:
+                await get_or_build_graph(graph_db)
+            logger.info("✓ Content graph warmed up at startup")
+        except Exception as e:
+            logger.warning("Graph warmup failed (non-fatal): %s", e)
     else:
         logger.error("✗ Supabase PostgreSQL connection FAILED")
 
@@ -315,3 +324,11 @@ app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["
 # ── Feedback Router ─────────────────────────────────────────
 from app.routers import feedback
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["Feedback"])
+
+# ── Phase 6: Recommendation Signals Router ───────────────────────
+from app.routers import recommendation_signals
+app.include_router(
+    recommendation_signals.router,
+    prefix="/api/v1/rec-feedback",
+    tags=["Recommendation Feedback"],
+)

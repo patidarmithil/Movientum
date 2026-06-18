@@ -12,9 +12,11 @@ import logging
 from typing import Optional
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db.cache import get_cached, set_cached, key_tmdb_config, TTL_TMDB_CONFIG
+from app.db.orm_models import ContentCatalog
 
 logger = logging.getLogger(__name__)
 
@@ -461,3 +463,87 @@ class TMDBService:
 
 # Global instance for FastAPI routers
 tmdb_service = TMDBService()
+
+
+# ── On-Demand Feature Ingestion (Phase 2) ─────────────────────
+
+def bin_release_era(year: Optional[int]) -> str:
+    """Maps a release year to a decade-era string bucket."""
+    if not year:
+        return "unknown"
+    decade = (year // 10) * 10
+    return f"{decade}s"
+
+
+def _parse_crew(crew: list[dict]) -> dict:
+    """Extracts director, writer, and producer IDs from TMDB credits crew array."""
+    result = {"director": [], "writer": [], "producer": []}
+    for member in crew:
+        job = member.get("job", "").lower()
+        if "director" in job:
+            result["director"].append(member["id"])
+        elif "screenplay" in job or "writer" in job:
+            result["writer"].append(member["id"])
+        elif "producer" in job and "executive" not in job:
+            result["producer"].append(member["id"])
+    return result
+
+
+async def ingest_item_to_catalog(
+    db: AsyncSession,
+    tmdb_id: int,
+    media_type: str  # "movie" | "tv"
+) -> Optional[ContentCatalog]:
+    """
+    Fetches full feature data from TMDB API and writes a ContentCatalog row.
+    Called on cache-miss in advanced_recs.py before graph traversal.
+    """
+    # 1. Fetch core details
+    endpoint = f"/movie/{tmdb_id}" if media_type == "movie" else f"/tv/{tmdb_id}"
+    details = await tmdb_service._get(endpoint, params={"language": "en-US"})
+    if not details:
+        return None
+
+    # 2. Fetch keywords
+    kw_endpoint = f"/{media_type}/{tmdb_id}/keywords"
+    kw_data = await tmdb_service._get(kw_endpoint)
+    if not kw_data:
+        kw_data = {}
+    keyword_ids = [kw["id"] for kw in kw_data.get("keywords", kw_data.get("results", []))[:15]]
+
+    # 3. Fetch credits
+    cr_endpoint = f"/{media_type}/{tmdb_id}/credits"
+    cr_data = await tmdb_service._get(cr_endpoint, params={"language": "en-US"})
+    if not cr_data:
+        cr_data = {}
+    cast_ids = [c["id"] for c in cr_data.get("cast", [])[:10]]
+    crew_map = _parse_crew(cr_data.get("crew", []))
+
+    # 4. Parse and map
+    release_date = details.get("release_date") or details.get("first_air_date") or ""
+    year = int(release_date[:4]) if release_date and len(release_date) >= 4 else None
+
+    row = ContentCatalog(
+        tmdb_id           = tmdb_id,
+        media_type        = media_type,
+        genre_ids         = [g["id"] for g in details.get("genres", [])],
+        keyword_ids       = keyword_ids,
+        studio_ids        = [p["id"] for p in details.get("production_companies", [])],
+        cast_ids          = cast_ids,
+        crew_ids          = crew_map,
+        original_language = details.get("original_language"),
+        origin_countries  = [c["iso_3166_1"] for c in details.get("production_countries", [])],
+        release_era       = bin_release_era(year) if year else "unknown",
+        release_year      = year,
+        vote_average      = details.get("vote_average", 0.0),
+        vote_count        = details.get("vote_count", 0),
+        popularity        = details.get("popularity", 0.0),
+        title             = details.get("title") or details.get("name"),
+        poster_path       = details.get("poster_path"),
+        is_seed           = False,
+    )
+
+    # 5. Upsert (INSERT on conflict UPDATE to refresh stale data)
+    await db.merge(row)
+    await db.commit()
+    return row

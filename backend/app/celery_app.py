@@ -20,7 +20,7 @@ celery_app = Celery(
         "app.tasks.sync_movies",
         "app.tasks.fetch_news",
         "app.tasks.check_episodes",
-        # "app.tasks.invalidate_cache", # future
+        "app.tasks.retrain_ranker",   # Phase 7: nightly XGBRanker retrain
     ],
 )
 
@@ -58,6 +58,13 @@ celery_app.conf.update(
             "task": "app.tasks.check_episodes.check_today_episodes_task",
             "schedule": crontab(hour=4, minute=0),    # 4 AM IST daily
             "options": {"expires": 3600},
+        },
+        # Phase 7: nightly XGBRanker retrain at 3:30 AM IST
+        # Offset: after movie sync (3:00) and before episode check (4:00)
+        "nightly-ranker-retrain": {
+            "task": "app.tasks.retrain_ranker.nightly_ranker_retrain",
+            "schedule": crontab(hour=3, minute=30),
+            "options": {"expires": 7200},  # Don't run if delayed > 2hr
         },
     },
 )
