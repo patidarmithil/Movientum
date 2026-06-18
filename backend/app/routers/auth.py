@@ -27,6 +27,7 @@ from app.schemas.user import (
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
+    UserResetPasswordRequest,
     UserResponse,
     WrappedTokenResponse,
     WrappedMeResponse,
@@ -36,6 +37,7 @@ from app.services.auth_service import (
     create_user,
     get_user_by_email,
     get_user_by_id,
+    reset_user_password,
 )
 from app.utils.deps import get_current_user
 from app.utils.jwt_utils import (
@@ -126,6 +128,26 @@ async def login(
 
     logger.info("USER_LOGIN user_id=%s", user.id)
     return {"data": _token_pair(user)}
+
+
+@router.post(
+    "/reset-password",
+    summary="Directly reset a user's password without confirmation",
+)
+async def reset_password(
+    body: UserResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset a user's password using their email directly.
+    """
+    user = await reset_user_password(db, body.email, body.new_password)
+    if not user:
+        # Prevent email enumeration by returning a generic success message
+        return {"data": {"message": "If the email is registered, the password has been reset."}}
+        
+    logger.info("USER_PASSWORD_RESET user_id=%s", user.id)
+    return {"data": {"message": "If the email is registered, the password has been reset."}}
 
 
 @router.post(

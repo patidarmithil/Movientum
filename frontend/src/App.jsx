@@ -34,6 +34,8 @@ import Help from './pages/Help'
 import Feedback from './pages/Feedback'
 import AdminDashboard from './pages/AdminDashboard'
 import ScrollRestore from './components/ScrollRestore'
+import ErrorBoundary from './components/ErrorBoundary'
+import ErrorPage from './pages/ErrorPage'
 import './index.css'
 import './components/Navbar.css'
 
@@ -122,19 +124,7 @@ function AppRoutes() {
           } 
         />
         {/* 404 fallback */}
-        <Route
-          path="*"
-          element={
-            <main style={{ padding: '120px 24px', textAlign: 'center' }}>
-              <h1 style={{ fontFamily: 'Outfit, sans-serif', color: '#fff', fontSize: '2rem' }}>
-                404 — Page Not Found
-              </h1>
-              <p style={{ color: '#9CA3AF', marginTop: '12px' }}>
-                <a href="/" style={{ color: '#B048FF' }}>Go home →</a>
-              </p>
-            </main>
-          }
-        />
+        <Route path="*" element={<ErrorPage type="404" />} />
       </Routes>
     </>
   )
@@ -143,10 +133,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Analytics />
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppRoutes />
+          <Analytics />
+        </AuthProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }

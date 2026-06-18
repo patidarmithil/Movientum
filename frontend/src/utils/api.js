@@ -20,7 +20,7 @@ const isLocalhost = typeof window !== 'undefined' &&
 
 const fallbackAPIUrl = isLocalhost 
   ? 'http://localhost:8000' 
-  : 'https://movientum-ewhhfwahfdh2bfgd.southeastasia-01.azurewebsites.net';
+  : 'https://movientumbackend.azurewebsites.net';
 
 const BASE_URL = import.meta.env.VITE_API_URL || fallbackAPIUrl;
 

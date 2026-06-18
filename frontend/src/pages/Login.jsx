@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { authService } from '../services/authService'
 import './Login.css'
 
 export default function Login() {
@@ -25,7 +26,9 @@ export default function Login() {
   const [showPwd, setShowPwd]     = useState(false)
   const [errors, setErrors]       = useState({})
   const [apiError, setApiError]   = useState('')
+  const [apiSuccess, setApiSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
 
   // Already logged in → redirect
   useEffect(() => {
@@ -46,16 +49,23 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setApiError('')
+    setApiSuccess('')
     const fieldErrors = validate()
     setErrors(fieldErrors)
     if (Object.keys(fieldErrors).length) return
 
     setSubmitting(true)
     try {
-      await login(email, password, rememberMe)
-      navigate(redirect, { replace: true })
+      if (isForgotPassword) {
+        await authService.resetPassword(email, password)
+        setApiSuccess("Password has been reset successfully. You can now sign in.")
+        setIsForgotPassword(false)
+      } else {
+        await login(email, password, rememberMe)
+        navigate(redirect, { replace: true })
+      }
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Login failed. Please try again.'
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'An error occurred. Please try again.'
       setApiError(msg)
     } finally {
       setSubmitting(false)
@@ -85,13 +95,18 @@ export default function Login() {
           </Link>
         </div>
 
-        <h1 className="auth-card__title">Welcome back</h1>
-        <p className="auth-card__subtitle">Sign in to your account to continue</p>
+        <h1 className="auth-card__title">{isForgotPassword ? 'Reset Password' : 'Welcome back'}</h1>
+        <p className="auth-card__subtitle">{isForgotPassword ? 'Enter your email and a new password' : 'Sign in to your account to continue'}</p>
 
-        {/* Error banner */}
+        {/* Error/Success banner */}
         {apiError && (
           <div className="auth-banner" role="alert" id="login-error">
             {apiError}
+          </div>
+        )}
+        {apiSuccess && (
+          <div className="auth-banner" role="alert" style={{ background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)', borderColor: 'rgba(34, 197, 94, 0.2)' }}>
+            {apiSuccess}
           </div>
         )}
 
@@ -116,7 +131,7 @@ export default function Login() {
 
           {/* Password */}
           <div className="auth-field">
-            <label className="auth-field__label" htmlFor="login-password">Password</label>
+            <label className="auth-field__label" htmlFor="login-password">{isForgotPassword ? 'New Password' : 'Password'}</label>
             <div className="auth-field__input-wrap">
               <input
                 id="login-password"
@@ -143,18 +158,26 @@ export default function Login() {
 
           {/* Remember me + Forgot */}
           <div className="auth-form__row">
-            <label className="auth-check">
-              <input
-                type="checkbox"
-                id="login-remember"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              Remember me
-            </label>
-            <span className="auth-form__forgot" style={{ cursor: 'default', color: 'var(--text-muted)' }}>
-              Forgot password?
-            </span>
+            {!isForgotPassword ? (
+              <>
+                <label className="auth-check">
+                  <input
+                    type="checkbox"
+                    id="login-remember"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  Remember me
+                </label>
+                <span className="auth-form__forgot" style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => { setIsForgotPassword(true); setApiError(''); setApiSuccess(''); }}>
+                  Forgot password?
+                </span>
+              </>
+            ) : (
+              <span className="auth-form__forgot" style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => { setIsForgotPassword(false); setApiError(''); }}>
+                Back to Sign In
+              </span>
+            )}
           </div>
 
           {/* Submit */}
@@ -166,7 +189,7 @@ export default function Login() {
             aria-busy={submitting}
           >
             {submitting && <span className="auth-submit__spinner" aria-hidden="true" />}
-            {submitting ? 'Signing in…' : 'Sign In'}
+            {submitting ? 'Please wait…' : (isForgotPassword ? 'Reset Password' : 'Sign In')}
           </button>
         </form>
 

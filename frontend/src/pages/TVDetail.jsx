@@ -102,9 +102,19 @@ export default function TVDetail() {
       })
       .catch(() => {})
 
+    return () => { cancelled = true }
+  }, [tvId])
+
+  // ── Fetch similar TV shows ───────────────────────────
+  useEffect(() => {
+    // Wait for the main TV show detail to load before fetching recommendations
+    if (!show) return
+
+    let cancelled = false
     if (similar.length === 0) {
       setSimilarLoading(true)
     }
+
     api.get(`/api/v1/recommendations/similar/${tvId}?media_type=tv`)
       .then((r) => {
         const sim = r.data.movies || []
@@ -122,7 +132,7 @@ export default function TVDetail() {
       })
 
     return () => { cancelled = true }
-  }, [tvId])
+  }, [tvId, show])
 
   // ── Fetch watch status (auth-gated) ─────────────────
   const fetchStatus = useCallback(() => {

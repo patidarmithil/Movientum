@@ -5,6 +5,7 @@ export default function ScrollRestore() {
   const location = useLocation()
   const navigationType = useNavigationType() // 'PUSH', 'POP', or 'REPLACE'
   const scrollRegistry = useRef({}) // In-memory fallback if sessionStorage is slow
+  const prevPathname = useRef(location.pathname)
 
   // Use pathname + search to uniquely identify every URL state including parameters
   const getCacheKey = (loc) => `scroll_cache_${loc.pathname}${loc.search}`
@@ -101,6 +102,9 @@ export default function ScrollRestore() {
         savedData = JSON.parse(saved)
       }
     } catch (e) {}
+
+    const pathChanged = location.pathname !== prevPathname.current
+    prevPathname.current = location.pathname
 
     if (navigationType === 'POP' && savedData) {
       const targetWindowScroll = savedData.window ?? 0
@@ -203,9 +207,17 @@ export default function ScrollRestore() {
         clearTimeout(startTimeout)
       }
     } else {
-      // PUSH/REPLACE navigation or no saved data -> reset to top
-      console.log(`[ScrollRestore] ${navigationType} navigation to ${location.pathname}${location.search}. Scrolling to top.`)
-      window.scrollTo(0, 0)
+      // PUSH/REPLACE navigation or no saved data -> reset to top ONLY if push or path changed
+      if (navigationType === 'PUSH' || pathChanged) {
+        console.log(`[ScrollRestore] ${navigationType} navigation to ${location.pathname}${location.search} (path changed: ${pathChanged}). Scrolling to top.`)
+        window.scrollTo(0, 0)
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0)
+          setTimeout(() => window.scrollTo(0, 0), 50)
+        })
+      } else {
+        console.log(`[ScrollRestore] ${navigationType} navigation to ${location.pathname}${location.search} (path changed: ${pathChanged}). Keeping scroll position.`)
+      }
     }
   }, [location, navigationType])
 

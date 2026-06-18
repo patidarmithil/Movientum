@@ -65,6 +65,16 @@ export default function Navbar() {
     }
   }
 
+  const addTestNotification = () => {
+    const newNotif = {
+      id: Date.now(),
+      message: "This is a test notification. Notifications are working!",
+      seen: false,
+      created_at: new Date().toISOString()
+    }
+    setNotifications([newNotif, ...notifications])
+  }
+
   // Avatar initials from user name/email
   const initials = user
     ? (user.username || user.name || user.email || '?').charAt(0).toUpperCase()
@@ -101,22 +111,18 @@ export default function Navbar() {
         {/* ── Right-Aligned Navigation Icons Group ── */}
         <div className="navbar__right-group">
           
-          {/* Search Trigger */}
-          <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
-          
-          {/* Help nav button */}
+          {/* Explore nav button (Compass Icon + Text) */}
           <NavLink
-            to="/help"
+            to="/explore"
             className={({ isActive }) =>
               `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
             }
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
               <circle cx="12" cy="12" r="10"></circle>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
             </svg>
-            <span>Help</span>
+            <span>Explore</span>
           </NavLink>
 
           {/* News nav button */}
@@ -135,37 +141,8 @@ export default function Navbar() {
             <span>News</span>
           </NavLink>
 
-          {/* Explore nav button (Compass Icon + Text) */}
-          <NavLink
-            to="/explore"
-            className={({ isActive }) =>
-              `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-            }
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-            </svg>
-            <span>Explore</span>
-          </NavLink>
-
           {isLoggedIn && (
             <>
-              {/* Dashboard nav button */}
-              <NavLink
-                to="/dashboard"
-                className={({ isActive }) =>
-                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-                }
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-                  <line x1="18" y1="20" x2="18" y2="10"></line>
-                  <line x1="12" y1="20" x2="12" y2="4"></line>
-                  <line x1="6" y1="20" x2="6" y2="14"></line>
-                </svg>
-                <span>Dashboard</span>
-              </NavLink>
-
               {/* Analysis nav button */}
               <NavLink
                 to="/analysis"
@@ -190,20 +167,40 @@ export default function Navbar() {
                 <span>Analysis</span>
               </NavLink>
 
-              {/* Feedback nav button */}
+              {/* Dashboard nav button */}
               <NavLink
-                to="/feedback"
+                to="/dashboard"
                 className={({ isActive }) =>
                   `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
                 }
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
                 </svg>
-                <span>Feedback</span>
+                <span>Dashboard</span>
               </NavLink>
             </>
           )}
+
+          {/* Search Trigger */}
+          <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
+
+          {/* Help nav button */}
+          <NavLink
+            to="/help"
+            className={({ isActive }) =>
+              `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+            }
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span>Help</span>
+          </NavLink>
 
           {/* Auth Actions (Avatar dropdown or Login / SignUp buttons) */}
           <div className="navbar__actions">
@@ -227,7 +224,11 @@ export default function Navbar() {
                     <div className="navbar__notif-header">Notifications</div>
                     <div className="navbar__notif-list">
                       {notifications.length === 0 ? (
-                        <div className="navbar__notif-empty">No notifications</div>
+                        <div className="navbar__notif-empty">
+                          No notifications
+                          <br/><br/>
+                          <button onClick={addTestNotification} className="btn btn--secondary btn--sm">Test Notifications</button>
+                        </div>
                       ) : (
                         notifications.map(n => (
                           <div
@@ -403,6 +404,42 @@ export default function Navbar() {
               >
                 <span>🧭</span> Explore
               </NavLink>
+              <NavLink 
+                to="/news" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>📰</span> News
+              </NavLink>
+              
+              {isLoggedIn && (
+                <>
+                  <NavLink 
+                    to="/analysis" 
+                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>🔮</span> Analysis
+                  </NavLink>
+                  <NavLink 
+                    to="/dashboard" 
+                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>📊</span> Dashboard
+                  </NavLink>
+                  {user?.role === 'admin' && (
+                    <NavLink 
+                      to="/admin" 
+                      className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <span>🛡️</span> Admin Panel
+                    </NavLink>
+                  )}
+                </>
+              )}
+
               <button 
                 className="navbar__mobile-drawer-link"
                 onClick={() => {
@@ -421,49 +458,6 @@ export default function Navbar() {
               >
                 <span>❓</span> Help
               </NavLink>
-              
-              <NavLink 
-                to="/news" 
-                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <span>📰</span> News
-              </NavLink>
-              
-              {isLoggedIn && (
-                <>
-                  <NavLink 
-                    to="/dashboard" 
-                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <span>📊</span> Dashboard
-                  </NavLink>
-                  <NavLink 
-                    to="/analysis" 
-                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <span>🔮</span> Analysis
-                  </NavLink>
-                  <NavLink 
-                    to="/feedback" 
-                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <span>💡</span> Feedback
-                  </NavLink>
-                  {user?.role === 'admin' && (
-                    <NavLink 
-                      to="/admin" 
-                      className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <span>🛡️</span> Admin Panel
-                    </NavLink>
-                  )}
-                </>
-              )}
             </div>
 
             <div className="navbar__mobile-drawer-divider" />

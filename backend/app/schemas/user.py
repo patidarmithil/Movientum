@@ -33,6 +33,11 @@ class UserLoginRequest(BaseModel):
     password: str
 
 
+class UserResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str = Field(..., min_length=8, description="Min 8 characters")
+
+
 class UserResponse(BaseModel):
     id: UUID
     username: str
