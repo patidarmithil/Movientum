@@ -1,9 +1,0 @@
-2026-06-14 19:21:35,687 INFO sqlalchemy.engine.Engine COMMIT
-INFO:     127.0.0.1:58784 - "OPTIONS /api/v1/movies/explore?page=3&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58784 - "GET /api/v1/movies/explore?page=3&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58784 - "GET /api/v1/movies/explore?page=1&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58786 - "GET /api/v1/movies/explore?page=1&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58786 - "OPTIONS /api/v1/movies/explore?page=2&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58786 - "GET /api/v1/movies/explore?page=2&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58786 - "GET /api/v1/movies/explore?page=3&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58786 - "GET /api/v1/movies/explore?page=1&limit=24&sort=popularity&watch_filter=unwatched HTTP/1.1" 200 OK

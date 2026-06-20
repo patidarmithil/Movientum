@@ -77,6 +77,21 @@ async def mark_watched(
     await invalidate(f"movie:similar:{body.movie_id}:movie")
     await invalidate(key_user_history(str(user_id)))  # dashboard history cache
     await invalidate(key_user_prefs(str(user_id)))    # news personalization prefs
+
+    # Taste Profile Update
+    try:
+        from app.services.tmdb_service import ingest_item_to_catalog
+        from app.services.feedback_service import apply_feedback
+        from app.db.orm_models import Movie
+        from sqlalchemy import select
+        media_type_res = await db.execute(select(Movie.type).where(Movie.id == body.movie_id))
+        m_type = media_type_res.scalar_one_or_none() or "movie"
+        catalog_item = await ingest_item_to_catalog(db, body.movie_id, m_type)
+        if catalog_item:
+            await apply_feedback(db, user_id, catalog_item, "watched")
+    except Exception as e:
+        logger.warning(f"Taste profile update failed: {e}")
+
     logger.info(
         "WATCH_MARKED",
         extra={"user_id": str(user_id), "movie_id": body.movie_id},
@@ -111,6 +126,21 @@ async def remove_from_watch_history(
     await invalidate(f"movie:similar:{movie_id}:movie")
     await invalidate(key_user_history(str(user_id)))  # dashboard history cache
     await invalidate(key_user_prefs(str(user_id)))    # news personalization prefs
+
+    # Taste Profile Update
+    try:
+        from app.services.tmdb_service import ingest_item_to_catalog
+        from app.services.feedback_service import apply_feedback
+        from app.db.orm_models import Movie
+        from sqlalchemy import select
+        media_type_res = await db.execute(select(Movie.type).where(Movie.id == movie_id))
+        m_type = media_type_res.scalar_one_or_none() or "movie"
+        catalog_item = await ingest_item_to_catalog(db, movie_id, m_type)
+        if catalog_item:
+            await apply_feedback(db, user_id, catalog_item, "unwatched")
+    except Exception as e:
+        logger.warning(f"Taste profile update failed: {e}")
+
     logger.info(
         "WATCH_REMOVED",
         extra={"user_id": str(user_id), "movie_id": movie_id},
@@ -183,6 +213,21 @@ async def add_to_watchlist(
     user_id = UUID(current_user["sub"])
     entry = await watch_service.add_to_watchlist(db, user_id=user_id, movie_id=body.movie_id)
     await invalidate(key_user_watchlist(str(user_id)))  # invalidate watchlist cache
+
+    # Taste Profile Update
+    try:
+        from app.services.tmdb_service import ingest_item_to_catalog
+        from app.services.feedback_service import apply_feedback
+        from app.db.orm_models import Movie
+        from sqlalchemy import select
+        media_type_res = await db.execute(select(Movie.type).where(Movie.id == body.movie_id))
+        m_type = media_type_res.scalar_one_or_none() or "movie"
+        catalog_item = await ingest_item_to_catalog(db, body.movie_id, m_type)
+        if catalog_item:
+            await apply_feedback(db, user_id, catalog_item, "watchlist")
+    except Exception as e:
+        logger.warning(f"Taste profile update failed: {e}")
+
     return WatchlistItem(
         id=entry.id,
         movie_id=entry.movie_id,

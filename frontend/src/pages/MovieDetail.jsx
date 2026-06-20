@@ -8,7 +8,7 @@
  *  - "Add/Remove Watchlist" button → POST/DELETE /api/v1/watch/watchlist
  *  - Similar Movies row → GET /api/v1/recommendations/similar/{id}
  */
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import { movieService } from '../services/movieService'
 import { watchService } from '../services/watchService'
@@ -21,7 +21,11 @@ import CastCrew from '../components/CastCrew'
 import TrailerModal from '../components/TrailerModal'
 import ProductionTags from '../components/ProductionTags'
 import ShinyText from '../components/ShinyText'
+import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import { pageCache } from '../utils/pageCache'
+import { watchlistService } from '../services/watchlistService'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
+import MovieRow from '../components/MovieRow'
 import './MovieDetail.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -41,11 +45,28 @@ export default function MovieDetail() {
   const { id } = useParams()
   const movieId = Number(id)
   const { isLoggedIn } = useAuth()
+  const location = useLocation()
+  const passedMovie = location.state?.movie
 
   const cacheKey = `movie-detail-${movieId}`
   const cachedData = pageCache.get(cacheKey)
 
-  const [movie,         setMovie]         = useState(cachedData?.movie || null)
+  const [movie,         setMovie]         = useState(() => {
+    if (cachedData?.movie) return cachedData.movie
+    if (passedMovie) {
+      return {
+        id: passedMovie.id,
+        title: passedMovie.title || passedMovie.name,
+        poster_path: passedMovie.poster_path,
+        backdrop_path: passedMovie.backdrop_path,
+        release_year: passedMovie.release_year,
+        release_date: passedMovie.release_date,
+        vote_average: passedMovie.vote_average,
+        media_type: passedMovie.media_type || 'movie'
+      }
+    }
+    return null
+  })
   const [similar,       setSimilar]       = useState(cachedData?.similar || [])
   const [watchStatus,   setWatchStatus]   = useState(cachedData?.watchStatus || { watched: false, watchlisted: false })
   const [loading,       setLoading]       = useState(!cachedData?.movie)
@@ -58,8 +79,30 @@ export default function MovieDetail() {
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
   
+  const [showCollectionModal, setShowCollectionModal] = useState(false)
+  const [isInAnyCollection, setIsInAnyCollection] = useState(false)
+  
   const [videosData,    setVideosData]    = useState(cachedData?.videosData || null)
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
+
+  const [showRatingMeter, setShowRatingMeter] = useState(false)
+  const [posterLoaded, setPosterLoaded] = useState(false)
+
+  useEffect(() => {
+    setPosterLoaded(false)
+    setShowRatingMeter(false)
+  }, [movieId])
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        setShowRatingMeter(true)
+      }, 200)
+      return () => clearTimeout(timer)
+    } else {
+      setShowRatingMeter(false)
+    }
+  }, [loading])
 
   const handleRequestRating = async () => {
     if (!movie || reqNeededState.loading || reqNeededState.success) return
@@ -80,7 +123,7 @@ export default function MovieDetail() {
   // ── Fetch movie detail ───────────────────────────────
   useEffect(() => {
     let cancelled = false
-    if (!movie) {
+    if (!cachedData?.movie) {
       setLoading(true)
     }
     setError(null)
@@ -94,7 +137,7 @@ export default function MovieDetail() {
           pageCache.set(cacheKey, { ...curr, movie: data })
         }
       })
-      .catch(() => { if (!cancelled && !movie) setError('Failed to load movie') })
+      .catch(() => { if (!cancelled && (!movie || !movie.overview)) setError('Failed to load movie') })
       .finally(() => { if (!cancelled) setLoading(false) })
       
     movieService.getVideos(movieId)
@@ -147,6 +190,13 @@ export default function MovieDetail() {
         pageCache.set(cacheKey, { ...curr, watchStatus: status })
       })
       .catch(() => {})
+
+    watchlistService.getMovieStatus(movieId)
+      .then(res => {
+        const inAny = res.collections?.some(c => c.has_movie)
+        setIsInAnyCollection(inAny)
+      })
+      .catch(() => {})
   }, [movieId, isLoggedIn])
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
@@ -175,38 +225,25 @@ export default function MovieDetail() {
     }
   }
 
-  // ── Watchlist toggle ─────────────────────────────────
-  const handleWatchlistToggle = async () => {
-    if (!isLoggedIn || listBusy) return
-    setListBusy(true)
-    try {
-      if (watchStatus.watchlisted) {
-        await watchService.removeFromWatchlist(movieId)
-        setWatchStatus((s) => ({ ...s, watchlisted: false }))
-      } else {
-        await watchService.addToWatchlist(movieId)
-        setWatchStatus((s) => ({ ...s, watchlisted: true }))
-      }
-    } catch {
-      /* silent fail */
-    } finally {
-      setListBusy(false)
-    }
-  }
 
-  // ── Render: loading ──────────────────────────────────
-  if (loading) {
+
+  // ── Render: loading without metadata ──────────────────
+  if (loading && !movie) {
     return (
       <main className="movie-detail page-content">
         <div className="container">
-          <div className="movie-detail__top">
+          <div className="movie-detail__top animate-fade-lift">
             <div className="movie-detail__poster-col">
               <div className="skeleton" style={{ width: 240, height: 360, borderRadius: 16 }} />
             </div>
             <div className="movie-detail__info-col" style={{ gap: 16 }}>
               <div className="skeleton" style={{ height: 40, width: '60%', borderRadius: 8 }} />
               <div className="skeleton" style={{ height: 20, width: '40%', borderRadius: 8 }} />
-              <div className="skeleton" style={{ height: 80, width: '90%', borderRadius: 8 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0' }}>
+                <div className="skeleton" style={{ height: 16, width: '100%', borderRadius: 4 }} />
+                <div className="skeleton" style={{ height: 16, width: '95%', borderRadius: 4 }} />
+                <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: 4 }} />
+              </div>
             </div>
           </div>
         </div>
@@ -240,11 +277,13 @@ export default function MovieDetail() {
     <main className="movie-detail page-content">
       {/* ── Backdrop ── */}
       {backdropUrl && (
-        <div
-          className="movie-detail__backdrop"
-          style={{ backgroundImage: `url(${backdropUrl})` }}
-          aria-hidden="true"
-        />
+        <div className="movie-detail__backdrop-container">
+          <div
+            className="movie-detail__backdrop"
+            style={{ backgroundImage: `url(${backdropUrl})` }}
+            aria-hidden="true"
+          />
+        </div>
       )}
       <div className="movie-detail__backdrop-overlay" aria-hidden="true" />
 
@@ -257,8 +296,9 @@ export default function MovieDetail() {
               <img
                 src={posterUrl}
                 alt={`${movie.title} poster`}
-                className="movie-detail__poster clickable-poster"
+                className={`movie-detail__poster clickable-poster poster-progressive ${posterLoaded ? 'poster-progressive--loaded' : ''}`}
                 onClick={() => setIsModalOpen(true)}
+                onLoad={() => setPosterLoaded(true)}
                 onError={() => setHasImgError(true)}
               />
             ) : (
@@ -267,7 +307,7 @@ export default function MovieDetail() {
           </div>
 
           {/* Info */}
-          <div className="movie-detail__info-col">
+          <div className="movie-detail__info-col animate-fade-lift">
             <h1 className="movie-detail__title">{movie.title}</h1>
 
             {/* Meta */}
@@ -275,7 +315,12 @@ export default function MovieDetail() {
               {movie.release_date && (
                 <span>{new Date(movie.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
               )}
-              {movie.runtime && (
+              {loading ? (
+                <>
+                  <span className="dot">·</span>
+                  <span className="skeleton" style={{ display: 'inline-block', width: 60, height: 16, borderRadius: 4 }} />
+                </>
+              ) : movie.runtime && (
                 <>
                   <span className="dot">·</span>
                   <span>{movie.runtime} min</span>
@@ -284,13 +329,19 @@ export default function MovieDetail() {
               {movie.vote_average > 0 && (
                 <>
                   <span className="dot">·</span>
-                  <span className="movie-detail__rating">★ {movie.vote_average}</span>
+                  <span className="movie-detail__rating">★ {movie.vote_average.toFixed(1)}</span>
                 </>
               )}
             </div>
 
             {/* Genres */}
-            {genres.length > 0 && (
+            {loading ? (
+              <div className="movie-detail__genres" style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+                <span className="skeleton" style={{ width: 60, height: 24, borderRadius: 12 }} />
+                <span className="skeleton" style={{ width: 80, height: 24, borderRadius: 12 }} />
+                <span className="skeleton" style={{ width: 70, height: 24, borderRadius: 12 }} />
+              </div>
+            ) : genres.length > 0 && (
               <div className="movie-detail__genres">
                 {genres.map((g) => (
                   <Link
@@ -305,7 +356,9 @@ export default function MovieDetail() {
             )}
 
             {/* Director */}
-            {directors.length > 0 && (
+            {loading ? (
+              <div className="skeleton" style={{ height: 20, width: '30%', borderRadius: 6, margin: '8px 0' }} />
+            ) : directors.length > 0 && (
               <p className="movie-detail__director">
                 <span className="label">Directed by</span>{' '}
                 {directors.map((d, idx) => (
@@ -318,7 +371,13 @@ export default function MovieDetail() {
             )}
 
             {/* Overview */}
-            {movie.overview && (
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0 24px 0' }}>
+                <div className="skeleton" style={{ height: 16, width: '100%', borderRadius: 4 }} />
+                <div className="skeleton" style={{ height: 16, width: '95%', borderRadius: 4 }} />
+                <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: 4 }} />
+              </div>
+            ) : movie.overview && (
               <p className="movie-detail__overview">{movie.overview}</p>
             )}
 
@@ -339,12 +398,11 @@ export default function MovieDetail() {
                     </button>
                     <button
                       id={`btn-watchlist-${movieId}`}
-                      className={`btn btn--md ${watchStatus.watchlisted ? 'btn--accent' : 'btn--secondary'}`}
-                      onClick={handleWatchlistToggle}
-                      disabled={listBusy}
-                      aria-label={watchStatus.watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+                      className={`btn btn--md ${isInAnyCollection ? 'btn--accent' : 'btn--secondary'}`}
+                      onClick={() => setShowCollectionModal(true)}
+                      aria-label={isInAnyCollection ? 'Manage in watchlists' : 'Add to watchlist'}
                     >
-                      {watchStatus.watchlisted ? '★ In Watchlist' : '+ Watchlist'}
+                      {isInAnyCollection ? '★ Watchlist' : '+ Watchlist'}
                     </button>
                     <button
                       className="btn btn--secondary btn--md btn--trailer"
@@ -418,14 +476,20 @@ export default function MovieDetail() {
 
           {/* Rating Sidebar */}
           <div className="movie-detail__rating-sidebar">
-            <RatingMeter
-              movieId={movieId}
-              onRated={fetchStatus}
-              userRating={watchStatus.user_rating}
-              {...(movie.moctale_rating || {})}
-            />
-            {(!movie.moctale_rating || !movie.moctale_rating.total_votes) && (
-              <div className="rating-needed-box">
+            {showRatingMeter ? (
+              <div className="animate-rating-reveal">
+                <RatingMeter
+                  movieId={movieId}
+                  onRated={fetchStatus}
+                  userRating={watchStatus.user_rating}
+                  {...(movie.moctale_rating || {})}
+                />
+              </div>
+            ) : (
+              <div className="skeleton rating-meter-skeleton" style={{ height: 280, borderRadius: 16 }} />
+            )}
+            {showRatingMeter && (!movie.moctale_rating || !movie.moctale_rating.total_votes) && (
+              <div className="rating-needed-box animate-fade-lift">
                 <p className="rating-needed-box__msg">Want to know rating?</p>
                 <button
                   className={`rating-needed-box__btn ${reqNeededState.success ? 'rating-needed-box__btn--success' : ''}`}
@@ -448,26 +512,17 @@ export default function MovieDetail() {
           productionCountries={movie.production_countries || []}
         />
         {/* ── Similar Movies ── */}
-        <section className="movie-detail__similar">
-          <div className="section-header">
-            <h2>
-              <ShinyText text="More Like This" />
-            </h2>
-            <Link to="/movies">See all →</Link>
-          </div>
-          <div className="scroll-row-container">
-            <div className="scroll-row-fade left-fade" />
-            <div id={`movie-similar-scroll-${movieId}`} className="scroll-row">
-              {similarLoading
-                ? <MovieCardSkeleton count={6} />
-                : similar.length > 0
-                  ? similar.map((m) => <MovieCard key={m.id} movie={m} showFeedback={true} />)
-                  : <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No similar movies found.</p>
-              }
-            </div>
-            <div className="scroll-row-fade right-fade" />
-          </div>
-        </section>
+        <div className="movie-detail__similar">
+          <MovieRow
+            title="More Like This"
+            movies={similar}
+            loading={similarLoading}
+            seeAllHref="/movies"
+            premiumScroll={true}
+            showFeedback={true}
+            emptyText="No similar movies found."
+          />
+        </div>
       </div>
 
       {/* Full screen modal */}
@@ -494,6 +549,16 @@ export default function MovieDetail() {
           data={videosData}
         />
       )}
+
+      {/* Save to Collection Modal */}
+      <SaveToCollectionModal
+        movieId={movieId}
+        isOpen={showCollectionModal}
+        onClose={() => {
+          setShowCollectionModal(false)
+          fetchStatus()
+        }}
+      />
     </main>
   )
 }

@@ -3,13 +3,48 @@
  * Shows 4–5 cards from latest feed.
  * Reuses existing scroll-row pattern from Home page.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { newsService } from '../services/newsService'
 import { useAuth } from '../context/AuthContext'
 import NewsCard from './NewsCard'
 import ShinyText from './ShinyText'
 import './HomeNewsStrip.css'
+
+function ViewportRevealNewsItem({ article, index }) {
+  const [isVisible, setIsVisible] = useState(false)
+  const itemRef = useRef(null)
+
+  useEffect(() => {
+    const el = itemRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.05, rootMargin: '0px 100px 0px 100px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const delay = isVisible ? `${(index % 8) * 40}ms` : '0ms'
+
+  return (
+    <div
+      ref={itemRef}
+      className={`viewport-reveal-card home-news-strip__item ${isVisible ? 'visible' : ''}`}
+      style={{ transitionDelay: delay }}
+    >
+      <NewsCard article={article} variant="standard" />
+    </div>
+  )
+}
 
 export default function HomeNewsStrip() {
   const { isLoggedIn } = useAuth()
@@ -58,11 +93,9 @@ export default function HomeNewsStrip() {
       ) : (
         <div className="scroll-row-container">
           <div className="scroll-row-fade left-fade" />
-          <div className="scroll-row home-news-strip__scroll">
-            {articles.map((article) => (
-              <div key={article.id} className="home-news-strip__item">
-                <NewsCard article={article} variant="standard" />
-              </div>
+          <div key={`news-strip-${articles.length}`} className="scroll-row home-news-strip__scroll">
+            {articles.map((article, index) => (
+              <ViewportRevealNewsItem key={article.id} index={index} article={article} />
             ))}
           </div>
           <div className="scroll-row-fade right-fade" />

@@ -12,18 +12,20 @@
  *  - Sidebar:
  *    - Most Interested / Upcoming (GET /api/v1/movies/upcoming?filter={week|month|year})
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { movieService } from '../services/movieService'
 import { useAuth } from '../context/AuthContext'
 import { useSessionState } from '../hooks/useSessionState'
-import MovieCard from '../components/MovieCard'
-import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
 import BorderGlow from '../components/BorderGlow'
 import HomeNewsStrip from '../components/HomeNewsStrip'
+import FilterDropdown from '../components/FilterDropdown'
 import api from '../utils/api'
 import ShinyText from '../components/ShinyText'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
+import ScrollReveal from '../components/ScrollReveal'
+import MovieRow from '../components/MovieRow'
 import './Home.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -41,36 +43,7 @@ const GENRE_OPTIONS = [
   { id: 16, name: 'Animation' }
 ]
 
-function MovieRow({ title, movies, loading = false, seeAllHref = '/movies', children }) {
-  return (
-    <div className="movie-row section-sm">
-      <div className="section-header">
-        <div className="section-header-left">
-          <h2>
-            <ShinyText text={title} />
-          </h2>
-        </div>
-        <Link to={seeAllHref} className="see-all-link">See all →</Link>
-      </div>
-      
-      {children && <div className="movie-row__pills-container">{children}</div>}
-      <div className="scroll-row-container">
-        <div className="scroll-row-fade left-fade"></div>
-        <div className="scroll-row">
-          {loading
-            ? <MovieCardSkeleton count={6} />
-            : movies.length === 0
-              ? <p className="no-movies-text">No titles found.</p>
-              : movies.map((m) => (
-                  <MovieCard key={`${m.id}-${m.media_type || 'movie'}`} movie={m} />
-                ))
-          }
-        </div>
-        <div className="scroll-row-fade right-fade"></div>
-      </div>
-    </div>
-  )
-}
+
 
 function formatDate(dateStr) {
   if (!dateStr) return 'To Be Confirmed'
@@ -198,7 +171,7 @@ export default function Home() {
 
   const handleItemClick = (item) => {
     const isTV = item.media_type === 'tv'
-    navigate(isTV ? `/tv/${item.id}` : `/movies/${item.id}`)
+    navigate(isTV ? `/tv/${item.id}` : `/movies/${item.id}`, { state: { movie: item } })
   }
 
   const selectedGenreName = GENRE_OPTIONS.find(g => g.id === selectedGenreId)?.name || 'Genre'
@@ -227,6 +200,7 @@ export default function Home() {
             movies={trending} 
             loading={trendLoad} 
             seeAllHref="/explore?sort=popularity" 
+            premiumScroll={true}
           />
 
           {/* For You (Personalized Recommendations) — Logged-in only */}
@@ -235,7 +209,8 @@ export default function Home() {
               title="For You 🎯" 
               movies={forYou} 
               loading={forYouLoad} 
-              seeAllHref="/dashboard" 
+              seeAllHref="/recommendations"
+              premiumScroll={true}
             />
           )}
 
@@ -245,6 +220,7 @@ export default function Home() {
             movies={topRated} 
             loading={topRatedLoad} 
             seeAllHref="/explore?sort=rating" 
+            premiumScroll={true}
           />
 
           {/* News Strip */}
@@ -256,6 +232,7 @@ export default function Home() {
             movies={genreMovies} 
             loading={genreLoad} 
             seeAllHref={`/explore?genres=${selectedGenreName}`}
+            premiumScroll={true}
           >
             <div className="genre-pills">
               {GENRE_OPTIONS.map((g) => (
@@ -273,7 +250,7 @@ export default function Home() {
         </div>
 
         {/* ── Right Sidebar Column ── */}
-        <aside className="home-sidebar">
+        <ScrollReveal className="home-sidebar" delay={0.15}>
           <div className="sidebar-header">
             <div className="sidebar-title-wrap">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg">
@@ -284,20 +261,32 @@ export default function Home() {
               </h3>
             </div>
             
-            <div className="sidebar-select-wrapper">
-              <select
-                value={upcomingFilter}
-                onChange={(e) => setUpcomingFilter(e.target.value)}
-                className="sidebar-select"
-              >
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="year">This Year</option>
-              </select>
-            </div>
+            <FilterDropdown
+              label={upcomingFilter === 'week' ? 'This Week' : upcomingFilter === 'month' ? 'This Month' : 'This Year'}
+              active={upcomingFilter !== 'month'}
+            >
+              <div className="filter-dropdown__menu-list">
+                {[
+                  { value: 'week', label: 'This Week' },
+                  { value: 'month', label: 'This Month' },
+                  { value: 'year', label: 'This Year' }
+                ].map((o) => (
+                  <label key={o.value} className={`filter-dropdown__menu-item ${upcomingFilter === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="upcoming-filter"
+                      className="filter-dropdown__radio"
+                      checked={upcomingFilter === o.value}
+                      onChange={() => setUpcomingFilter(o.value)}
+                    />
+                    <span>{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
           </div>
 
-          <div className="sidebar-list">
+          <StaggerContainer key={`upcoming-${upcomingFilter}-${upcomingLoad}-${upcoming.length}`} className="sidebar-list">
             {upcomingLoad ? (
               Array.from({ length: 4 }).map((_, idx) => (
                 <div key={idx} className="sidebar-card-skeleton">
@@ -324,46 +313,47 @@ export default function Home() {
                 const categoryText = isTV ? 'New Season' : 'In Theatre'
 
                 return (
-                  <BorderGlow
-                    key={`${item.id}-${item.media_type}`}
-                    className="sidebar-card"
-                    onClick={() => handleItemClick(item)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && handleItemClick(item)}
-                    borderRadius={16}
-                    glowRadius={25}
-                    glowIntensity={0.6}
-                    fillOpacity={0.08}
-                    colors={['#B048FF', '#00E5A0', '#FF4D6D']}
-                    backgroundColor="rgba(18, 18, 18, 0.6)"
-                  >
-                    <div className="sidebar-card-rank">{index + 1}</div>
-                    
-                    <div className="sidebar-card-poster-wrap">
-                      {posterUrl ? (
-                        <img src={posterUrl} alt={item.title} className="sidebar-card-poster" loading="lazy" />
-                      ) : (
-                        <div className="sidebar-card-poster-fallback">🎬</div>
-                      )}
-                    </div>
-
-                    <div className="sidebar-card-info">
-                      <h4 className="sidebar-card-title">{item.title}</h4>
-                      <p className="sidebar-card-meta">
-                        {dateText} • {categoryText}
-                      </p>
-                      <div className="sidebar-card-interested">
-                        <span className="sidebar-card-fire-icon">🔥</span>
-                        {interestedStr} Interested
+                  <StaggerItem key={`${item.id}-${item.media_type}`} index={index}>
+                    <BorderGlow
+                      className="sidebar-card"
+                      onClick={() => handleItemClick(item)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && handleItemClick(item)}
+                      borderRadius={16}
+                      glowRadius={25}
+                      glowIntensity={0.6}
+                      fillOpacity={0.08}
+                      colors={['#B048FF', '#00E5A0', '#FF4D6D']}
+                      backgroundColor="rgba(18, 18, 18, 0.6)"
+                    >
+                      <div className="sidebar-card-rank">{index + 1}</div>
+                      
+                      <div className="sidebar-card-poster-wrap">
+                        {posterUrl ? (
+                          <img src={posterUrl} alt={item.title} className="sidebar-card-poster" loading="lazy" />
+                        ) : (
+                          <div className="sidebar-card-poster-fallback">🎬</div>
+                        )}
                       </div>
-                    </div>
-                  </BorderGlow>
+
+                      <div className="sidebar-card-info">
+                        <h4 className="sidebar-card-title">{item.title}</h4>
+                        <p className="sidebar-card-meta">
+                          {dateText} • {categoryText}
+                        </p>
+                        <div className="sidebar-card-interested">
+                          <span className="sidebar-card-fire-icon">🔥</span>
+                          {interestedStr} Interested
+                        </div>
+                      </div>
+                    </BorderGlow>
+                  </StaggerItem>
                 )
               })
             )}
-          </div>
-        </aside>
+          </StaggerContainer>
+        </ScrollReveal>
 
       </div>
     </main>

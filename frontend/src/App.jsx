@@ -9,8 +9,10 @@
  *
  * 'mv:logout' custom event from api.js interceptor clears auth state.
  */
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
+import { AnimatePresence } from 'motion/react'
+import PageTransition from './components/PageTransition'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import InstallPrompt from './components/InstallPrompt'
@@ -22,6 +24,7 @@ import MovieDetail from './pages/MovieDetail'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
+import Recommendations from './pages/Recommendations'
 import Search from './pages/Search'
 import PersonPage from './pages/PersonPage'
 import Explore from './pages/Explore'
@@ -31,8 +34,12 @@ import News from './pages/News'
 import CompanyPage from './pages/CompanyPage'
 import CountryPage from './pages/CountryPage'
 import Help from './pages/Help'
+import Privacy from './pages/Privacy'
+import TermsOfService from './pages/TermsOfService'
+import Intro from './pages/Intro'
 import Feedback from './pages/Feedback'
 import AdminDashboard from './pages/AdminDashboard'
+import WatchlistDetail from './pages/WatchlistDetail'
 import ScrollRestore from './components/ScrollRestore'
 import ErrorBoundary from './components/ErrorBoundary'
 import ErrorPage from './pages/ErrorPage'
@@ -51,81 +58,111 @@ function LogoutListener() {
 }
 
 function AppRoutes() {
+  const location = useLocation()
+  const { isLoggedIn } = useAuth()
+
   return (
     <>
       <LogoutListener />
       <ScrollRestore />
       <Navbar />
       <InstallPrompt />
-      <Routes>
-        {/* Public */}
-        <Route path="/"           element={<Home />} />
-        <Route path="/movies"     element={<MovieList />} />
-        <Route path="/movies/:id" element={<MovieDetail />} />
-        <Route path="/login"      element={<Login />} />
-        <Route path="/register"   element={<Register />} />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          {/* Public */}
+          <Route path="/" element={isLoggedIn ? <PageTransition><Navigate to="/home" replace /></PageTransition> : <PageTransition><Intro /></PageTransition>} />
+          <Route path="/home"       element={<PageTransition><Home /></PageTransition>} />
+          <Route path="/movies"     element={<PageTransition><MovieList /></PageTransition>} />
+          <Route path="/movies/:id" element={<PageTransition><MovieDetail /></PageTransition>} />
+          <Route path="/login"      element={<PageTransition><Login /></PageTransition>} />
+          <Route path="/register"   element={<PageTransition><Register /></PageTransition>} />
 
-        {/* Protected */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <PageTransition><Dashboard /></PageTransition>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/analysis"
-          element={
-            <ProtectedRoute>
-              <Analysis />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/recommendations"
+            element={
+              <ProtectedRoute>
+                <PageTransition><Recommendations /></PageTransition>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Phase 3.5B — Search */}
-        <Route path="/search" element={<Search />} />
+          <Route
+            path="/analysis"
+            element={
+              <ProtectedRoute>
+                <PageTransition><Analysis /></PageTransition>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Improvement 1.4 — Person */}
-        <Route path="/person/:id" element={<PersonPage />} />
+          {/* Phase 3.5B — Search */}
+          <Route path="/search" element={<PageTransition><Search /></PageTransition>} />
 
-        {/* Improvement 1.6 — Explore */}
-        <Route path="/explore" element={<Explore />} />
+          {/* Improvement 1.4 — Person */}
+          <Route path="/person/:id" element={<PageTransition><PersonPage /></PageTransition>} />
 
-        {/* Improvement H — Help */}
-        <Route path="/help" element={<Help />} />
+          {/* Improvement 1.6 — Explore */}
+          <Route path="/explore" element={<PageTransition><Explore /></PageTransition>} />
 
-        {/* Improvement 1.7 — TV Shows */}
-        <Route path="/tv/:id" element={<TVDetail />} />
+          {/* Improvement H — Help */}
+          <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
+          <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+          <Route path="/terms-of-service" element={<PageTransition><TermsOfService /></PageTransition>} />
 
-        {/* News */}
-        <Route path="/news" element={<News />} />
+          {/* Landing / Intro page (standalone route) */}
+          <Route path="/intro" element={<PageTransition><Intro /></PageTransition>} />
 
-        {/* Production company & country browse */}
-        <Route path="/company/:id"    element={<CompanyPage />} />
-        <Route path="/country/:iso"   element={<CountryPage />} />
+          {/* Improvement 1.7 — TV Shows */}
+          <Route path="/tv/:id" element={<PageTransition><TVDetail /></PageTransition>} />
 
-        {/* Feedback & Admin */}
-        <Route
-          path="/feedback"
-          element={
-            <ProtectedRoute>
-              <Feedback />
-            </ProtectedRoute>
-          }
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        {/* 404 fallback */}
-        <Route path="*" element={<ErrorPage type="404" />} />
-      </Routes>
+          {/* News */}
+          <Route path="/news" element={<PageTransition><News /></PageTransition>} />
+
+          {/* Production company & country browse */}
+          <Route path="/company/:id"    element={<PageTransition><CompanyPage /></PageTransition>} />
+          <Route path="/country/:iso"   element={<PageTransition><CountryPage /></PageTransition>} />
+
+          {/* Feedback & Admin */}
+          <Route
+            path="/feedback"
+            element={
+              <ProtectedRoute>
+                <PageTransition><Feedback /></PageTransition>
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute>
+                <PageTransition><AdminDashboard /></PageTransition>
+              </ProtectedRoute>
+            } 
+          />
+          {/* Phase 4 — Watchlist Detail */}
+          <Route
+            path="/watchlists/:collectionId"
+            element={
+              <ProtectedRoute>
+                <PageTransition><WatchlistDetail /></PageTransition>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 404 fallback */}
+          <Route path="*" element={<PageTransition><ErrorPage type="404" /></PageTransition>} />
+        </Routes>
+      </AnimatePresence>
     </>
   )
 }

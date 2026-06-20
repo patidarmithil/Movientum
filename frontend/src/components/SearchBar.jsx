@@ -9,7 +9,7 @@
  * - Keyboard arrows navigate list
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { searchService } from '../services/searchService'
 import './SearchBar.css'
 
@@ -29,6 +29,16 @@ export default function SearchBar() {
   const listRef    = useRef(null)
   const timerRef   = useRef(null)
   const containerRef = useRef(null)
+  const abortControllerRef = useRef(null)
+
+  // Clean up abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   // ── Close on outside click ─────────────────────────────────────
   useEffect(() => {
@@ -49,18 +59,30 @@ export default function SearchBar() {
       setIsOpen(false)
       return
     }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setIsLoading(true)
     try {
-      const data = await searchService.autocomplete(val)
+      const data = await searchService.autocomplete(val, 'content', controller.signal)
       const list = Array.isArray(data) ? data : (data.results ?? [])
       setSuggestions(list.slice(0, 8))
       setIsOpen(list.length > 0)
       setActiveIdx(-1)
-    } catch {
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.message === 'canceled') {
+        return
+      }
       setSuggestions([])
       setIsOpen(false)
     } finally {
-      setIsLoading(false)
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false)
+      }
     }
   }, [])
 
@@ -193,34 +215,55 @@ export default function SearchBar() {
                 id={`search-item-${i}`}
                 role="option"
                 aria-selected={i === activeIdx}
-                className={`searchbar__item${i === activeIdx ? ' searchbar__item--active' : ''}`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onMouseLeave={() => setActiveIdx(-1)}
-                onClick={() => goToMovie(item)}
+                style={{ padding: 0 }}
               >
-                <div className="searchbar__item-poster">
-                  {posterUrl ? (
-                    <img src={posterUrl} alt="" loading="lazy" />
-                  ) : (
-                    <div className="searchbar__item-poster-fallback">
-                      {item.title?.[0] ?? '?'}
-                    </div>
-                  )}
-                </div>
-                <div className="searchbar__item-info">
-                  <span className="searchbar__item-title">{item.title}</span>
-                  {item.release_year && (
-                    <span className="searchbar__item-year">{item.release_year}</span>
-                  )}
-                </div>
-                <span className="searchbar__item-arrow" aria-hidden="true">›</span>
+                <Link
+                  to={item.media_type === 'tv' ? `/tv/${item.id}` : `/movies/${item.id}`}
+                  className={`searchbar__item${i === activeIdx ? ' searchbar__item--active' : ''}`}
+                  onClick={() => {
+                    setIsOpen(false)
+                    setQuery('')
+                    setSuggestions([])
+                  }}
+                  style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%', alignItems: 'center' }}
+                >
+                  <div className="searchbar__item-poster">
+                    {posterUrl ? (
+                      <img src={posterUrl} alt="" loading="lazy" />
+                    ) : (
+                      <div className="searchbar__item-poster-fallback">
+                        {item.title?.[0] ?? '?'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="searchbar__item-info">
+                    <span className="searchbar__item-title">{item.title}</span>
+                    {item.release_year && (
+                      <span className="searchbar__item-year">{item.release_year}</span>
+                    )}
+                  </div>
+                  <span className="searchbar__item-arrow" aria-hidden="true">›</span>
+                </Link>
               </li>
             )
           })}
 
-          <li className="searchbar__see-all" role="option" aria-selected={false} onClick={() => goToSearch(query)}>
-            <span className="searchbar__icon-search" aria-hidden="true">🔍</span>
-            See all results for <strong>"{query}"</strong>
+          <li className="searchbar__see-all-wrapper" role="option" aria-selected={false} style={{ padding: 0 }}>
+            <Link
+              to={`/search?q=${encodeURIComponent(query)}`}
+              className="searchbar__see-all"
+              onClick={() => {
+                setIsOpen(false)
+                setQuery('')
+                setSuggestions([])
+              }}
+              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%', alignItems: 'center' }}
+            >
+              <span className="searchbar__icon-search" aria-hidden="true">🔍</span>
+              See all results for <strong>"{query}"</strong>
+            </Link>
           </li>
         </ul>
       )}

@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react'
 import api from '../utils/api'
 import Aurora from '../components/Aurora'
 import { pageCache } from '../utils/pageCache'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './PersonPage.css'
 
 const FALLBACK_COLORS = [
@@ -247,38 +248,39 @@ export default function PersonPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="person-page__film-grid">
-                      {credits.map((w) => {
+                    <StaggerContainer key={`known-for-${personId}-${creditsLoading}`} className="person-page__film-grid" instant={true}>
+                      {credits.map((w, index) => {
                         const isMovie = w.media_type === 'movie'
                         const isTV = w.media_type === 'tv'
                         const CardComponent = (isMovie || isTV) ? Link : 'div'
                         const cardProps = isMovie ? { to: `/movies/${w.id}` } : (isTV ? { to: `/tv/${w.id}` } : {})
 
                         return (
-                          <CardComponent
-                            key={`${w.media_type}-${w.id}`}
-                            className={`film-card ${(!isMovie && !isTV) ? 'film-card--disabled' : ''}`}
-                            {...cardProps}
-                          >
-                            <div className="film-card__poster-wrap">
-                              <img
-                                src={w.poster_path}
-                                alt={w.title}
-                                className="film-card__poster"
-                                loading="lazy"
-                              />
-                              {w.media_type === 'tv' && (
-                                <span className="film-card__badge">TV</span>
+                          <StaggerItem key={`${w.media_type}-${w.id}`} index={index}>
+                            <CardComponent
+                              className={`film-card ${(!isMovie && !isTV) ? 'film-card--disabled' : ''}`}
+                              {...cardProps}
+                            >
+                              <div className="film-card__poster-wrap">
+                                <img
+                                  src={w.poster_path}
+                                  alt={w.title}
+                                  className="film-card__poster"
+                                  loading="lazy"
+                                />
+                                {w.media_type === 'tv' && (
+                                  <span className="film-card__badge">TV</span>
+                                )}
+                              </div>
+                              <p className="film-card__title">{w.title}</p>
+                              {w.release_year && (
+                                <p className="film-card__year">{w.release_year}</p>
                               )}
-                            </div>
-                            <p className="film-card__title">{w.title}</p>
-                            {w.release_year && (
-                              <p className="film-card__year">{w.release_year}</p>
-                            )}
-                          </CardComponent>
+                            </CardComponent>
+                          </StaggerItem>
                         )
                       })}
-                    </div>
+                    </StaggerContainer>
                   )}
                 </div>
                 <div className="vertical-scroll-fade bottom-fade" />

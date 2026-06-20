@@ -128,9 +128,10 @@ def _normalise(item: dict) -> dict:
 @router.get(
     "",
     summary="Personalized movie recommendations",
-    response_description="20 items — 60% ML model + 40% baseline for auth users, trending for guests",
+    response_description="Paginated items — 60% ML model + 40% baseline for auth users",
 )
 async def get_recommendations(
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
@@ -146,69 +147,133 @@ async def get_recommendations(
     """
     user_id_str = current_user["sub"]
     user_id     = UUID(user_id_str)
-    cache_key   = key_user_recommendations(user_id_str)
+    
+    block = (page - 1) // 5
+    cache_key   = f"rec:user:{user_id_str}:pool:v6:block:{block}"
 
     cached = await get_cached(cache_key)
+    full_pool = []
+    source = ""
+
     if cached:
         logger.info("CACHE_HIT key=%s", cache_key)
-        return cached
-
-    # ── Step 1: Get watch seed for ML pipeline ────────────────────
-    seed = await recommendation_service.get_user_watch_seed(db, user_id)
-
-    new_pool: list[dict] = []
-    if seed:
-        try:
-            raw = await get_new_model_recommendations(
-                db,
-                tmdb_id=seed["tmdb_id"],
-                media_type=seed["media_type"],
-                user_id=user_id,
-                top_n=30,
-            )
-            new_pool = [_normalise(m) for m in raw]
-        except Exception as e:
-            logger.warning("ML pipeline failed for user %s: %s — falling back", user_id_str, e)
-
-    # ── Step 2: Baseline pool ─────────────────────────────────────
-    base_pool: list[dict] = []
-    try:
-        raw_base = await recommendation_service.get_baseline_recommendations(
-            db, user_id=user_id, limit=30
-        )
-        base_pool = [_normalise(m) for m in raw_base]
-    except Exception as e:
-        logger.warning("Baseline pipeline failed for user %s: %s", user_id_str, e)
-
-    # ── Step 3: Blend ─────────────────────────────────────────────
-    if new_pool and base_pool:
-        movies = team_draft_interleave(new_pool, base_pool, k=20, ratio_a=0.6)
-        source = "tdi_blend_60_40"
-    elif new_pool:
-        movies = new_pool[:20]
-        source = "ml_only_fallback"
-    elif base_pool:
-        movies = base_pool[:20]
-        source = "baseline_only_fallback"
+        full_pool = cached.get("movies", [])
+        source = cached.get("source", "cache")
     else:
-        movies = []
-        source = "empty"
 
-    # ── Step 4: Moctale ratings enrichment ───────────────────────
-    if movies:
+        # ── Collect exclusion IDs ────────────────────
+        exclude_ids = set()
         try:
-            from app.routers.movies import _bulk_fetch_moctale
-            item_ids   = [m["id"] for m in movies]
-            item_types = [m.get("media_type", "movie") for m in movies]
-            moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
-            for m in movies:
-                m["moctale_rating"] = moctale_map.get(m["id"])
+            watch_stmt = select(WatchHistory.movie_id).where(WatchHistory.user_id == user_id)
+            exclude_ids.update((await db.execute(watch_stmt)).scalars().all())
+            wl_stmt = select(Watchlist.movie_id).where(Watchlist.user_id == user_id)
+            exclude_ids.update((await db.execute(wl_stmt)).scalars().all())
         except Exception as e:
-            logger.warning("Moctale enrichment failed: %s", e)
+            logger.warning("Failed to fetch exclusion IDs: %s", e)
 
-    result = {"movies": movies, "source": source}
-    await set_cached(cache_key, result, TTL_USER_RECS)
-    logger.info("RECS source=%s count=%d user=%s", source, len(movies), user_id_str)
+        # ── Step 1: Get watch seed for ML pipeline ────────────────────
+        seed = await recommendation_service.get_user_watch_seed(db, user_id, offset=block)
+
+        new_pool: list[dict] = []
+        if seed:
+            try:
+                raw = await get_new_model_recommendations(
+                    db,
+                    tmdb_id=seed["tmdb_id"],
+                    media_type=seed["media_type"],
+                    user_id=user_id,
+                    top_n=150,
+                )
+                new_pool = [_normalise(m) for m in raw if m.get("id") not in exclude_ids]
+            except Exception as e:
+                logger.warning("ML pipeline failed for user %s: %s — falling back", user_id_str, e)
+
+        # ── Step 2: Baseline pool ─────────────────────────────────────
+        base_pool: list[dict] = []
+        try:
+            raw_base = await recommendation_service.get_baseline_recommendations(
+                db, user_id=user_id, limit=150, offset=block * 150
+            )
+            base_pool = [_normalise(m) for m in raw_base if m.get("id") not in exclude_ids]
+        except Exception as e:
+            logger.warning("Baseline pipeline failed for user %s: %s", user_id_str, e)
+
+        # ── Step 2.5: Fresh Unwatched Discovery Pool ──────────────────
+        fresh_pool: list[dict] = []
+        try:
+            # Get highly rated content that user hasn't seen
+            from app.db.orm_models import Movie
+            fresh_stmt = (
+                select(Movie)
+                .where(Movie.vote_average >= 7.0)
+                .where(Movie.vote_count >= 100)
+                .where(Movie.adult == False)
+                .where(Movie.id.not_in(exclude_ids))
+                .order_by(Movie.popularity.desc())
+                .offset(block * 50)  # Different offset stride for variety
+                .limit(50)
+            )
+            fresh_res = await db.execute(fresh_stmt)
+            from app.routers.search import _movie_to_search_result
+            fresh_pool = [_normalise(_movie_to_search_result(m)) for m in fresh_res.scalars().all()]
+        except Exception as e:
+            logger.warning("Fresh discovery failed for user %s: %s", user_id_str, e)
+
+        # ── Step 3: Blend ─────────────────────────────────────────────
+        # Combine base and fresh pools to ensure we never run out of content
+        combined_base = base_pool + fresh_pool
+
+        if new_pool and combined_base:
+            full_pool = team_draft_interleave(new_pool, combined_base, k=100, ratio_a=0.5)
+            source = "tdi_blend_ml_base_fresh"
+        elif new_pool:
+            full_pool = new_pool[:100]
+            source = "ml_only_fallback"
+        elif combined_base:
+            full_pool = combined_base[:100]
+            source = "baseline_fresh_fallback"
+        else:
+            full_pool = []
+            source = "empty"
+
+        # ── Step 3.5: Apply Language-Based Personalization ─────────────
+        if full_pool:
+            lang_profile = await recommendation_service.get_user_language_profile(db, user_id)
+            if lang_profile:
+                top_langs = [lang for lang, freq in lang_profile.items() if freq > 0.10]
+                if top_langs:
+                    preferred_ratio = sum(lang_profile[lang] for lang in top_langs)
+                    target_ratio = min(preferred_ratio, 0.90)
+                    
+                    preferred_pool = [m for m in full_pool if m.get("original_language") in top_langs]
+                    foreign_pool = [m for m in full_pool if m.get("original_language") not in top_langs]
+                    
+                    if preferred_pool and foreign_pool:
+                        full_pool = team_draft_interleave(
+                            preferred_pool, foreign_pool, k=len(full_pool), ratio_a=target_ratio
+                        )
+
+        # ── Step 4: Moctale ratings enrichment ───────────────────────
+        if full_pool:
+            try:
+                from app.routers.movies import _bulk_fetch_moctale
+                item_ids   = [m["id"] for m in full_pool]
+                item_types = [m.get("media_type", "movie") for m in full_pool]
+                moctale_map = await _bulk_fetch_moctale(db, item_ids, item_types)
+                for m in full_pool:
+                    m["moctale_rating"] = moctale_map.get(m["id"])
+            except Exception as e:
+                logger.warning("Moctale enrichment failed: %s", e)
+        
+        await set_cached(cache_key, {"movies": full_pool, "source": source}, TTL_USER_RECS)
+
+    # Pagination
+    limit = 20
+    local_offset = ((page - 1) % 5) * limit
+    paginated_movies = full_pool[local_offset : local_offset + limit]
+    
+    result = {"movies": paginated_movies, "source": source, "page": page, "total_pages": 10000}
+    logger.info("RECS source=%s page=%d count=%d user=%s", source, page, len(paginated_movies), user_id_str)
     return result
 
 

@@ -1,1 +1,0 @@
-# FedGNN utils package

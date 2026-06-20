@@ -16,6 +16,7 @@ import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './MovieList.css'
 
 const SORT_OPTIONS = [
@@ -189,12 +190,14 @@ export default function MovieList() {
           </div>
         ) : (
           <>
-            <div className="movie-grid" id="movie-grid">
-              {movies.map((m) => (
-                <MovieCard key={m.id} movie={m} />
+            <StaggerContainer className="movie-grid" id="movie-grid" instant={true}>
+              {movies.map((m, index) => (
+                <StaggerItem key={m.id} index={index}>
+                  <MovieCard movie={m} />
+                </StaggerItem>
               ))}
               {loadingMore && <MovieCardSkeleton count={4} />}
-            </div>
+            </StaggerContainer>
 
             {hasMore && !loadingMore && (
               <div className="movie-list__load-more">

@@ -19,7 +19,7 @@ import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -69,12 +69,39 @@ async def _bulk_fetch_moctale(db: AsyncSession, item_ids: list[int], media_types
 
     result = {}
 
-    if movie_ids:
+    if not movie_ids and not tv_ids:
+        return result
+
+    if movie_ids and tv_ids:
+        movie_q = select(
+            MovieRating.id,
+            MovieRating.perfection,
+            MovieRating.go_for_it,
+            MovieRating.timepass,
+            MovieRating.skip,
+            MovieRating.score,
+            MovieRating.total_votes
+        ).where(MovieRating.id.in_(movie_ids))
+
+        tv_q = select(
+            TvRating.id,
+            TvRating.perfection,
+            TvRating.go_for_it,
+            TvRating.timepass,
+            TvRating.skip,
+            TvRating.score,
+            TvRating.total_votes
+        ).where(TvRating.id.in_(tv_ids))
+
+        stmt = union_all(movie_q, tv_q)
+        rows = await db.execute(stmt)
+        for r in rows.all():
+            result[r.id] = _compute_dominant(r)
+    elif movie_ids:
         rows = await db.execute(select(MovieRating).where(MovieRating.id.in_(movie_ids)))
         for r in rows.scalars().all():
             result[r.id] = _compute_dominant(r)
-
-    if tv_ids:
+    elif tv_ids:
         rows = await db.execute(select(TvRating).where(TvRating.id.in_(tv_ids)))
         for r in rows.scalars().all():
             result[r.id] = _compute_dominant(r)

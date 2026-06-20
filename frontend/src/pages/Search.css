@@ -161,3 +161,9 @@
     font-size: var(--text-xs);
   }
 }
+
+.search-grid--loading {
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.25s ease-out;
+}

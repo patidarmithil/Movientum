@@ -170,6 +170,14 @@ def key_search(query: str) -> str:
 def key_autocomplete(prefix: str) -> str:
     return f"autocomplete:{prefix.lower()}"
 
+def key_search_paged(query: str, page: int, type: str, genre: Optional[str], limit: int) -> str:
+    params = f"{query.lower().strip()}:{page}:{type}:{genre.lower().strip() if genre else ''}:{limit}"
+    hash_ = hashlib.md5(params.encode()).hexdigest()[:12]
+    return f"search:paged:{hash_}"
+
+def key_autocomplete_typed(prefix: str, type: str) -> str:
+    return f"autocomplete:{type}:{prefix.lower().strip()}"
+
 def key_user_recommendations(user_id: str) -> str:
     return f"user:recommendations:{user_id}"
 

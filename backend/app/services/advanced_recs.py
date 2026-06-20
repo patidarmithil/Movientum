@@ -408,7 +408,7 @@ async def get_advanced_similar_items(
 def get_rwr_candidates(
     G: nx.Graph,
     seed_node: str,          # e.g. "m:550" for Interstellar, "tv:1399" for GoT
-    top_k: int = 100,
+    top_k: int = 200,
     alpha: float = 0.15,     # restart probability (teleport back to seed)
     max_iter: int = 50,
 ) -> list[str]:
@@ -534,6 +534,16 @@ async def get_or_create_taste_profile(
         except Exception as e:
             await db.rollback()
             logger.warning("Could not create UserTasteProfile for %s: %s", user_id, e)
+            result = await db.execute(stmt)
+            profile = result.scalar_one_or_none()
+
+    # Rebuild profile if it's completely new/empty and user has pre-existing history/watchlist
+    if profile and profile.total_interactions == 0:
+        try:
+            from app.services.feedback_service import rebuild_taste_profile_from_history
+            profile = await rebuild_taste_profile_from_history(db, profile)
+        except Exception as e:
+            logger.warning(f"Failed to rebuild taste profile from history: {e}")
 
     return profile
 
@@ -619,6 +629,14 @@ def build_feature_matrix(
 
             era_score = (taste.era_weights or {}).get(item.release_era or "", 0.0)
             lang_mult = (taste.language_weights or {}).get(item.original_language or "", 1.0)
+
+            # Apply Negative Penalties (Phase 9.2)
+            if taste.negative_weights:
+                nw = taste.negative_weights
+                genre_penalty = sum(nw.get(f"genre_{gid}", 0.0) for gid in (item.genre_ids or []))
+                keyword_penalty = sum(nw.get(f"keyword_{kid}", 0.0) for kid in (item.keyword_ids or []))
+                genre_score -= genre_penalty
+                keyword_score -= keyword_penalty
 
         # ── Structural overlap with origin item ───────────────────
         genre_overlap = len(origin_genres & set(item.genre_ids or []))

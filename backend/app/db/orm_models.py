@@ -156,6 +156,7 @@ class User(Base):
     watchlist_entries = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
     genre_preferences = relationship("UserGenrePreference", back_populates="user", cascade="all, delete-orphan")
     click_histories = relationship("ClickHistory", back_populates="user", cascade="all, delete-orphan")
+    watchlist_collections = relationship("WatchlistCollection", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_users_email", "email"),
@@ -245,6 +246,56 @@ class Watchlist(Base):
 
     def __repr__(self):
         return f"<Watchlist user={self.user_id} movie={self.movie_id}>"
+
+
+# ═══════════════════════════════════════════════════════════════
+# Multi-Watchlist System: Collections + Items
+# ═══════════════════════════════════════════════════════════════
+
+class WatchlistCollection(Base):
+    """Named watchlist collection owned by a user."""
+    __tablename__ = "watchlist_collections"
+
+    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id     = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name        = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at  = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    items = relationship("WatchlistItem", back_populates="collection", cascade="all, delete-orphan",
+                         order_by="WatchlistItem.added_at.desc()")
+    user  = relationship("User", back_populates="watchlist_collections")
+
+    __table_args__ = (
+        Index("idx_wlcoll_user_id", "user_id"),
+        Index("idx_wlcoll_user_created", "user_id", "created_at"),
+    )
+
+    def __repr__(self):
+        return f"<WatchlistCollection id={self.id} name={self.name!r}>"
+
+
+class WatchlistItem(Base):
+    """Single movie/tv entry inside a WatchlistCollection."""
+    __tablename__ = "watchlist_items"
+
+    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    collection_id = Column(UUID(as_uuid=True), ForeignKey("watchlist_collections.id", ondelete="CASCADE"), nullable=False)
+    movie_id      = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    added_at      = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    collection = relationship("WatchlistCollection", back_populates="items")
+    movie      = relationship("Movie", backref="watchlist_collection_items")
+
+    __table_args__ = (
+        UniqueConstraint("collection_id", "movie_id", name="uq_wlitem_coll_movie"),
+        Index("idx_wlitem_collection_id", "collection_id"),
+        Index("idx_wlitem_collection_added", "collection_id", "added_at"),
+    )
+
+    def __repr__(self):
+        return f"<WatchlistItem collection={self.collection_id} movie={self.movie_id}>"
 
 
 class UserGenrePreference(Base):
@@ -475,6 +526,9 @@ class UserTasteProfile(Base):
 
     era_weights      = Column(JSONB, default={})
     # e.g. {"1990s": -5.0, "2010s": 22.0, "2020s": 35.0}
+
+    negative_weights = Column(JSONB, default={})
+    # Stores negative signals (Phase 9.2)
 
     # ── Global Interaction Statistics ─────────────────────────────────────
     total_interactions = Column(Integer, default=0)
