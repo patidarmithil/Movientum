@@ -14,13 +14,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
+import { watchlistService } from '../services/watchlistService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
+import WatchlistCollectionCard from '../components/WatchlistCollectionCard'
 import Aurora from '../components/Aurora'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Dashboard.css'
 
 const TABS = [
-  { key: 'watchlist', label: '★ Watchlist' },
+  { key: 'watchlist', label: '★ My Watchlists' },
   { key: 'history',   label: '✓ Watched' },
   { key: 'ratings',   label: '🎯 My Ratings' },
 ]
@@ -81,7 +84,7 @@ function TabContent({ tab, data, loading, error }) {
   if (!data || data.length === 0) {
     const EMPTY_MSGS = {
       history:   'No watch history yet. Start watching movies!',
-      watchlist: 'Your watchlist is empty. Add movies you want to watch.',
+      watchlist: 'You do not have any watchlists yet. Create one to get started!',
       ratings:   "You haven't rated any movies yet.",
     }
     return <EmptyTab message={EMPTY_MSGS[tab]} />
@@ -89,22 +92,40 @@ function TabContent({ tab, data, loading, error }) {
 
   if (tab === 'ratings') {
     return (
-      <div className="movie-grid">
-        {data.map((item) => (
-          <RatingCard key={item.id} item={item} />
+      <StaggerContainer className="movie-grid" instant={true}>
+        {data.map((item, index) => (
+          <StaggerItem key={item.id} index={index}>
+            <RatingCard item={item} />
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerContainer>
     )
   }
 
-  // history + watchlist
+  if (tab === 'watchlist') {
+    return (
+      <StaggerContainer className="movie-grid" instant={true}>
+        {data.map((collection, index) => (
+          <StaggerItem key={collection.id} index={index}>
+            <WatchlistCollectionCard collection={collection} />
+          </StaggerItem>
+        ))}
+      </StaggerContainer>
+    )
+  }
+
+  // history
   return (
-    <div className="movie-grid">
-      {data.map((item) => {
+    <StaggerContainer className="movie-grid" instant={true}>
+      {data.map((item, index) => {
         const movie = extractMovie(item)
-        return <MovieCard key={movie.id ?? item.id} movie={movie} />
+        return (
+          <StaggerItem key={movie.id ?? item.id} index={index}>
+            <MovieCard movie={movie} />
+          </StaggerItem>
+        )
       })}
-    </div>
+    </StaggerContainer>
   )
 }
 
@@ -139,12 +160,12 @@ export default function Dashboard() {
   const fetchWatchlist = useCallback(() => {
     setLoadW(true)
     setErrW(null)
-    watchService.getWatchlist()
+    watchlistService.getCollections()
       .then((d) => {
-        const items = Array.isArray(d) ? d : (d?.items || d?.watchlist || d?.data || [])
+        const items = Array.isArray(d) ? d : (d?.collections || d?.data || d || [])
         setWatchlist(items)
       })
-      .catch(() => setErrW('Failed to load watchlist'))
+      .catch(() => setErrW('Failed to load watchlists'))
       .finally(() => setLoadW(false))
   }, [])
 
@@ -201,7 +222,7 @@ export default function Dashboard() {
             </div>
             <div className="dashboard__stat">
               <span className="dashboard__stat-value">{watchlist.length}</span>
-              <span className="dashboard__stat-label">Watchlist</span>
+              <span className="dashboard__stat-label">Watchlists</span>
             </div>
             <div className="dashboard__stat">
               <span className="dashboard__stat-value">{ratings.length}</span>

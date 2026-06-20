@@ -45,7 +45,17 @@ from app.schemas.search import (
     WrappedAutocompleteResponse,
     WrappedSearchResponse,
 )
-from app.services.search_service import get_autocomplete_suggestions
+from app.services.search_service import get_autocomplete_suggestions, _normalize_str, _is_adult_or_blacklist
+from app.db.cache import (
+    get_cached,
+    set_cached,
+    key_search_paged,
+    key_autocomplete_typed,
+    key_instant_search,
+    TTL_SEARCH,
+    TTL_AUTOCOMPLETE,
+    TTL_INSTANT_SEARCH,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -70,12 +80,15 @@ def _relevance_score(item: dict, query: str) -> float:
     if not q:
         return 0.0
 
-    exact    = 2.0 if title == q else 0.0
-    starts   = 1.5 if title.startswith(q) else 0.0
-    contains = 1.0 if q in title else 0.0
-    words    = q.split()
-    word_match = sum(1 for w in words if w in title) / max(len(words), 1)
-    similarity = difflib.SequenceMatcher(None, q, title).ratio()
+    norm_title = _normalize_str(title)
+    norm_q = _normalize_str(q)
+
+    exact    = 2.0 if norm_title == norm_q else 0.0
+    starts   = 1.5 if norm_title.startswith(norm_q) else 0.0
+    contains = 1.0 if norm_q in norm_title else 0.0
+    words    = norm_q.split()
+    word_match = sum(1 for w in words if w in norm_title) / max(len(words), 1)
+    similarity = difflib.SequenceMatcher(None, norm_q, norm_title).ratio()
     pop = math.log(max(item.get("popularity") or 1.0, 1.0))
     length_penalty = 0.3 if abs(len(title) - len(q)) > 10 else 0.0
 
@@ -280,7 +293,7 @@ async def autocomplete(
 ):
     """
     Return up to 8 movie title matches for the given prefix.
-    Uses index-friendly LOWER(title) LIKE prefix pattern. Results cached for 5 minutes per prefix.
+    Uses index-friendly LOWER(title) LIKE prefix pattern.
     If local suggestions < 3, falls back to TMDB multi_search with 2s timeout.
     No auth required.
     """
@@ -370,6 +383,8 @@ async def search_movies(
                         item["media_type"] = "movie" if i == 0 else "tv"
                     if not item.get("poster_path") or item.get("adult"):
                         continue
+                    if _is_adult_or_blacklist(item):
+                        continue
                     master_list.append(item)
 
         seen = set()
@@ -432,8 +447,8 @@ async def search_movies(
         local_results_task, tmdb_task
     )
 
-    # ── Pre-processing: remove items without poster_path ─────────
-    local_results = [r for r in local_results if r.get("poster_path")]
+    # ── Pre-processing: remove items without poster_path and blacklist items ─────────
+    local_results = [r for r in local_results if r.get("poster_path") and not _is_adult_or_blacklist(r)]
 
     tmdb_items: list[dict] = []
     if tmdb_resp and "results" in tmdb_resp:
@@ -441,12 +456,16 @@ async def search_movies(
             if type == "person":
                 if not item.get("profile_path"):
                     continue
+                if _is_adult_or_blacklist(item):
+                    continue
             else:
                 if item.get("media_type") not in ("movie", "tv"):
                     continue
                 if item.get("adult"):  # pre-filter: no adult content
                     continue
                 if not item.get("poster_path"):  # pre-filter: no poster = skip
+                    continue
+                if _is_adult_or_blacklist(item):
                     continue
             tmdb_items.append(item)
 
@@ -483,25 +502,24 @@ async def search_movies(
     results = all_results[start:end]
 
     # ── Persist qualifying TMDB-only results ─────────────────────
-    # Only persist movies (not TV), only if popular + has required fields
+    # User requested not to save unique search results
     for item in tmdb_items:
         if item.get("media_type") == "movie" and _is_persistable(item):
-            # Fire-and-forget: don't block response on DB write
-            asyncio.create_task(_persist_movie_stub(item))
+            # asyncio.create_task(_persist_movie_stub(item))
+            pass
 
     # ── Return results ───────────────────────────────────────────
     total = max(local_total, len(all_results))
 
     if not results:
-        return {
-            "data": {
-                "results": [],
-                "total": 0,
-                "page": page,
-                "limit": limit,
-                "query": query_str,
-            }
+        empty_data = {
+            "results": [],
+            "total": 0,
+            "page": page,
+            "limit": limit,
+            "query": query_str,
         }
+        return {"data": empty_data}
 
     data = {
         "results": results,
@@ -510,7 +528,6 @@ async def search_movies(
         "limit": limit,
         "query": query_str,
     }
-    await set_cached(cache_key, data, TTL_SEARCH)
     logger.info(
         "SEARCH_QUERY q=%r results=%d total=%d local=%d tmdb=%d",
         query_str, len(results), total, len(local_results), len(tmdb_items),

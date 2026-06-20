@@ -11,6 +11,7 @@ import { searchService } from '../services/searchService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RequestContentModal from '../components/RequestContentModal'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Search.css'
 
 export default function Search() {
@@ -30,15 +31,18 @@ export default function Search() {
   const [showRequestModal, setShowRequestModal] = useState(false)
 
   const observerRef = useRef(null)
+  const abortControllerRef = useRef(null)
 
   // Reset state when query or genre changes
   useEffect(() => {
-    setResults([])
     setPage(1)
     setTotal(0)
     setHasMore(true)
     setIsLoading(true)
     setError(null)
+    if (!query.trim() && !genre.trim()) {
+      setResults([])
+    }
   }, [query, genre])
 
   const doFetch = useCallback(async (q, g, p) => {
@@ -56,12 +60,18 @@ export default function Search() {
     }
     setError(null)
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       let data
       if (g.trim() && !q.trim()) {
-        data = await searchService.searchByGenre(g, p)
+        data = await searchService.searchByGenre(g, p, controller.signal)
       } else {
-        data = await searchService.search(q, p)
+        data = await searchService.search(q, p, 'content', controller.signal)
       }
 
       const newResults = data?.results ?? []
@@ -85,17 +95,30 @@ export default function Search() {
         setHasMore(true)
       }
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.message === 'canceled') {
+        return
+      }
       setError(err?.response?.data?.detail ?? 'Search failed. Try again.')
       if (isFirstPage) setResults([])
     } finally {
-      setIsLoading(false)
-      setLoadingMore(false)
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false)
+        setLoadingMore(false)
+      }
     }
   }, [])
 
   useEffect(() => {
     if (query.trim() || genre.trim()) {
-      doFetch(query, genre, page)
+      // Debounce the first page load when typing or changing options
+      const isFirstPage = page === 1
+      const delay = isFirstPage ? 300 : 0
+
+      const timer = setTimeout(() => {
+        doFetch(query, genre, page)
+      }, delay)
+
+      return () => clearTimeout(timer)
     } else {
       setResults([])
       setTotal(0)
@@ -176,25 +199,30 @@ export default function Search() {
           </div>
         )}
 
-        {/* Loading skeletons */}
-        {isLoading && !error && (
+        {/* Loading skeletons (only on first load when results are empty) */}
+        {isLoading && results.length === 0 && !error && (
           <div className="movie-grid">
-            <MovieCardSkeleton count={12} />
+            <MovieCardSkeleton count={6} />
           </div>
         )}
 
         {/* Results grid */}
-        {!isLoading && !error && results.length > 0 && (
+        {!error && results.length > 0 && (
           <>
-            <div className="movie-grid">
-              {results.map((movie) => (
-                <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} />
+            <StaggerContainer
+              key={`${query}-${genre}`}
+              className={`movie-grid ${isLoading ? 'search-grid--loading' : ''}`}
+            >
+              {results.map((movie, index) => (
+                <StaggerItem key={`${movie.id}-${movie.media_type}`} index={index}>
+                  <MovieCard movie={movie} />
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerContainer>
 
             {loadingMore && (
               <div className="movie-grid" style={{ marginTop: '24px' }}>
-                <MovieCardSkeleton count={8} />
+                <MovieCardSkeleton count={4} />
               </div>
             )}
 

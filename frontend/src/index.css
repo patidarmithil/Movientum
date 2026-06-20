@@ -92,6 +92,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 #root {
@@ -162,13 +163,58 @@ button {
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--surface-card) 25%,
-    #242424 50%,
-    var(--surface-card) 75%
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s linear infinite;
+  animation: shimmer 1.4s linear infinite;
   border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Progressive Loading Animations */
+.animate-fade-lift {
+  animation: fadeLiftPlay 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeLiftPlay {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rating-reveal {
+  animation: ratingRevealPlay 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ratingRevealPlay {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.poster-progressive {
+  filter: blur(15px);
+  opacity: 0.6;
+  transition: filter 400ms cubic-bezier(0.16, 1, 0.3, 1), opacity 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.poster-progressive--loaded {
+  filter: blur(0);
+  opacity: 1;
 }
 
 /* ── Scrollbar ───────────────────────────────────────── */
@@ -187,12 +233,29 @@ button {
   padding-top: 6px;
   padding-bottom: var(--space-3);
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.scroll-row-container:hover .scroll-row {
   scrollbar-color: var(--border) transparent;
 }
 
-.scroll-row::-webkit-scrollbar { height: 4px; }
+.scroll-row::-webkit-scrollbar { height: 5px; }
 .scroll-row::-webkit-scrollbar-track { background: transparent; }
-.scroll-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.scroll-row::-webkit-scrollbar-thumb { 
+  background: transparent; 
+  border-radius: 3px; 
+  transition: background-color 0.2s ease;
+}
+
+.scroll-row-container:hover .scroll-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+.scroll-row-container:hover .scroll-row::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
 
 /* ── Horizontal Scroll Fade Effects ────────────────── */
 .scroll-row-container {
@@ -362,7 +425,8 @@ button {
 
 @media (max-width: 480px) {
   .movie-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
   }
 }
 
@@ -459,4 +523,54 @@ button {
 .brand-name__e-bar--bot {
   background: #FFC300; /* Yellow */
 }
+
+/* Stagger Item Wrap Layout Helpers with CSS-driven mount animation */
+@keyframes cardEntry {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-item-wrap {
+  display: block;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.stagger-container--visible .stagger-item-wrap {
+  animation: cardEntry 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.movie-grid > .stagger-item-wrap,
+.explore-grid > .stagger-item-wrap,
+.search-results-grid > .stagger-item-wrap,
+.person-page__film-grid > .stagger-item-wrap {
+  width: 100%;
+}
+
+.castcrew__cast-row > .stagger-item-wrap {
+  flex: 0 0 88px;
+}
+
+/* Card reveal animation styles (IntersectionObserver driven) */
+.viewport-reveal-card {
+  display: block;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translateY(30px) scale(0.92);
+  transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.viewport-reveal-card.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+
 

@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../utils/api'
+import StaggerContainer, { StaggerItem } from './StaggerContainer'
 import './CastCrew.css'
 
 const FALLBACK_COLORS = [
@@ -98,19 +99,21 @@ export default function CastCrew({ movieId, isTV = false }) {
           <h3 className="castcrew__heading">Cast</h3>
           <div className="scroll-row-container">
             <div className="scroll-row-fade left-fade" />
-            <div id={`cast-scroll-${movieId}`} className="castcrew__cast-row">
-              {credits.cast.map((p) => (
-                <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
-                  <div className="cast-avatar">
-                    <Avatar person={p} size={72} />
-                  </div>
-                  <p className="cast-card__name">{p.name}</p>
-                  {p.character && (
-                    <p className="cast-card__character">{p.character}</p>
-                  )}
-                </Link>
+            <StaggerContainer key={`cast-${movieId}-${loading}`} id={`cast-scroll-${movieId}`} className="castcrew__cast-row">
+              {credits.cast.map((p, index) => (
+                <StaggerItem key={p.id} index={index}>
+                  <Link to={`/person/${p.id}`} className="cast-card">
+                    <div className="cast-avatar">
+                      <Avatar person={p} size={72} />
+                    </div>
+                    <p className="cast-card__name">{p.name}</p>
+                    {p.character && (
+                      <p className="cast-card__character">{p.character}</p>
+                    )}
+                  </Link>
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerContainer>
             <div className="scroll-row-fade right-fade" />
           </div>
         </>
@@ -122,19 +125,21 @@ export default function CastCrew({ movieId, isTV = false }) {
           <h3 className="castcrew__heading castcrew__heading--crew">Crew</h3>
           <div className="scroll-row-container">
             <div className="scroll-row-fade left-fade" />
-            <div id={`crew-scroll-${movieId}`} className="castcrew__cast-row">
-              {credits.crew.map((p) => (
-                <Link key={p.id} to={`/person/${p.id}`} className="cast-card">
-                  <div className="cast-avatar">
-                    <Avatar person={p} size={72} />
-                  </div>
-                  <p className="cast-card__name">{p.name}</p>
-                  {p.job && (
-                    <p className="cast-card__character">{p.job}</p>
-                  )}
-                </Link>
+            <StaggerContainer key={`crew-${movieId}-${loading}`} id={`crew-scroll-${movieId}`} className="castcrew__cast-row">
+              {credits.crew.map((p, index) => (
+                <StaggerItem key={p.id} index={index}>
+                  <Link to={`/person/${p.id}`} className="cast-card">
+                    <div className="cast-avatar">
+                      <Avatar person={p} size={72} />
+                    </div>
+                    <p className="cast-card__name">{p.name}</p>
+                    {p.job && (
+                      <p className="cast-card__character">{p.job}</p>
+                    )}
+                  </Link>
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerContainer>
             <div className="scroll-row-fade right-fade" />
           </div>
         </>

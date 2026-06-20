@@ -332,3 +332,7 @@ app.include_router(
     prefix="/api/v1/rec-feedback",
     tags=["Recommendation Feedback"],
 )
+
+# ── Multi-Watchlist Router ──────────────────────────────────────────────────
+from app.routers import watchlist
+app.include_router(watchlist.router, prefix="/api/v1/watchlists", tags=["Watchlists"])

@@ -45,42 +45,7 @@
   gap: var(--space-6);
 }
 
-/* Movie Row Customizations */
-.movie-row {
-  padding-bottom: var(--space-8);
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
-  gap: var(--space-4);
-}
-
-.section-header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  flex-wrap: wrap;
-}
-
-.see-all-link {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--accent);
-  transition: opacity 150ms ease;
-}
-
-.see-all-link:hover {
-  opacity: 0.8;
-}
-
-.movie-row__pills-container {
-  margin-bottom: var(--space-4);
-  width: 100%;
-}
+/* Genre Pills styling */
 
 /* Genre Pills */
 .genre-pills {
@@ -365,7 +330,7 @@
   }
 }
 
-/* ── Mobile Layout & Movie Row Optimizations ── */
+/* ── Mobile Layout & Genre Pills Optimizations ── */
 @media (max-width: 768px) {
   .home-layout-container {
     padding-top: var(--space-4);
@@ -376,19 +341,6 @@
     gap: var(--space-4);
   }
   
-  .movie-row {
-    padding-bottom: var(--space-2);
-  }
-  
-  .section-header {
-    margin-bottom: var(--space-2);
-    gap: var(--space-2);
-  }
-  
-  .section-header-left {
-    gap: var(--space-3);
-  }
-  
   .genre-pills {
     padding-bottom: 2px;
   }
@@ -397,9 +349,11 @@
     padding: 4px 10px;
     font-size: 11px;
   }
-  
-  .movie-row__pills-container {
-    margin-bottom: var(--space-2);
-  }
+}
+
+/* Sidebar filter dropdown menu positioning */
+.home-sidebar .filter-dropdown__menu {
+  left: auto;
+  right: 0;
 }
 

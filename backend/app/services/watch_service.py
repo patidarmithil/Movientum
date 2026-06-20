@@ -126,6 +126,27 @@ async def mark_watched(
         "WATCH_MARKED",
         extra={"user_id": str(user_id), "movie_id": movie_id},
     )
+
+    # Trigger Taste Profile Update
+    try:
+        movie_stmt = select(Movie).where(Movie.id == movie_id)
+        movie_res = await db.execute(movie_stmt)
+        movie_item = movie_res.scalar_one_or_none()
+        media_type = movie_item.type if movie_item else "movie"
+
+        from app.services.advanced_recs import get_catalog_row
+        from app.services.tmdb_service import ingest_item_to_catalog
+        from app.services.feedback_service import apply_feedback
+
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        if not catalog_item:
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+
+        if catalog_item:
+            await apply_feedback(db, user_id, catalog_item, "watched")
+    except Exception as e:
+        logger.warning(f"Failed to update taste profile on watched mark: {e}")
+
     return row
 
 
@@ -178,6 +199,26 @@ async def remove_from_watch_history(
             detail="Movie/TV show not in watch history",
         )
 
+    # Trigger Taste Profile Update before delete
+    try:
+        movie_stmt = select(Movie).where(Movie.id == movie_id)
+        movie_res = await db.execute(movie_stmt)
+        movie_item = movie_res.scalar_one_or_none()
+        media_type = movie_item.type if movie_item else "movie"
+
+        from app.services.advanced_recs import get_catalog_row
+        from app.services.tmdb_service import ingest_item_to_catalog
+        from app.services.feedback_service import apply_feedback
+
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        if not catalog_item:
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+
+        if catalog_item:
+            await apply_feedback(db, user_id, catalog_item, "unwatched")
+    except Exception as e:
+        logger.warning(f"Failed to update taste profile on watched remove: {e}")
+
     await db.delete(entry)
     logger.info(
         "WATCH_HISTORY_REMOVED",
@@ -207,7 +248,9 @@ async def add_to_watchlist(
     result = await db.execute(stmt)
     row = result.scalar_one_or_none()
 
+    is_new = True
     if row is None:
+        is_new = False
         # Already exists — fetch the existing row
         existing = await db.execute(
             select(Watchlist).where(
@@ -221,6 +264,28 @@ async def add_to_watchlist(
         "WATCHLIST_ADDED",
         extra={"user_id": str(user_id), "movie_id": movie_id},
     )
+
+    # Trigger Taste Profile Update if it's newly added
+    if is_new:
+        try:
+            movie_stmt = select(Movie).where(Movie.id == movie_id)
+            movie_res = await db.execute(movie_stmt)
+            movie_item = movie_res.scalar_one_or_none()
+            media_type = movie_item.type if movie_item else "movie"
+
+            from app.services.advanced_recs import get_catalog_row
+            from app.services.tmdb_service import ingest_item_to_catalog
+            from app.services.feedback_service import apply_feedback
+
+            catalog_item = await get_catalog_row(db, movie_id, media_type)
+            if not catalog_item:
+                catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+
+            if catalog_item:
+                await apply_feedback(db, user_id, catalog_item, "watchlist")
+        except Exception as e:
+            logger.warning(f"Failed to update taste profile on watchlist add: {e}")
+
     return row
 
 
@@ -246,6 +311,26 @@ async def remove_from_watchlist(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Movie not in watchlist",
         )
+
+    # Trigger Taste Profile Update before delete
+    try:
+        movie_stmt = select(Movie).where(Movie.id == movie_id)
+        movie_res = await db.execute(movie_stmt)
+        movie_item = movie_res.scalar_one_or_none()
+        media_type = movie_item.type if movie_item else "movie"
+
+        from app.services.advanced_recs import get_catalog_row
+        from app.services.tmdb_service import ingest_item_to_catalog
+        from app.services.feedback_service import apply_feedback
+
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        if not catalog_item:
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+
+        if catalog_item:
+            await apply_feedback(db, user_id, catalog_item, "unwatchlist")
+    except Exception as e:
+        logger.warning(f"Failed to update taste profile on watchlist remove: {e}")
 
     await db.delete(entry)
     logger.info(

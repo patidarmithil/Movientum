@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { searchService } from '../services/searchService'
 import RequestContentModal from './RequestContentModal'
+import StaggerContainer, { StaggerItem } from './StaggerContainer'
 import './SearchOverlay.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
+const CACHE_TTL = 300000 // 5 minutes
 
 export default function SearchOverlay({ isOpen, setIsOpen }) {
   const navigate = useNavigate()
@@ -25,13 +27,27 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
   const overlayRef = useRef(null)
   const containerRef = useRef(null)
   const debounceTimer = useRef(null)
+  const abortControllerRef = useRef(null)
 
   const closeSearch = useCallback(() => {
     setIsOpen(false)
     setQuery('')
     setResults([])
     setActiveIdx(-1)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
   }, [setIsOpen])
+
+  // Clean up abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   const getCache = (q, type) => {
     const key = `${type}_${q}`
@@ -91,26 +107,29 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
   }, [isOpen])
 
   const fetchResults = useCallback(async (val) => {
-    const cached = getCache(val, searchType)
-    if (cached) {
-      setResults(cached)
-      setIsLoading(false)
-      return
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     try {
       const data = searchService.instantSearch 
-        ? await searchService.instantSearch(val, searchType)
-        : await searchService.autocomplete(val, searchType)
+        ? await searchService.instantSearch(val, searchType, controller.signal)
+        : await searchService.autocomplete(val, searchType, controller.signal)
         
       const list = Array.isArray(data) ? data : (data.results ?? [])
       setResults(list)
-      setCache(val, searchType, list)
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.message === 'canceled') {
+        return
+      }
       console.error(err)
       setResults([])
     } finally {
-      setIsLoading(false)
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false)
+      }
     }
   }, [searchType])
 
@@ -180,26 +199,15 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
     if (item.media_type === 'person') {
       navigate(`/person/${item.id}`)
     } else if (item.media_type === 'tv') {
-      navigate(`/tv/${item.id}`)
+      navigate(`/tv/${item.id}`, { state: { movie: item } })
     } else {
-      navigate(`/movies/${item.id}`)
+      navigate(`/movies/${item.id}`, { state: { movie: item } })
     }
   }
 
   return (
     <div className="searchbar-wrapper" ref={containerRef}>
-      <button
-        type="button"
-        className={`navbar__link navbar__link--icon navbar__search-btn ${isOpen ? 'navbar__link--active' : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <span>Search</span>
-      </button>
+
 
       {isOpen && createPortal(
         <div
@@ -302,36 +310,44 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
             ) : results.length > 0 ? (
               <div className="search-results-section">
                 <h4>SEARCH RESULTS</h4>
-                <div className="search-results-grid">
+                <StaggerContainer 
+                  key={`search-overlay-${query.trim()}-${results.length}`} 
+                  className={`search-results-grid ${isLoading ? 'search-grid--loading' : ''}`} 
+                  instant={true}
+                >
                   {results.map((item, i) => {
                     const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE}/w92${item.poster_path}` : null
                     return (
-                      <div 
-                        key={item.id}
-                        className={`search-result-card ${i === activeIdx ? 'search-result-card--active' : ''}`}
-                        onClick={() => goToMovie(item)}
-                        onMouseEnter={() => setActiveIdx(i)}
-                        onMouseLeave={() => setActiveIdx(-1)}
-                      >
-                        {posterUrl ? (
-                          <img className="search-result-poster" src={posterUrl} alt="" loading="lazy" />
-                        ) : (
-                          <div className="search-result-poster" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                            {item.title?.[0] ?? '?'}
-                          </div>
-                        )}
-                        <div>
-                          <div className="search-result-title">{item.title || item.name}</div>
-                          {(item.release_year || item.media_type) && (
-                            <div className="search-result-meta">
-                              {[item.release_year, item.media_type === 'tv' ? 'TV Show' : item.media_type === 'movie' ? 'Movie' : item.media_type === 'person' ? 'Person' : item.media_type].filter(Boolean).join(' • ')}
+                      <StaggerItem key={item.id} index={i}>
+                        <Link 
+                          to={item.media_type === 'person' ? `/person/${item.id}` : item.media_type === 'tv' ? `/tv/${item.id}` : `/movies/${item.id}`}
+                          state={{ movie: item }}
+                          className={`search-result-card ${i === activeIdx ? 'search-result-card--active' : ''}`}
+                          onClick={() => closeSearch()}
+                          onMouseEnter={() => setActiveIdx(i)}
+                          onMouseLeave={() => setActiveIdx(-1)}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          {posterUrl ? (
+                            <img className="search-result-poster" src={posterUrl} alt="" loading="lazy" />
+                          ) : (
+                            <div className="search-result-poster" style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                              {item.title?.[0] ?? '?'}
                             </div>
                           )}
-                        </div>
-                      </div>
+                          <div>
+                            <div className="search-result-title">{item.title || item.name}</div>
+                            {(item.release_year || item.media_type) && (
+                              <div className="search-result-meta">
+                                {[item.release_year, item.media_type === 'tv' ? 'TV Show' : item.media_type === 'movie' ? 'Movie' : item.media_type === 'person' ? 'Person' : item.media_type].filter(Boolean).join(' • ')}
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                      </StaggerItem>
                     )
                   })}
-                </div>
+                </StaggerContainer>
               </div>
             ) : query.trim().length >= 2 && !isLoading && (
               <div className="search-empty">

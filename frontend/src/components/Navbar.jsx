@@ -1,4 +1,4 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
@@ -14,6 +14,7 @@ import './Navbar.css'
 export default function Navbar() {
   const { isLoggedIn, isLoading, user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [dropOpen, setDropOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -22,6 +23,17 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef(null)
+
+  const [scrolled, setScrolled] = useState(false)
+
+  // Track window scroll to change navbar glass style
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -54,13 +66,14 @@ export default function Navbar() {
     }
   }, [isLoggedIn])
 
-  const unreadCount = notifications.filter(n => !n.seen).length
+  const safeNotifications = Array.isArray(notifications) ? notifications : []
+  const unreadCount = safeNotifications.filter(n => !n.seen).length
 
   const handleNotifClick = () => {
     setNotifOpen(!notifOpen)
     if (!notifOpen && unreadCount > 0) {
       notificationService.markAllSeen().then(() => {
-        setNotifications(notifications.map(n => ({...n, seen: true})))
+        setNotifications(safeNotifications.map(n => ({...n, seen: true})))
       })
     }
   }
@@ -82,19 +95,14 @@ export default function Navbar() {
 
   return (
     <nav
-      className="navbar"
+      className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}
       role="navigation"
       aria-label="Main navigation"
-      style={{
-        background: 'rgba(13, 14, 18, 0.8)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)'
-      }}
     >
       <div className="navbar__inner">
         
         {/* ── Logo + Brand Name + Beta Symbol ── */}
-        <Link to="/" className="navbar__logo" aria-label="Movientum home" onClick={() => setMobileMenuOpen(false)}>
+        <Link to="/home" className="navbar__logo" aria-label="Movientum home" onClick={() => setMobileMenuOpen(false)}>
           <img src="/favicon.svg" alt="Movientum Logo" className="navbar__logo-img" />
           <span className="navbar__logo-text">
             OVI
@@ -111,99 +119,147 @@ export default function Navbar() {
         {/* ── Right-Aligned Navigation Icons Group ── */}
         <div className="navbar__right-group">
           
-          {/* Explore nav button (Compass Icon + Text) */}
-          <NavLink
-            to="/explore"
-            className={({ isActive }) =>
-              `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-            }
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-            </svg>
-            <span>Explore</span>
-          </NavLink>
-
-          {/* News nav button */}
-          <NavLink
-            to="/news"
-            className={({ isActive }) =>
-              `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-            }
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-              <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" />
-              <path d="M2 12h10" />
-              <path d="M2 17h10" />
-              <path d="M2 7h4" />
-            </svg>
-            <span>News</span>
-          </NavLink>
-
-          {isLoggedIn && (
+          {(location.pathname === '/intro' || (location.pathname === '/' && !isLoggedIn)) ? (
             <>
-              {/* Analysis nav button */}
+              <a href="https://github.com/patidarmithil/Movientum" target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm" style={{ marginRight: '8px' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                </svg>
+                Source Code
+              </a>
+              <Link to="/home" className="btn btn--secondary btn--sm" style={{ marginRight: '8px' }}>Demo</Link>
+            </>
+          ) : (
+            <>
+              {/* Explore nav button (Compass Icon + Text) */}
               <NavLink
-                to="/analysis"
+                to="/explore"
                 className={({ isActive }) =>
                   `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
                 }
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-                  <line x1="3" y1="22" x2="21" y2="22"></line>
-                  <line x1="4" y1="22" x2="4" y2="16"></line>
-                  <line x1="8" y1="22" x2="8" y2="12"></line>
-                  <line x1="12" y1="22" x2="12" y2="9"></line>
-                  <line x1="16" y1="22" x2="16" y2="11"></line>
-                  <line x1="20" y1="22" x2="20" y2="5"></line>
-                  <path d="M4 12l4-4 4-3 4 3.5 4-5.5"></path>
-                  <circle cx="4" cy="12" r="1.2" fill="currentColor"></circle>
-                  <circle cx="8" cy="8" r="1.2" fill="currentColor"></circle>
-                  <circle cx="12" cy="5" r="1.2" fill="currentColor"></circle>
-                  <circle cx="16" cy="8.5" r="1.2" fill="currentColor"></circle>
-                  <circle cx="20" cy="3" r="1.2" fill="currentColor"></circle>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
                 </svg>
-                <span>Analysis</span>
+                <span>Explore</span>
               </NavLink>
 
-              {/* Dashboard nav button */}
+              {/* News nav button */}
               <NavLink
-                to="/dashboard"
+                to="/news"
                 className={({ isActive }) =>
                   `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
                 }
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-                  <line x1="18" y1="20" x2="18" y2="10"></line>
-                  <line x1="12" y1="20" x2="12" y2="4"></line>
-                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                  <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" />
+                  <path d="M2 12h10" />
+                  <path d="M2 17h10" />
+                  <path d="M2 7h4" />
                 </svg>
-                <span>Dashboard</span>
+                <span>News</span>
+              </NavLink>
+
+              {/* About / Intro page link */}
+              <NavLink
+                to="/intro"
+                className={({ isActive }) =>
+                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>About</span>
+              </NavLink>
+
+              {isLoggedIn && (
+                <>
+                  {/* Analysis nav button */}
+                  <NavLink
+                    to="/analysis"
+                    className={({ isActive }) =>
+                      `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                    }
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                      <line x1="3" y1="22" x2="21" y2="22"></line>
+                      <line x1="4" y1="22" x2="4" y2="16"></line>
+                      <line x1="8" y1="22" x2="8" y2="12"></line>
+                      <line x1="12" y1="22" x2="12" y2="9"></line>
+                      <line x1="16" y1="22" x2="16" y2="11"></line>
+                      <line x1="20" y1="22" x2="20" y2="5"></line>
+                      <path d="M4 12l4-4 4-3 4 3.5 4-5.5"></path>
+                      <circle cx="4" cy="12" r="1.2" fill="currentColor"></circle>
+                      <circle cx="8" cy="8" r="1.2" fill="currentColor"></circle>
+                      <circle cx="12" cy="5" r="1.2" fill="currentColor"></circle>
+                      <circle cx="16" cy="8.5" r="1.2" fill="currentColor"></circle>
+                      <circle cx="20" cy="3" r="1.2" fill="currentColor"></circle>
+                    </svg>
+                    <span>Analysis</span>
+                  </NavLink>
+
+                  {/* Dashboard nav button */}
+                  <NavLink
+                    to="/dashboard"
+                    className={({ isActive }) =>
+                      `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                    }
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                      <line x1="18" y1="20" x2="18" y2="10"></line>
+                      <line x1="12" y1="20" x2="12" y2="4"></line>
+                      <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <span>Dashboard</span>
+                  </NavLink>
+                </>
+              )}
+
+              {/* Help nav button */}
+              <NavLink
+                to="/help"
+                className={({ isActive }) =>
+                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>Help</span>
               </NavLink>
             </>
           )}
 
-          {/* Search Trigger */}
-          <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
-
-          {/* Help nav button */}
-          <NavLink
-            to="/help"
-            className={({ isActive }) =>
-              `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-            }
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            <span>Help</span>
-          </NavLink>
-
           {/* Auth Actions (Avatar dropdown or Login / SignUp buttons) */}
           <div className="navbar__actions">
+            {/* Search Trigger Button */}
+            {!(location.pathname === '/intro' || (location.pathname === '/' && !isLoggedIn)) && (
+              <button
+                className="navbar__notif-btn"
+                onClick={() => setSearchOpen(!searchOpen)}
+                aria-label="Search"
+                style={{ marginRight: '8px' }}
+              >
+                {searchOpen ? (
+                  <svg key="cross" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg search-icon-animate">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                ) : (
+                  <svg key="search" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg search-icon-animate">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                )}
+              </button>
+            )}
+
             {isLoggedIn && (
               <div className="navbar__user" ref={notifRef} style={{ marginRight: '8px' }}>
                 <button
@@ -223,14 +279,14 @@ export default function Navbar() {
                   <div className="navbar__notif-dropdown">
                     <div className="navbar__notif-header">Notifications</div>
                     <div className="navbar__notif-list">
-                      {notifications.length === 0 ? (
+                      {safeNotifications.length === 0 ? (
                         <div className="navbar__notif-empty">
                           No notifications
                           <br/><br/>
                           <button onClick={addTestNotification} className="btn btn--secondary btn--sm">Test Notifications</button>
                         </div>
                       ) : (
-                        notifications.map(n => (
+                        safeNotifications.map(n => (
                           <div
                             key={n.id}
                             className="navbar__notif-item"
@@ -346,6 +402,11 @@ export default function Navbar() {
               </div>
             )}
 
+          {/* Search Trigger */}
+          {!(location.pathname === '/intro' || (location.pathname === '/' && !isLoggedIn)) && (
+            <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
+          )}
+
             {/* Mobile Hamburger menu toggle button */}
             <button 
               className="navbar__hamburger"
@@ -374,7 +435,7 @@ export default function Navbar() {
           />
           <div className={`navbar__mobile-drawer${mobileMenuOpen ? ' navbar__mobile-drawer--open' : ''}`} role="dialog" aria-label="Mobile navigation">
             <div className="navbar__mobile-drawer-header">
-              <Link to="/" className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
+              <Link to="/home" className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
                 <img src="/favicon.svg" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
                 <span className="navbar__logo-text" style={{ fontSize: '15px' }}>OVIENTUM</span>
               </Link>
@@ -403,6 +464,13 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <span>🧭</span> Explore
+              </NavLink>
+              <NavLink 
+                to="/intro" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>✨</span> About Movientum
               </NavLink>
               <NavLink 
                 to="/news" 

@@ -1,6 +1,6 @@
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 import { useNavigate, Link } from 'react-router-dom'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
 import BorderGlow from './BorderGlow'
 import { recFeedback } from '../services/feedbackService'
 import './MovieCard.css'
@@ -27,10 +27,12 @@ const MOCTALE_SYMBOLS = {
  *   showFeedback?: boolean — render thumbs-up/down overlay and track scroll-ignore
  *                  Pass true only from authenticated recommendation carousels.
  */
-export default function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false }) {
+const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false }) {
   const navigate = useNavigate()
   const [hasError, setHasError]               = useState(false)
+  const [imageLoaded, setImageLoaded]         = useState(false)
   const [feedbackSent, setFeedbackSent]       = useState(null)  // null | 'up' | 'down'
+  const [isVisible, setIsVisible]             = useState(false)
   const cardRef                               = useRef(null)
   const impressionLogged                      = useRef(false)
 
@@ -51,9 +53,35 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory,
     navigate(isTV ? `/tv/${movie.id}` : `/movies/${movie.id}`)
   }, [isTV, movie.id, showFeedback, tmdbId, mediaType, navigate])
 
+  // ── Card Reveal entry animation via IntersectionObserver ─────────
+  useEffect(() => {
+    const parentEl = cardRef.current
+    if (!parentEl) return
+
+    const targetEl = parentEl.querySelector('.movie-card')
+    if (!targetEl) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.1, rootMargin: '0px 0px 100px 0px' }
+    )
+
+    observer.observe(targetEl)
+    return () => observer.disconnect()
+  }, [])
+
   // ── Implicit ignore detection via IntersectionObserver ──────────
   useEffect(() => {
-    if (!showFeedback || !cardRef.current || !tmdbId) return
+    const parentEl = cardRef.current
+    if (!showFeedback || !parentEl || !tmdbId) return
+
+    const targetEl = parentEl.querySelector('.movie-card')
+    if (!targetEl) return
 
     const timeout = { id: null }
 
@@ -74,7 +102,7 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory,
       { threshold: 0.5 }
     )
 
-    observer.observe(cardRef.current)
+    observer.observe(targetEl)
     return () => {
       observer.disconnect()
       clearTimeout(timeout.id)
@@ -116,12 +144,13 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory,
     <div ref={cardRef} style={{ display: 'contents' }}>
       <Link
         to={targetPath}
+        state={{ movie }}
         onClick={handleLinkClick}
         style={{ textDecoration: 'none', display: 'contents', color: 'inherit' }}
         aria-label={`${movie.title} (${movie.release_year})`}
       >
         <BorderGlow
-          className={`movie-card movie-card--${variant}`}
+          className={`movie-card movie-card--${variant} ${isVisible ? 'visible' : ''}`}
           tabIndex={0}
           borderRadius={12}
           glowRadius={30}
@@ -134,8 +163,9 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory,
               <img
                 src={posterUrl}
                 alt={`${movie.title} poster`}
-                className="movie-card__poster"
+                className={`movie-card__poster poster-progressive ${imageLoaded ? 'poster-progressive--loaded' : ''}`}
                 loading="lazy"
+                onLoad={() => setImageLoaded(true)}
                 onError={() => setHasError(true)}
               />
             ) : (
@@ -214,4 +244,6 @@ export default function MovieCard({ movie, variant = 'standard', ratingCategory,
       </Link>
     </div>
   )
-}
+})
+
+export default MovieCard

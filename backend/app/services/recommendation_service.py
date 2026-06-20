@@ -90,6 +90,8 @@ def _compute_score(item: dict, user_genre_profile: dict) -> float:
 async def get_personalized_recommendations(
     db: AsyncSession,
     user_id: UUID,
+    offset: int = 0,
+    limit: int = 40,
 ) -> dict:
     """
     Personalized picks for authenticated user.
@@ -157,7 +159,8 @@ async def get_personalized_recommendations(
             .options(selectinload(Movie.genres).selectinload(MovieGenre.genre))
             .where(Movie.id.in_(candidate_ids))
             .order_by(Movie.popularity.desc())
-            .limit(100)
+            .offset(offset)
+            .limit(max(150, limit))
         )
         result = await db.execute(stmt)
         local_movies = [_movie_to_dict(m) for m in result.scalars().all()]
@@ -202,9 +205,9 @@ async def get_personalized_recommendations(
     for m in unique:
         m["_score"] = _compute_score(m, user_genre_profile)
 
-    # Step 7 — Sort + top 40
+    # Step 7 — Sort + limit
     unique.sort(key=lambda x: x["_score"], reverse=True)
-    final = unique[:_REC_TARGET]
+    final = unique[:limit]
 
     for m in final:
         m.pop("_score", None)
@@ -242,6 +245,7 @@ async def get_baseline_recommendations(
     db: AsyncSession,
     user_id: Optional[UUID] = None,
     limit: int = 30,
+    offset: int = 0,
 ) -> list[dict]:
     """
     Phase 5 adapter: returns a flat list of up to `limit` baseline recommendations.
@@ -253,12 +257,12 @@ async def get_baseline_recommendations(
         try:
             from app.routers.movies import get_trending
             data = await get_trending(db=None)
-            return data.get("movies", [])[:limit]
+            return data.get("movies", [])[offset : offset + limit]
         except Exception as e:
             logger.warning("Baseline trending fallback failed: %s", e)
             return []
 
-    result = await get_personalized_recommendations(db, user_id=user_id)
+    result = await get_personalized_recommendations(db, user_id=user_id, limit=limit, offset=offset)
     movies = result.get("movies", [])
     return movies[:limit]
 
@@ -278,9 +282,38 @@ async def get_baseline_similar_items(
     return items[:limit]
 
 
+async def get_user_language_profile(
+    db: AsyncSession,
+    user_id: UUID,
+) -> dict:
+    """
+    Computes the frequency of each original_language in the user's watch history.
+    """
+    from app.db.orm_models import WatchHistory, Movie
+    try:
+        stmt = (
+            select(Movie.original_language, func.count(Movie.id).label("cnt"))
+            .select_from(WatchHistory)
+            .join(Movie, WatchHistory.movie_id == Movie.id)
+            .where(WatchHistory.user_id == user_id)
+            .where(Movie.original_language.is_not(None))
+            .group_by(Movie.original_language)
+        )
+        res = await db.execute(stmt)
+        counts = {row.original_language: row.cnt for row in res.all()}
+        total = sum(counts.values())
+        if total == 0:
+            return {}
+        return {lang: cnt / total for lang, cnt in counts.items()}
+    except Exception as e:
+        logger.warning(f"Failed to get user language profile: {e}")
+        return {}
+
+
 async def get_user_watch_seed(
     db: AsyncSession,
     user_id: UUID,
+    offset: int = 0,
 ) -> Optional[dict]:
     """
     Returns the most recently watched/rated ContentCatalog-compatible item for a user.
@@ -292,10 +325,18 @@ async def get_user_watch_seed(
     from app.db.orm_models import WatchHistory, Movie
 
     try:
+        count_stmt = select(func.count(WatchHistory.id)).where(WatchHistory.user_id == user_id)
+        count = (await db.execute(count_stmt)).scalar_one()
+        if count == 0:
+            return None
+            
+        real_offset = offset % count
+
         stmt = (
             select(WatchHistory.movie_id)
             .where(WatchHistory.user_id == user_id)
             .order_by(WatchHistory.watched_at.desc())
+            .offset(real_offset)
             .limit(1)
         )
         result = await db.execute(stmt)

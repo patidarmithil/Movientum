@@ -1,0 +1,236 @@
+.collection-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.collection-modal-content {
+  background: rgba(18, 18, 24, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  width: 90%;
+  max-width: 400px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalContentReveal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalContentReveal {
+  from { opacity: 0; transform: translateY(-20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.collection-modal-header {
+  display: flex;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.collection-modal-header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  transition: color 0.2s;
+}
+
+.icon-btn:hover {
+  color: #fff;
+}
+
+.close-btn {
+  margin-left: auto;
+}
+
+.back-btn {
+  margin-right: auto;
+}
+
+/* LIST VIEW */
+.collection-list {
+  padding: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.collection-loading {
+  padding: 3rem;
+  text-align: center;
+  color: #888;
+}
+
+.no-collections {
+  text-align: center;
+  color: #666;
+  padding: 2rem 0;
+}
+
+.collection-row {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 0.5rem;
+}
+
+.collection-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.collection-row.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.collection-row input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-right: 1rem;
+  cursor: pointer;
+  accent-color: #9d4edd;
+}
+
+.collection-info {
+  flex: 1;
+}
+
+.collection-name {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.create-new-row {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  margin-top: 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #ccc;
+}
+
+.create-new-row:hover {
+  border-color: #9d4edd;
+  color: #fff;
+  background: rgba(157, 78, 221, 0.1);
+}
+
+.plus-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  font-weight: bold;
+}
+
+.create-new-row:hover .plus-icon {
+  background: #9d4edd;
+  color: #fff;
+}
+
+/* CREATE VIEW */
+.collection-create-form {
+  padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: #fff;
+  font-family: inherit;
+  resize: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #9d4edd;
+}
+
+.char-count {
+  position: absolute;
+  bottom: -1.2rem;
+  right: 0;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.create-submit-btn {
+  width: 100%;
+  background: #9d4edd;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 1rem;
+}
+
+.create-submit-btn:hover:not(:disabled) {
+  background: #7b2cbf;
+}
+
+.create-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.row-spinner {
+  font-size: 0.8rem;
+  color: #9d4edd;
+  animation: blink 1s infinite alternate;
+}
+
+@keyframes blink {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}

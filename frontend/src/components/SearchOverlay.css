@@ -178,17 +178,19 @@
 .search-overlay-input-wrapper .search-input-container {
   width: 100%;
   max-width: none;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1.5px solid rgba(176, 72, 255, 0.4);
+  border: 3px solid #0000;
   border-radius: 24px;
   height: 48px;
   padding: 0 20px;
   transition: all 0.2s ease;
+  background: linear-gradient(#131219, #131219) padding-box,
+              linear-gradient(var(--angle), #070707, #687aff) border-box;
+  animation: 8s rotate linear infinite;
 }
 
 .search-overlay-input-wrapper .search-input-container:focus-within {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(176, 72, 255, 0.85);
+  background: linear-gradient(#1c1b24, #1c1b24) padding-box,
+              linear-gradient(var(--angle), #b048ff, #687aff) border-box;
   box-shadow: 0 0 16px rgba(176, 72, 255, 0.25);
 }
 
@@ -204,5 +206,23 @@
   .search-overlay-input-wrapper .search-input-container {
     max-width: none;
     height: 40px;
+  }
+}
+
+.search-grid--loading {
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.25s ease-out;
+}
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes rotate {
+  to {
+    --angle: 360deg;
   }
 }

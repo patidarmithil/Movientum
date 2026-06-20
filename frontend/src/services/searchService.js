@@ -16,9 +16,9 @@ export const searchService = {
    * @param {string} search_type  default 'content'
    * @returns {Promise<{results: Array, total: number, page: number, pages: number}>}
    */
-  search: (query, page = 1, search_type = 'content') =>
+  search: (query, page = 1, search_type = 'content', signal) =>
     api
-      .get(BASE, { params: { q: query, page, type: search_type } })
+      .get(BASE, { params: { q: query, page, type: search_type }, signal })
       .then((r) => r.data.data),
 
   /**
@@ -27,9 +27,9 @@ export const searchService = {
    * @param {string} search_type  default 'content'
    * @returns {Promise<Array>}
    */
-  autocomplete: (prefix, search_type = 'content') =>
+  autocomplete: (prefix, search_type = 'content', signal) =>
     api
-      .get(`${BASE}/autocomplete`, { params: { q: prefix, type: search_type } })
+      .get(`${BASE}/autocomplete`, { params: { q: prefix, type: search_type }, signal })
       .then((r) => r.data.data),
 
   /**
@@ -38,9 +38,9 @@ export const searchService = {
    * @param {string} search_type  default 'content'
    * @returns {Promise<Array>}
    */
-  instantSearch: (query, search_type = 'content') =>
+  instantSearch: (query, search_type = 'content', signal) =>
     api
-      .get(`${BASE}/instant`, { params: { q: query, type: search_type } })
+      .get(`${BASE}/instant`, { params: { q: query, type: search_type }, signal })
       .then((r) => r.data.data),
 
   /**
@@ -48,9 +48,9 @@ export const searchService = {
    * @param {string} genre  e.g. "Action"
    * @param {number} page
    */
-  searchByGenre: (genre, page = 1) =>
+  searchByGenre: (genre, page = 1, signal) =>
     api
-      .get(BASE, { params: { genre, page } })
+      .get(BASE, { params: { genre, page }, signal })
       .then((r) => r.data.data),
 
   /**

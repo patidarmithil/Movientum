@@ -11,6 +11,7 @@ import { newsService } from '../services/newsService'
 import { useAuth } from '../context/AuthContext'
 import NewsCard from '../components/NewsCard'
 import Aurora from '../components/Aurora'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './News.css'
 
 const PAGE_SIZE = 12
@@ -136,11 +137,13 @@ export default function News() {
                 <p>Rate and watch more titles to start getting personalized news!</p>
               </div>
             ) : (
-              <div className="news-grid">
-                {articles.map((article) => (
-                  <NewsCard key={article.id} article={article} variant="standard" />
+              <StaggerContainer className="news-grid" instant={true}>
+                {articles.map((article, index) => (
+                  <StaggerItem key={article.id} index={index}>
+                    <NewsCard article={article} variant="standard" />
+                  </StaggerItem>
                 ))}
-              </div>
+              </StaggerContainer>
             )}
 
             {/* Load more */}

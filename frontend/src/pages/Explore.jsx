@@ -14,6 +14,7 @@ import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
 import FilterDropdown from '../components/FilterDropdown'
+import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Explore.css'
 
 const SORT_OPTIONS = [
@@ -333,7 +334,7 @@ export default function Explore() {
           setPage((prev) => prev + 1)
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.05, rootMargin: '300px' }
     )
 
     const currentTrigger = observerRef.current
@@ -733,32 +734,30 @@ export default function Explore() {
           <div className="error-state">{error}</div>
         )}
 
-        {/* Grid */}
-        {loading ? (
-          <div className="explore-grid">
-            <MovieCardSkeleton count={24} />
-          </div>
-        ) : movies.length > 0 ? (
+        {/* Grid and Skeletons */}
+        {!error && (movies.length > 0 || loading) && (
           <>
-            <div className="explore-grid">
-              {movies.map((m) => <MovieCard key={`${m.id}-${m.media_type}`} movie={m} />)}
-            </div>
-
-            {loadingMore && (
-              <div className="explore-grid" style={{ marginTop: '24px' }}>
-                <MovieCardSkeleton count={8} />
-              </div>
-            )}
+            <StaggerContainer className="explore-grid" instant={false}>
+              {movies.map((m, index) => (
+                <StaggerItem key={`${m.id}-${m.media_type}`} index={index}>
+                  <MovieCard movie={m} />
+                </StaggerItem>
+              ))}
+              {loading && <MovieCardSkeleton count={24} />}
+              {loadingMore && <MovieCardSkeleton count={8} />}
+            </StaggerContainer>
 
             <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
 
-            {!hasMore && (
+            {!loading && !loadingMore && !hasMore && (
               <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
                 No more titles to load.
               </p>
             )}
           </>
-        ) : !error && (
+        )}
+
+        {!loading && !error && movies.length === 0 && (
           <div className="empty-state">
             <div style={{ fontSize: 48, marginBottom: 16 }}>🎬</div>
             <h3>No movies match these filters</h3>
