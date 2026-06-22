@@ -142,11 +142,37 @@ async def get_personalized_recommendations(
     user_genre_profile = {gid: cnt / total for gid, cnt in genre_counts.items()}
     candidate_genre_ids = set(user_genre_profile.keys())
 
-    # Step 3 — Fetch unwatched candidates from local DB (top 100 by popularity)
+    # Step 2.5 — Collect exclusion IDs (recent watch + low rated + watchlist)
+    exclude_recs_ids = set()
+    try:
+        from datetime import datetime, timedelta, timezone
+        recent_limit = datetime.now(timezone.utc) - timedelta(days=7)
+        recent_stmt = select(WatchHistory.movie_id).where(
+            WatchHistory.user_id == user_id,
+            WatchHistory.watched_at >= recent_limit
+        )
+        recent_res = await db.execute(recent_stmt)
+        exclude_recs_ids.update(recent_res.scalars().all())
+
+        from app.db.orm_models import Rating, Watchlist
+        low_rating_stmt = select(Rating.movie_id).where(
+            Rating.user_id == user_id,
+            Rating.category.in_(["skip", "timepass"])
+        )
+        low_rating_res = await db.execute(low_rating_stmt)
+        exclude_recs_ids.update(low_rating_res.scalars().all())
+
+        wl_stmt = select(Watchlist.movie_id).where(Watchlist.user_id == user_id)
+        wl_res = await db.execute(wl_stmt)
+        exclude_recs_ids.update(wl_res.scalars().all())
+    except Exception as e:
+        logger.warning("Failed to collect exclude IDs in service: %s", e)
+
+    # Step 3 — Fetch candidate movie IDs from local DB (top 100 by popularity)
     genre_movie_ids_stmt = (
         select(MovieGenre.movie_id)
         .where(MovieGenre.genre_id.in_(candidate_genre_ids))
-        .where(MovieGenre.movie_id.not_in(watched_ids))
+        .where(MovieGenre.movie_id.not_in(list(exclude_recs_ids)))
         .distinct()
     )
     genre_movie_ids_res = await db.execute(genre_movie_ids_stmt)
@@ -188,11 +214,11 @@ async def get_personalized_recommendations(
         except Exception as e:
             logger.warning(f"TMDB discover backfill failed: {e}")
 
-    # Step 5 — Quality filter + deduplicate (skip watched movies)
+    # Step 5 — Quality filter + deduplicate (skip recently watched, low-rated, or watchlisted movies)
     seen: set[str] = set()
     unique: list[dict] = []
     for m in local_movies:
-        if m.get("media_type", "movie") == "movie" and m["id"] in watched_set:
+        if m.get("media_type", "movie") == "movie" and m["id"] in exclude_recs_ids:
             continue
         if not _passes_quality(m):
             continue

@@ -58,33 +58,90 @@
   overflow: hidden;
 }
 
-/* Strong cinematic spotlight — purple-magenta radial */
-.intro-hero__spotlight {
+/* Cinematic Aurora Effect - Glowing animated blobs */
+.intro-hero__aurora {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at 60% 20%,
-    rgba(177, 92, 255, 0.4) 0%,
-    rgba(135, 60, 129, 0.3) 35%,
-    transparent 75%
-  );
-  animation: heroSpotlight 9s ease-in-out infinite alternate;
+  overflow: hidden;
   z-index: 0;
   pointer-events: none;
-}
-
-.intro-hero__spotlight--secondary {
   background: radial-gradient(
-    ellipse 50% 40% at 30% 60%,
-    rgba(104, 122, 255, 0.08) 0%,
-    transparent 65%
+    circle at 50% 20%,
+    rgba(8, 8, 8, 0) 40%,
+    var(--bg-void) 90%
   );
-  animation-delay: -4s;
 }
 
-@keyframes heroSpotlight {
-  0%   { transform: scale(1)    translateY(0);   opacity: 1; }
-  100% { transform: scale(1.08) translateY(3%);  opacity: 0.85; }
+.intro-hero__aurora-blob {
+  position: absolute;
+  filter: blur(130px);
+  opacity: 0.38;
+  mix-blend-mode: screen;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.intro-hero__aurora-blob--1 {
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(0, 245, 212, 0.95) 0%, rgba(0, 245, 212, 0) 70%);
+  top: -15%;
+  left: 5%;
+  animation: auroraFlow1 24s ease-in-out infinite alternate;
+}
+
+.intro-hero__aurora-blob--2 {
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, rgba(123, 44, 191, 0.9) 0%, rgba(123, 44, 191, 0) 70%);
+  top: -25%;
+  right: 0%;
+  animation: auroraFlow2 30s ease-in-out infinite alternate;
+  animation-delay: -3s;
+}
+
+.intro-hero__aurora-blob--3 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(0, 180, 216, 0.85) 0%, rgba(0, 180, 216, 0) 70%);
+  top: 10%;
+  left: 25%;
+  animation: auroraFlow3 27s ease-in-out infinite alternate;
+  animation-delay: -6s;
+}
+
+.intro-hero__aurora-blob--4 {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(176, 72, 255, 0.85) 0%, rgba(176, 72, 255, 0) 70%);
+  top: 5%;
+  right: 20%;
+  animation: auroraFlow4 22s ease-in-out infinite alternate;
+  animation-delay: -9s;
+}
+
+@keyframes auroraFlow1 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(90px, 50px) scale(1.18) rotate(180deg); }
+  100% { transform: translate(-50px, -70px) scale(0.92) rotate(360deg); }
+}
+
+@keyframes auroraFlow2 {
+  0% { transform: translate(0, 0) scale(1.05) rotate(0deg); }
+  50% { transform: translate(-110px, 70px) scale(0.88) rotate(-180deg); }
+  100% { transform: translate(70px, -50px) scale(1.12) rotate(-360deg); }
+}
+
+@keyframes auroraFlow3 {
+  0% { transform: translate(0, 0) scale(0.92) rotate(0deg); }
+  50% { transform: translate(70px, -90px) scale(1.12) rotate(120deg); }
+  100% { transform: translate(-90px, 50px) scale(1) rotate(240deg); }
+}
+
+@keyframes auroraFlow4 {
+  0% { transform: translate(0, 0) scale(1.12) rotate(0deg); }
+  50% { transform: translate(-60px, 40px) scale(0.92) rotate(90deg); }
+  100% { transform: translate(50px, -60px) scale(1.08) rotate(180deg); }
 }
 
 .intro-hero__content {

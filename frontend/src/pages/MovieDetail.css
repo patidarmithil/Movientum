@@ -205,6 +205,27 @@
   border-top: 1px solid var(--border);
 }
 
+.movie-detail__similar .scroll-row::-webkit-scrollbar {
+  height: 8px;
+}
+
+.movie-detail__similar .scroll-row::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  min-width: 150px;
+  transition: background-color var(--ease-hover);
+}
+
+.movie-detail__similar .scroll-row-container:hover .scroll-row::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.movie-detail__similar .scroll-row-container:hover .scroll-row::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+
 /* ── Responsive ── */
 @media (max-width: 1023px) {
   .movie-detail__top {

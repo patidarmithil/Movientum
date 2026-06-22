@@ -86,13 +86,27 @@ def _relevance_score(item: dict, query: str) -> float:
     exact    = 2.0 if norm_title == norm_q else 0.0
     starts   = 1.5 if norm_title.startswith(norm_q) else 0.0
     contains = 1.0 if norm_q in norm_title else 0.0
-    words    = norm_q.split()
-    word_match = sum(1 for w in words if w in norm_title) / max(len(words), 1)
+
+    # Split and filter stop words
+    STOP_WORDS = {"a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "by", "with", "of", "my", "your", "our", "his", "her", "its", "it", "is", "was", "were", "be", "been", "being"}
+    q_words = [w for w in norm_q.split() if w]
+    t_words = set(norm_title.split())
+
+    non_stop_q = [w for w in q_words if w not in STOP_WORDS]
+    if non_stop_q:
+        word_match_count = sum(1 for w in non_stop_q if w in t_words)
+        word_match = word_match_count / len(non_stop_q)
+        has_any_match = word_match_count > 0
+    else:
+        word_match_count = sum(1 for w in q_words if w in t_words)
+        word_match = word_match_count / max(len(q_words), 1)
+        has_any_match = word_match_count > 0
+
     similarity = difflib.SequenceMatcher(None, norm_q, norm_title).ratio()
     pop = math.log(max(item.get("popularity") or 1.0, 1.0))
     length_penalty = 0.3 if abs(len(title) - len(q)) > 10 else 0.0
 
-    return (
+    score = (
         exact      * 2.0 +
         starts     * 1.5 +
         contains   * 1.0 +
@@ -100,6 +114,12 @@ def _relevance_score(item: dict, query: str) -> float:
         similarity * 0.5 +
         pop        * 0.1
     ) - length_penalty
+
+    # Guard against completely unrelated matches
+    if non_stop_q and not has_any_match and exact == 0.0 and starts == 0.0 and contains == 0.0:
+        score -= 20.0
+
+    return score
 
 
 # ── Helpers ──────────────────────────────────────────────────────

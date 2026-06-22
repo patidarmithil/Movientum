@@ -164,8 +164,24 @@ async def get_recommendations(
         # ── Collect exclusion IDs ────────────────────
         exclude_ids = set()
         try:
-            watch_stmt = select(WatchHistory.movie_id).where(WatchHistory.user_id == user_id)
+            # Exclude recently watched (last 7 days)
+            from datetime import datetime, timedelta, timezone
+            recent_limit = datetime.now(timezone.utc) - timedelta(days=7)
+            watch_stmt = select(WatchHistory.movie_id).where(
+                WatchHistory.user_id == user_id,
+                WatchHistory.watched_at >= recent_limit
+            )
             exclude_ids.update((await db.execute(watch_stmt)).scalars().all())
+
+            # Exclude low-rated content (skip, timepass)
+            from app.db.orm_models import Rating
+            low_rating_stmt = select(Rating.movie_id).where(
+                Rating.user_id == user_id,
+                Rating.category.in_(["skip", "timepass"])
+            )
+            exclude_ids.update((await db.execute(low_rating_stmt)).scalars().all())
+
+            # Keep watchlist items excluded (since they are in the watchlist)
             wl_stmt = select(Watchlist.movie_id).where(Watchlist.user_id == user_id)
             exclude_ids.update((await db.execute(wl_stmt)).scalars().all())
         except Exception as e:
@@ -313,12 +329,26 @@ async def get_similar_items(
     exclude_ids: set[int] = {item_id}     # always exclude seed itself
     if user_uuid:
         try:
+            # Exclude recently watched (last 7 days)
+            from datetime import datetime, timedelta, timezone
+            recent_limit = datetime.now(timezone.utc) - timedelta(days=7)
             watch_stmt = select(WatchHistory.movie_id).where(
-                WatchHistory.user_id == user_uuid
+                WatchHistory.user_id == user_uuid,
+                WatchHistory.watched_at >= recent_limit
             )
             watch_res = await db.execute(watch_stmt)
             exclude_ids.update(watch_res.scalars().all())
 
+            # Exclude low-rated content (skip, timepass)
+            from app.db.orm_models import Rating
+            low_rating_stmt = select(Rating.movie_id).where(
+                Rating.user_id == user_uuid,
+                Rating.category.in_(["skip", "timepass"])
+            )
+            low_res = await db.execute(low_rating_stmt)
+            exclude_ids.update(low_res.scalars().all())
+
+            # Keep watchlist items excluded (since they are in the watchlist)
             wl_stmt = select(Watchlist.movie_id).where(
                 Watchlist.user_id == user_uuid
             )

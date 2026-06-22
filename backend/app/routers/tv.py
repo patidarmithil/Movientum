@@ -13,7 +13,7 @@ import logging
 from typing import Optional
 from datetime import datetime, timezone, date
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -108,14 +108,33 @@ async def persist_tv_full(db: AsyncSession, raw_tmdb: dict):
         )
     await db.commit()
 
+async def _background_ingest_to_catalog(tv_id: int, media_type: str):
+    try:
+        from app.db.database import AsyncSessionLocal
+        from app.services.advanced_recs import get_catalog_row
+        from app.services.tmdb_service import ingest_item_to_catalog
+        async with AsyncSessionLocal() as new_db:
+            catalog_row = await get_catalog_row(new_db, tv_id, media_type)
+            if not catalog_row:
+                await ingest_item_to_catalog(new_db, tv_id, media_type)
+                logger.info(f"Background ingested {media_type} {tv_id} to content_catalog")
+    except Exception as e:
+        logger.warning(f"Background ingest failed for {media_type} {tv_id}: {e}")
+
+
 @router.get("/{tv_id}", summary="TV show detail")
-async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
+async def get_tv_detail(
+    tv_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
     """
     Full TV show details fetched from TMDB and cached based on popularity.
     """
     cache_key = key_tv_detail(tv_id)
     cached = await get_cached(cache_key)
     if cached and cached.get("title") and cached.get("poster_path"):
+        background_tasks.add_task(_background_ingest_to_catalog, tv_id, "tv")
         return cached
 
     # Fallback to DB
@@ -145,6 +164,7 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
         if waited:
             cached = await get_cached(cache_key)
             if cached and cached.get("title") and cached.get("poster_path"):
+                background_tasks.add_task(_background_ingest_to_catalog, tv_id, "tv")
                 return cached
 
         raw = await tmdb.fetch_tv_detail(tv_id)
@@ -167,6 +187,7 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
                 "moctale_rating": moctale_data,
             }
             await set_cached(cache_key, data, 600)
+            background_tasks.add_task(_background_ingest_to_catalog, tv_id, "tv")
             return data
         raise HTTPException(status_code=404, detail="TV show not found")
 
@@ -232,6 +253,7 @@ async def get_tv_detail(tv_id: int, db: AsyncSession = Depends(get_db)):
         ttl = get_ttl_for_popularity(pop)
 
     await set_cached(cache_key, data, ttl)
+    background_tasks.add_task(_background_ingest_to_catalog, tv_id, "tv")
     return data
 
 
