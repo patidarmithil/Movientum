@@ -26,6 +26,8 @@ import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import ScrollReveal from '../components/ScrollReveal'
 import MovieRow from '../components/MovieRow'
+import { AnimatePresence } from 'motion/react'
+import ColdStartLoader from '../components/ColdStartLoader'
 import './Home.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -63,6 +65,17 @@ export default function Home() {
   // Main columns states
   const [trending, setTrending] = useSessionState('home_trending', [])
   const [trendLoad, setTrendLoad] = useState(trending.length === 0)
+  const [showLoader, setShowLoader] = useState(trending.length === 0)
+
+  // Control full screen cold start loader visibility
+  useEffect(() => {
+    if (!trendLoad) {
+      const timer = setTimeout(() => {
+        setShowLoader(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [trendLoad])
 
   const [topRated, setTopRated] = useSessionState('home_topRated', [])
   const [topRatedLoad, setTopRatedLoad] = useState(topRated.length === 0)
@@ -177,7 +190,11 @@ export default function Home() {
   const selectedGenreName = GENRE_OPTIONS.find(g => g.id === selectedGenreId)?.name || 'Genre'
 
   return (
-    <main className="home page-content">
+    <>
+      <AnimatePresence>
+        {showLoader && <ColdStartLoader />}
+      </AnimatePresence>
+      <main className="home page-content">
       {/* ── Background Aurora Animation ── */}
       <div className="home-aurora-bg" aria-hidden="true">
         <Aurora
@@ -357,5 +374,6 @@ export default function Home() {
 
       </div>
     </main>
+    </>
   )
 }

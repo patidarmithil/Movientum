@@ -28,6 +28,14 @@ export default function Intro() {
   const [showContactModal, setShowContactModal] = useState(false)
 
   useEffect(() => {
+    try {
+      localStorage.setItem('hasSeenIntro', 'true')
+    } catch (err) {
+      console.error('Failed to write hasSeenIntro:', err)
+    }
+  }, [])
+
+  useEffect(() => {
     movieService.getTrending()
       .then((data) => {
         const movies = data?.movies || data || [];
@@ -69,9 +77,13 @@ export default function Intro() {
 
       {/* ── 1. Hero ── */}
       <section className="intro-hero">
-        {/* Cinematic spotlight gradient */}
-        <div className="intro-hero__spotlight" aria-hidden="true" />
-        <div className="intro-hero__spotlight intro-hero__spotlight--secondary" aria-hidden="true" />
+        {/* Cinematic Aurora Effect */}
+        <div className="intro-hero__aurora" aria-hidden="true">
+          <div className="intro-hero__aurora-blob intro-hero__aurora-blob--1" />
+          <div className="intro-hero__aurora-blob intro-hero__aurora-blob--2" />
+          <div className="intro-hero__aurora-blob intro-hero__aurora-blob--3" />
+          <div className="intro-hero__aurora-blob intro-hero__aurora-blob--4" />
+        </div>
 
         {/* Text content above poster row */}
         <div className="container intro-hero__content">

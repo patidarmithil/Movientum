@@ -57,6 +57,74 @@ function LogoutListener() {
   return null
 }
 
+function MobileRefreshDetector() {
+  useEffect(() => {
+    let lastScrollY = window.scrollY
+    let lastTime = Date.now()
+    let touchStartY = 0
+    let touchStartTime = 0
+
+    const handleScroll = () => {
+      if (window.innerWidth > 768) return
+
+      const currentScrollY = window.scrollY
+      const currentTime = Date.now()
+      const timeDiff = currentTime - lastTime
+
+      if (timeDiff > 0) {
+        const deltaY = currentScrollY - lastScrollY
+        const velocity = deltaY / timeDiff // px/ms
+
+        // Fast scroll up at top
+        if (currentScrollY <= 5 && deltaY < -25 && velocity < -1.5) {
+          window.location.reload()
+        }
+      }
+
+      lastScrollY = currentScrollY
+      lastTime = currentTime
+    }
+
+    const handleTouchStart = (e) => {
+      if (window.innerWidth > 768) return
+      if (window.scrollY <= 10) {
+        touchStartY = e.touches[0].clientY
+        touchStartTime = Date.now()
+      }
+    }
+
+    const handleTouchEnd = (e) => {
+      if (window.innerWidth > 768) return
+      if (window.scrollY <= 10 && touchStartY > 0) {
+        const touchEndY = e.changedTouches[0].clientY
+        const touchEndTime = Date.now()
+        const diffY = touchEndY - touchStartY
+        const timeDiff = touchEndTime - touchStartTime
+
+        if (timeDiff > 0 && timeDiff < 300) {
+          const velocity = diffY / timeDiff
+          if (diffY > 80 && velocity > 0.6) {
+            window.location.reload()
+          }
+        }
+      }
+      touchStartY = 0
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchend', handleTouchEnd, { passive: true })
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [])
+
+  return null
+}
+
 function AppRoutes() {
   const location = useLocation()
   const { isLoggedIn } = useAuth()
@@ -64,13 +132,23 @@ function AppRoutes() {
   return (
     <>
       <LogoutListener />
+      <MobileRefreshDetector />
       <ScrollRestore />
       <Navbar />
       <InstallPrompt />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public */}
-          <Route path="/" element={isLoggedIn ? <PageTransition><Navigate to="/home" replace /></PageTransition> : <PageTransition><Intro /></PageTransition>} />
+          <Route 
+            path="/" 
+            element={
+              isLoggedIn || localStorage.getItem('hasSeenIntro') === 'true' ? (
+                <PageTransition><Navigate to="/home" replace /></PageTransition>
+              ) : (
+                <PageTransition><Intro /></PageTransition>
+              )
+            } 
+          />
           <Route path="/home"       element={<PageTransition><Home /></PageTransition>} />
           <Route path="/movies"     element={<PageTransition><MovieList /></PageTransition>} />
           <Route path="/movies/:id" element={<PageTransition><MovieDetail /></PageTransition>} />

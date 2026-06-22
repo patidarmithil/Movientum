@@ -18,7 +18,7 @@ import logging
 import asyncio
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy import func, select, text, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -996,8 +996,26 @@ async def persist_movie_full(db: AsyncSession, raw_tmdb: dict):
     logger.info(f"PERSIST: movie_id={movie_id} title='{title}'")
 
 
+async def _background_ingest_to_catalog(movie_id: int, media_type: str):
+    try:
+        from app.db.database import AsyncSessionLocal
+        from app.services.advanced_recs import get_catalog_row
+        from app.services.tmdb_service import ingest_item_to_catalog
+        async with AsyncSessionLocal() as new_db:
+            catalog_row = await get_catalog_row(new_db, movie_id, media_type)
+            if not catalog_row:
+                await ingest_item_to_catalog(new_db, movie_id, media_type)
+                logger.info(f"Background ingested {media_type} {movie_id} to content_catalog")
+    except Exception as e:
+        logger.warning(f"Background ingest failed for {media_type} {movie_id}: {e}")
+
+
 @router.get("/{movie_id}", response_model=MovieDetail, summary="Movie detail")
-async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
+async def get_movie_by_id(
+    movie_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
     """
     Full detail for a single movie including genres + directors.
     No auth required. Cached 1 hour.
@@ -1005,6 +1023,7 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
     cache_key = key_movie_detail(movie_id)
     cached = await get_cached(cache_key)
     if cached:
+        background_tasks.add_task(_background_ingest_to_catalog, movie_id, "movie")
         return cached
 
     # Fetch MovieRating separately to ensure it is always attached
@@ -1056,6 +1075,7 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
                 data["revenue"] = raw.get("revenue")
         data["moctale_rating"] = moctale_data
         await set_cached(cache_key, data, TTL_MOVIE_DETAIL)
+        background_tasks.add_task(_background_ingest_to_catalog, movie_id, "movie")
         return data
 
     # NOT IN DB: release DB connection before slow TMDB calls
@@ -1091,6 +1111,7 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession = Depends(get_db)):
 
     # 5. Cache and return
     await set_cached(cache_key, data, ttl)
+    background_tasks.add_task(_background_ingest_to_catalog, movie_id, "movie")
     return data
 
 

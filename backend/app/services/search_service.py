@@ -166,10 +166,21 @@ def _instant_score(item: dict, query: str) -> float:
     contains  = 2.0 if norm_q in norm_title else 0.0
 
     # --- Word overlap ---
-    q_words  = set(norm_q.split())
-    t_words  = set(norm_title.split())
-    overlap  = len(q_words & t_words) / max(len(q_words), 1)
-    word_hit = overlap * 2.5
+    STOP_WORDS = {"a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "by", "with", "of", "my", "your", "our", "his", "her", "its", "it", "is", "was", "were", "be", "been", "being"}
+    q_words = [w for w in norm_q.split() if w]
+    t_words = set(norm_title.split())
+
+    non_stop_q = [w for w in q_words if w not in STOP_WORDS]
+    if non_stop_q:
+        word_match_count = sum(1 for w in non_stop_q if w in t_words)
+        word_match = word_match_count / len(non_stop_q)
+        has_any_match = word_match_count > 0
+    else:
+        word_match_count = sum(1 for w in q_words if w in t_words)
+        word_match = word_match_count / max(len(q_words), 1)
+        has_any_match = word_match_count > 0
+        
+    word_hit = word_match * 2.5
 
     # --- Trigram similarity (from DB column 'sim' if available) ---
     trgm_sim = float(item.get("trgm_sim") or 0.0) * 3.0
@@ -188,9 +199,15 @@ def _instant_score(item: dict, query: str) -> float:
     len_diff = abs(len(norm_title) - len(norm_q))
     penalty  = min(len_diff * 0.05, 1.0)
 
-    return (
+    score = (
         exact + starts + contains + word_hit + trgm_sim + seq_sim + pop + recency
     ) - penalty
+
+    # Guard against completely unrelated matches
+    if non_stop_q and not has_any_match and exact == 0.0 and starts == 0.0 and contains == 0.0:
+        score -= 20.0
+
+    return score
 
 async def _fts_query(db: AsyncSession, query: str, limit: int) -> list[dict]:
     from app.routers.search import _query_local_db
