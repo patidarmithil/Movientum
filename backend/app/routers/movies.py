@@ -853,7 +853,7 @@ async def get_upcoming(filter: str = Query(default="month", description="week|mo
         item["moctale_rating"] = moctale_map.get(item["id"])
 
     data = {"movies": formatted}
-    await set_cached(cache_key, data, 10 if is_fallback else 1800)
+    await set_cached(cache_key, data, 10 if is_fallback else 43200)
     return data
 
 

@@ -126,6 +126,11 @@ export function AuthProvider({ children }) {
     }
   }, [persist, clearSession])
 
+  const updateUser = useCallback((newData) => {
+    setUser(newData)
+    storage.setItem(KEYS.user, JSON.stringify(newData))
+  }, [])
+
   const value = {
     user,
     accessToken,
@@ -135,6 +140,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     refreshToken,
+    updateUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

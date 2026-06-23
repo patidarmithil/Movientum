@@ -59,6 +59,18 @@ async def submit_feedback(
     return feedback
 
 
+@router.get("/mine", response_model=List[FeedbackResponse])
+async def get_my_feedback(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user_id = uuid.UUID(current_user["sub"])
+    stmt = select(Feedback).where(Feedback.user_id == user_id).order_by(Feedback.created_at.desc())
+    result = await db.execute(stmt)
+    feedbacks = result.scalars().all()
+    return feedbacks
+
+
 @router.get("/", response_model=List[FeedbackResponse])
 async def get_all_feedback(
     current_user: dict = Depends(get_current_user),

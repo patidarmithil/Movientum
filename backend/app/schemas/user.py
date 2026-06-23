@@ -38,6 +38,16 @@ class UserResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, description="Min 8 characters")
 
 
+class UserPasswordUpdateRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, description="Min 8 characters")
+
+
+class UserDeleteRequest(BaseModel):
+    password: str
+    confirmation: str = Field(..., description="Must be 'DELETE'")
+
+
 class UserResponse(BaseModel):
     id: UUID
     username: str
@@ -46,6 +56,7 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     avatar_url: Optional[str] = None
+    bio: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

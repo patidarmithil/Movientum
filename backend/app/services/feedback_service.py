@@ -255,6 +255,9 @@ async def log_interaction(
     the card was displayed to the user.  If the frontend doesn't send it, we
     store an empty dict (still useful for label distribution analysis).
     """
+    if signal_type == "ignore":
+        return
+
     label = SIGNAL_LABEL.get(signal_type, 0)
     log_entry = InteractionLog(
         user_id          = user_id,

@@ -179,7 +179,7 @@ async def get_person_credits(person_id: int):
     top_credits = normalized[:72]
 
     if top_credits:
-        await set_cached(cache_key, top_credits, 3600)  # 1 hour
+        await set_cached(cache_key, top_credits, 86400)  # 24 hours
     return top_credits
 
 

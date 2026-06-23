@@ -16,7 +16,7 @@ import './SearchBar.css'
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
 
-export default function SearchBar() {
+export default function SearchBar({ onSelect, placeholder = "Search movies…" }) {
   const navigate = useNavigate()
 
   const [query, setQuery]           = useState('')
@@ -69,7 +69,7 @@ export default function SearchBar() {
     setIsLoading(true)
     try {
       const data = await searchService.autocomplete(val, 'content', controller.signal)
-      const list = Array.isArray(data) ? data : (data.results ?? [])
+      const list = Array.isArray(data) ? data : (data.suggestions ?? data.results ?? [])
       setSuggestions(list.slice(0, 8))
       setIsOpen(list.length > 0)
       setActiveIdx(-1)
@@ -114,7 +114,7 @@ export default function SearchBar() {
         e.preventDefault()
         if (activeIdx >= 0 && suggestions[activeIdx]) {
           goToMovie(suggestions[activeIdx])
-        } else if (query.trim()) {
+        } else if (query.trim() && !onSelect) {
           goToSearch(query.trim())
         }
         break
@@ -132,21 +132,25 @@ export default function SearchBar() {
     setIsOpen(false)
     setQuery('')
     setSuggestions([])
-    if (item.media_type === 'tv') {
-      navigate(`/tv/${item.id}`)
+    if (onSelect) {
+      onSelect(item)
     } else {
-      navigate(`/movies/${item.id}`)
+      if (item.media_type === 'tv') {
+        navigate(`/tv/${item.id}`)
+      } else {
+        navigate(`/movies/${item.id}`)
+      }
     }
   }
 
   const goToSearch = (q) => {
     setIsOpen(false)
-    navigate(`/search?q=${encodeURIComponent(q)}`)
+    if (!onSelect) navigate(`/search?q=${encodeURIComponent(q)}`)
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (query.trim()) goToSearch(query.trim())
+    if (query.trim() && !onSelect) goToSearch(query.trim())
   }
 
   return (
@@ -172,7 +176,7 @@ export default function SearchBar() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => suggestions.length > 0 && setIsOpen(true)}
-          placeholder="Search movies…"
+          placeholder={placeholder}
           autoComplete="off"
           aria-autocomplete="list"
           aria-controls="searchbar-dropdown"
@@ -250,21 +254,23 @@ export default function SearchBar() {
             )
           })}
 
-          <li className="searchbar__see-all-wrapper" role="option" aria-selected={false} style={{ padding: 0 }}>
-            <Link
-              to={`/search?q=${encodeURIComponent(query)}`}
-              className="searchbar__see-all"
-              onClick={() => {
-                setIsOpen(false)
-                setQuery('')
-                setSuggestions([])
-              }}
-              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%', alignItems: 'center' }}
-            >
-              <span className="searchbar__icon-search" aria-hidden="true">🔍</span>
-              See all results for <strong>"{query}"</strong>
-            </Link>
-          </li>
+          {!onSelect && (
+            <li className="searchbar__see-all-wrapper" role="option" aria-selected={false} style={{ padding: 0 }}>
+              <Link
+                to={`/search?q=${encodeURIComponent(query)}`}
+                className="searchbar__see-all"
+                onClick={() => {
+                  setIsOpen(false)
+                  setQuery('')
+                  setSuggestions([])
+                }}
+                style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%', alignItems: 'center' }}
+              >
+                <span className="searchbar__icon-search" aria-hidden="true">🔍</span>
+                See all results for <strong>"{query}"</strong>
+              </Link>
+            </li>
+          )}
         </ul>
       )}
     </div>
