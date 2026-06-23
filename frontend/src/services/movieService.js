@@ -75,5 +75,12 @@ export const movieService = {
    */
   getUpcoming: (filter = 'month') =>
     api.get('/api/v1/movies/upcoming', { params: { filter } }).then((r) => r.data),
+
+  /**
+   * POST /api/v1/recommendations/content
+   * Returns content similar to a basket of movies/TV shows.
+   */
+  getContentBasketRecommendations: (items, page = 1) =>
+    api.post('/api/v1/recommendations/content', { items, page }).then(r => r.data),
 }
 

@@ -30,82 +30,14 @@ from app.db.orm_models import WatchHistory, Watchlist
 from app.services import recommendation_service
 from app.services.advanced_recs import get_new_model_recommendations
 from app.utils.deps import get_current_user, get_optional_user
+from app.schemas.recommendations import ContentBasketRequest
+from app.services.content_recs_service import get_content_basket_recommendations, team_draft_interleave
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _TTL_SIMILAR   = 1800   # 30 min for similar (heavier computation)
 _TTL_ANON_RECS = 600    # 10 min for anonymous recommendations
-
-
-# ── Team-Draft Interleaving ───────────────────────────────────────
-
-def team_draft_interleave(
-    list_a: list[dict],    # New model results (higher ratio team)
-    list_b: list[dict],    # Baseline model results (lower ratio team)
-    k: int = 20,
-    ratio_a: float = 0.6,
-) -> list[dict]:
-    """
-    Team-Draft Interleaving producing k deduplicated results.
-
-    Industry-standard A/B blend algorithm (Netflix, Spotify, YouTube).
-    Avoids position bias by deterministically distributing slots and
-    shuffling assignment order for natural feel.
-
-    Args:
-        list_a:   New ML model results (allocated ratio_a fraction of slots).
-        list_b:   Baseline results (allocated 1-ratio_a fraction of slots).
-        k:        Target output size.
-        ratio_a:  Fraction of slots for list_a (0.6 = 60% new model).
-
-    Guarantees:
-      - No duplicates (deduped by tmdb_id + media_type).
-      - Graceful degradation: if one pool exhausted, fills from the other.
-      - Ratio is deterministic per call (slots pre-computed) but shuffled for
-        natural feel.
-    """
-    result:   list[dict] = []
-    seen_ids: set         = set()
-    ptr_a = ptr_b = 0
-
-    # Deterministic slot allocation
-    slots_a = round(k * ratio_a)
-    slots_b = k - slots_a
-
-    def pick_next(lst: list[dict], ptr: int, seen: set):
-        """Advance ptr until an unseen item is found, or exhaust list."""
-        while ptr < len(lst):
-            item = lst[ptr]
-            key  = (item.get("tmdb_id") or item.get("id"), item.get("media_type", "movie"))
-            ptr += 1
-            if key not in seen:
-                return item, ptr
-        return None, ptr
-
-    # Build interleave queue: True = pick from A, False = pick from B
-    queue: list[bool] = [False] * slots_b + [True] * slots_a
-    random.shuffle(queue)
-
-    for pick_from_a in queue:
-        if len(result) >= k:
-            break
-
-        if pick_from_a:
-            item, ptr_a = pick_next(list_a, ptr_a, seen_ids)
-            if item is None:           # A exhausted — fall back to B
-                item, ptr_b = pick_next(list_b, ptr_b, seen_ids)
-        else:
-            item, ptr_b = pick_next(list_b, ptr_b, seen_ids)
-            if item is None:           # B exhausted — fall back to A
-                item, ptr_a = pick_next(list_a, ptr_a, seen_ids)
-
-        if item:
-            key = (item.get("tmdb_id") or item.get("id"), item.get("media_type", "movie"))
-            seen_ids.add(key)
-            result.append(item)
-
-    return result
 
 
 # ── Normalise item dict ───────────────────────────────────────────
@@ -423,3 +355,34 @@ async def get_similar_items(
         source, len(blended), media_type, item_id, user_id_str,
     )
     return result
+
+
+# ── POST /recommendations/content ─────────────────────────────────
+
+@router.post(
+    "/content",
+    summary="Content Basket Recommendations (Phase 1)",
+    response_description="Paginated blended recommendations for a basket of items"
+)
+async def get_content_recommendations(
+    body: ContentBasketRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[dict] = Depends(get_optional_user),
+) -> dict:
+    """
+    [Phase 1] Fetches content similar to a basket of movies/tv.
+    Returns un-scored and non-cached raw candidates using RWR + TMDB Discovery.
+    """
+    user_id = UUID(current_user["sub"]) if current_user else None
+    
+    items_dicts = [item.model_dump() for item in body.items]
+    
+    result = await get_content_basket_recommendations(
+        db=db,
+        items=items_dicts,
+        page=body.page,
+        user_id=user_id
+    )
+    
+    return result
+

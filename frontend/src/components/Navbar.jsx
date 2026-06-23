@@ -93,6 +93,10 @@ export default function Navbar() {
     ? (user.username || user.name || user.email || '?').charAt(0).toUpperCase()
     : '?'
 
+  const avatarUrl = user?.avatar_url
+    ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar_url}`)
+    : null
+
   return (
     <nav
       className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}
@@ -159,6 +163,21 @@ export default function Navbar() {
                   <path d="M2 7h4" />
                 </svg>
                 <span>News</span>
+              </NavLink>
+
+              {/* Content DNA nav button */}
+              <NavLink
+                to="/rec-content"
+                className={({ isActive }) =>
+                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span>DNA</span>
               </NavLink>
 
               {/* About / Intro page link */}
@@ -321,7 +340,15 @@ export default function Navbar() {
                   aria-haspopup="true"
                   onClick={() => setDropOpen((v) => !v)}
                 >
-                  {initials}
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={user?.username || 'User'}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    initials
+                  )}
                 </button>
 
                 {dropOpen && (
@@ -368,6 +395,15 @@ export default function Navbar() {
                       onClick={() => setDropOpen(false)}
                     >
                       <span>💡</span> Feedback
+                    </Link>
+                    <Link
+                      to="/settings"
+                      className="navbar__dropdown-item"
+                      role="menuitem"
+                      id="nav-settings"
+                      onClick={() => setDropOpen(false)}
+                    >
+                      <span>⚙️</span> Settings
                     </Link>
                     {user?.role === 'admin' && (
                       <Link
@@ -479,6 +515,13 @@ export default function Navbar() {
               >
                 <span>📰</span> News
               </NavLink>
+              <NavLink 
+                to="/rec-content" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span>🧬</span> Content DNA
+              </NavLink>
               
               {isLoggedIn && (
                 <>
@@ -495,6 +538,13 @@ export default function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <span>📊</span> Dashboard
+                  </NavLink>
+                  <NavLink 
+                    to="/settings" 
+                    className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>⚙️</span> Settings
                   </NavLink>
                   {user?.role === 'admin' && (
                     <NavLink 
@@ -534,7 +584,17 @@ export default function Navbar() {
               {isLoggedIn ? (
                 <div className="navbar__mobile-drawer-user-section">
                   <div className="navbar__mobile-drawer-user-info">
-                    <div className="navbar__avatar" style={{ cursor: 'default' }}>{initials}</div>
+                    <div className="navbar__avatar" style={{ cursor: 'default' }}>
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={user?.username || 'User'}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        initials
+                      )}
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                       <span className="navbar__mobile-drawer-username">{user?.username || 'User'}</span>
                       <span className="navbar__mobile-drawer-email">{user?.email}</span>

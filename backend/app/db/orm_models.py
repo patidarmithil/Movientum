@@ -145,6 +145,7 @@ class User(Base):
     username = Column(String(100), nullable=False, unique=True)
     password_hash = Column(Text, nullable=False)        # bcrypt hash, never plaintext
     avatar_url = Column(Text, nullable=True)
+    bio = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
     is_active = Column(Boolean, default=True)

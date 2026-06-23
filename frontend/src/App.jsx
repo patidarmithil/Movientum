@@ -25,6 +25,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Recommendations from './pages/Recommendations'
+import RecommendationsContent from './pages/RecommendationsContent'
 import Search from './pages/Search'
 import PersonPage from './pages/PersonPage'
 import Explore from './pages/Explore'
@@ -40,6 +41,16 @@ import Intro from './pages/Intro'
 import Feedback from './pages/Feedback'
 import AdminDashboard from './pages/AdminDashboard'
 import WatchlistDetail from './pages/WatchlistDetail'
+import Settings from './pages/settings/Settings'
+import SettingsProfile from './pages/settings/SettingsProfile'
+import SettingsPassword from './pages/settings/SettingsPassword'
+import SettingsDeleteAccount from './pages/settings/SettingsDeleteAccount'
+import SettingsFeedback from './pages/settings/SettingsFeedback'
+import SettingsMyIssues from './pages/settings/SettingsMyIssues'
+import SettingsPrivacy from './pages/settings/SettingsPrivacy'
+import SettingsTerms from './pages/settings/SettingsTerms'
+import SettingsHelp from './pages/settings/SettingsHelp'
+import SettingsImport from './pages/settings/SettingsImport'
 import ScrollRestore from './components/ScrollRestore'
 import ErrorBoundary from './components/ErrorBoundary'
 import ErrorPage from './pages/ErrorPage'
@@ -186,14 +197,18 @@ function AppRoutes() {
           {/* Phase 3.5B — Search */}
           <Route path="/search" element={<PageTransition><Search /></PageTransition>} />
 
+          <Route path="/rec-content" element={<PageTransition><RecommendationsContent /></PageTransition>} />
+
           {/* Improvement 1.4 — Person */}
           <Route path="/person/:id" element={<PageTransition><PersonPage /></PageTransition>} />
 
           {/* Improvement 1.6 — Explore */}
           <Route path="/explore" element={<PageTransition><Explore /></PageTransition>} />
 
-          {/* Improvement H — Help */}
-          <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
+          {/* Improvement H — Help (Redirect to settings) */}
+          <Route path="/help" element={<Navigate to="/settings/help" replace />} />
+          
+          {/* Legal Pages (Dual Routed) */}
           <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
           <Route path="/terms-of-service" element={<PageTransition><TermsOfService /></PageTransition>} />
 
@@ -211,14 +226,7 @@ function AppRoutes() {
           <Route path="/country/:iso"   element={<PageTransition><CountryPage /></PageTransition>} />
 
           {/* Feedback & Admin */}
-          <Route
-            path="/feedback"
-            element={
-              <ProtectedRoute>
-                <PageTransition><Feedback /></PageTransition>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/feedback" element={<Navigate to="/settings/feedback" replace />} />
           <Route 
             path="/admin" 
             element={
@@ -227,6 +235,27 @@ function AppRoutes() {
               </ProtectedRoute>
             } 
           />
+
+          {/* Settings */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <PageTransition><Settings /></PageTransition>
+              </ProtectedRoute>
+            }
+          >
+            <Route path="profile" element={<SettingsProfile />} />
+            <Route path="password" element={<SettingsPassword />} />
+            <Route path="delete-account" element={<SettingsDeleteAccount />} />
+            <Route path="feedback" element={<SettingsFeedback />} />
+            <Route path="my-issues" element={<SettingsMyIssues />} />
+            <Route path="privacy" element={<SettingsPrivacy />} />
+            <Route path="terms" element={<SettingsTerms />} />
+            <Route path="help" element={<SettingsHelp />} />
+            <Route path="import" element={<SettingsImport />} />
+          </Route>
+          
           {/* Phase 4 — Watchlist Detail */}
           <Route
             path="/watchlists/:collectionId"

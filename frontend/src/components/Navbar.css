@@ -263,6 +263,8 @@
   align-items: center;
   justify-content: center;
   transition: box-shadow var(--ease-hover), border-color var(--ease-hover);
+  padding: 0;
+  overflow: hidden;
 }
 
 .navbar__avatar:hover {

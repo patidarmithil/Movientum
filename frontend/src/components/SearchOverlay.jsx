@@ -348,6 +348,29 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
                     )
                   })}
                 </StaggerContainer>
+                {searchType !== 'person' && (
+                  <div className="search-empty" style={{ padding: '24px 0 0 0' }}>
+                    <p style={{ margin: 0 }}>
+                      Could not find what you're looking for?{' '}
+                      <button 
+                        onClick={() => setShowRequestModal(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#fff',
+                          textDecoration: 'underline',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          padding: 0,
+                          font: 'inherit',
+                          marginLeft: '4px'
+                        }}
+                      >
+                        Request Content
+                      </button>
+                    </p>
+                  </div>
+                )}
               </div>
             ) : query.trim().length >= 2 && !isLoading && (
               <div className="search-empty">

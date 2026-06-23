@@ -8,6 +8,8 @@
  * break the user experience.
  */
 
+import { storage } from '../utils/storage'
+
 const BASE_URL = import.meta.env.VITE_API_URL || ''
 
 /**
@@ -22,7 +24,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || ''
  */
 export async function sendRecSignal({ tmdbId, mediaType = 'movie', signalType, featureSnapshot = {} }) {
   try {
-    const token = localStorage.getItem('access_token')
+    const token = storage.getItem('mv_access_token')
     if (!token) return  // anonymous users — skip
 
     await fetch(`${BASE_URL}/api/v1/rec-feedback/`, {

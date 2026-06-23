@@ -1,0 +1,166 @@
+/* RecommendationsContent.css */
+
+/* Search section container */
+.reccontent-search-section {
+  max-width: 700px;
+  margin: 0 auto 32px;
+}
+
+/* Type toggle pills (Movie / TV) */
+.reccontent-type-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+/* Active state uses .filter-pill.active */
+
+/* Search input */
+.reccontent-input-wrap {
+  position: relative;
+}
+.reccontent-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.reccontent-input:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Autocomplete dropdown */
+.reccontent-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: rgba(10, 10, 15, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  margin-top: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.reccontent-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.reccontent-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.reccontent-dropdown-thumb {
+  width: 32px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+/* Basket chips row */
+.reccontent-basket {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+  min-height: 0;
+}
+.reccontent-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px 8px 4px 4px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.reccontent-chip-poster {
+  width: 24px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.reccontent-chip-title {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reccontent-chip-type {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 194, 255, 0.15);
+  color: #00C2FF;
+}
+.reccontent-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  line-height: 1;
+}
+.reccontent-chip-remove:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Find Similar CTA */
+.reccontent-find-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #00C2FF, #7B2FBE);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  transition: opacity 0.2s, transform 0.15s;
+  margin-top: 16px;
+}
+.reccontent-find-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+.reccontent-find-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Common Traits bar */
+.reccontent-traits-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 24px;
+}
+.reccontent-traits-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+.reccontent-trait-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(0, 194, 255, 0.1);
+  color: rgba(0, 194, 255, 0.9);
+  border: 1px solid rgba(0, 194, 255, 0.2);
+}

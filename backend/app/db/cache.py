@@ -30,7 +30,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 # ── TTL Constants (seconds) ─────────────────────────────────────
-TTL_MOVIE_DETAIL = 3600        # 1 hour
+TTL_MOVIE_DETAIL = 86400       # 24 hours
 TTL_TRENDING = 18000           # 5 hours
 TTL_MOVIE_LIST = 1800          # 30 min
 TTL_GENRE_LIST = 86400         # 24 hours
@@ -48,7 +48,7 @@ TTL_USER_HISTORY = 300         # 5 min — dashboard watch history
 TTL_USER_PREFS = 900           # 15 min — news personalization prefs
 TTL_NEWS_FEED_USER = 300       # 5 min — per-user scored news feed
 TTL_NEWS_FEED_LATEST = 120     # 2 min — unpersonalized latest feed
-TTL_EXPLORE = 600              # 10 min — explore page filters cache
+TTL_EXPLORE = 14400            # 4 hours — explore page filters cache
 
 
 def _make_redis_client() -> Redis:
