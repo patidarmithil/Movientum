@@ -19,6 +19,7 @@ def verify_token(token: str):
         )
 
 @router.post("/movie-sync", summary="Trigger daily movie sync background task")
+@router.get("/movie-sync", summary="Trigger daily movie sync background task")
 async def trigger_movie_sync(token: str = Query(...)):
     verify_token(token)
     try:
@@ -29,6 +30,7 @@ async def trigger_movie_sync(token: str = Query(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/news-expire", summary="Trigger daily news expiration background task")
+@router.get("/news-expire", summary="Trigger daily news expiration background task")
 async def trigger_news_expire(token: str = Query(...)):
     verify_token(token)
     try:
@@ -39,6 +41,7 @@ async def trigger_news_expire(token: str = Query(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/check-episodes", summary="Trigger daily episode check background task")
+@router.get("/check-episodes", summary="Trigger daily episode check background task")
 async def trigger_check_episodes(token: str = Query(...)):
     verify_token(token)
     try:
@@ -49,6 +52,7 @@ async def trigger_check_episodes(token: str = Query(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/ranker-retrain", summary="Trigger nightly ML ranker retrain background task")
+@router.get("/ranker-retrain", summary="Trigger nightly ML ranker retrain background task")
 async def trigger_ranker_retrain(token: str = Query(...)):
     verify_token(token)
     try:
@@ -59,6 +63,7 @@ async def trigger_ranker_retrain(token: str = Query(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/nightly-job", summary="Trigger all nightly jobs in sequence (chained) or in parallel")
+@router.get("/nightly-job", summary="Trigger all nightly jobs in sequence (chained) or in parallel")
 async def trigger_nightly_job(token: str = Query(...), execute_chained: bool = Query(True, description="Execute tasks sequentially in a Celery chain")):
     verify_token(token)
     try:
@@ -93,3 +98,4 @@ async def trigger_nightly_job(token: str = Query(...), execute_chained: bool = Q
     except Exception as e:
         logger.error(f"Failed to trigger nightly job: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
