@@ -21,7 +21,7 @@ class RatingCategory(str, enum.Enum):
 # ── Requests ────────────────────────────────────────────────────
 
 class RatingCreateRequest(BaseModel):
-    movie_id: int = Field(..., gt=0)
+    movie_id: int = Field(...)
     category: RatingCategory
 
 

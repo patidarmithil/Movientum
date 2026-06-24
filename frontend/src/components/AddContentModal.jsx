@@ -143,7 +143,9 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
 
   // Add item to collection
   const handleAdd = useCallback(async (item) => {
-    const movieId = Number(item.id)
+    const isTv = item.media_type === 'tv' || item.type === 'tv'
+    const absId = Math.abs(Number(item.id))
+    const movieId = isTv ? -absId : absId
 
     // Optimistic
     setAddedIds((prev) => new Set([...prev, movieId]))
@@ -248,15 +250,20 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
             <>
               <p className="acm-results-label">SEARCH RESULTS</p>
               <div className="acm-results-scroll">
-                {results.map((item) => (
-                  <ResultCard
-                    key={item.id}
-                    item={item}
-                    isAdded={addedIds.has(Number(item.id))}
-                    isLoading={loadingIds.has(Number(item.id))}
-                    onAdd={handleAdd}
-                  />
-                ))}
+                {results.map((item) => {
+                  const isTv = item.media_type === 'tv' || item.type === 'tv'
+                  const absId = Math.abs(Number(item.id))
+                  const movieId = isTv ? -absId : absId
+                  return (
+                    <ResultCard
+                      key={item.id}
+                      item={item}
+                      isAdded={addedIds.has(movieId)}
+                      isLoading={loadingIds.has(movieId)}
+                      onAdd={handleAdd}
+                    />
+                  )
+                })}
               </div>
             </>
           )}

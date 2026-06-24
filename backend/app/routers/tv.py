@@ -65,6 +65,7 @@ async def persist_tv_full(db: AsyncSession, raw_tmdb: dict):
     Idempotent — uses INSERT ... ON CONFLICT DO UPDATE.
     """
     tv_id = raw_tmdb["id"]
+    db_id = -tv_id  # Store TV shows with negative IDs to avoid collisions
     title = raw_tmdb.get("name") or raw_tmdb.get("original_name") or ""
     overview = raw_tmdb.get("overview") or ""
 
@@ -72,7 +73,7 @@ async def persist_tv_full(db: AsyncSession, raw_tmdb: dict):
     search_vector = func.to_tsvector("english", f"{title} {overview}")
 
     stmt = pg_insert(Movie).values(
-        id=tv_id,
+        id=db_id,
         title=title,
         original_title=raw_tmdb.get("original_name") or title,
         overview=overview,
@@ -103,7 +104,7 @@ async def persist_tv_full(db: AsyncSession, raw_tmdb: dict):
             .on_conflict_do_nothing()
         )
         await db.execute(
-            pg_insert(MovieGenre).values(movie_id=tv_id, genre_id=genre_raw["id"])
+            pg_insert(MovieGenre).values(movie_id=db_id, genre_id=genre_raw["id"])
             .on_conflict_do_nothing()
         )
     await db.commit()
@@ -131,6 +132,7 @@ async def get_tv_detail(
     """
     Full TV show details fetched from TMDB and cached based on popularity.
     """
+    tv_id = abs(tv_id)
     cache_key = key_tv_detail(tv_id)
     cached = await get_cached(cache_key)
     if cached and cached.get("title") and cached.get("poster_path"):
@@ -261,6 +263,7 @@ async def get_tv_detail(
 
 @router.get("/{tv_id}/videos", summary="TV show trailers and teasers")
 async def get_tv_videos(tv_id: int):
+    tv_id = abs(tv_id)
     cache_key = f"tmdb:videos:tv:{tv_id}"
     cached = await get_cached(cache_key)
     if cached is not None:
@@ -291,6 +294,7 @@ async def get_tv_videos(tv_id: int):
 
 @router.get("/{tv_id}/season/{season_number}/videos", summary="TV season trailers and teasers")
 async def get_tv_season_videos(tv_id: int, season_number: int):
+    tv_id = abs(tv_id)
     cache_key = f"tmdb:videos:tv:{tv_id}:season:{season_number}"
     cached = await get_cached(cache_key)
     if cached is not None:
@@ -325,6 +329,7 @@ async def get_tv_credits(tv_id: int):
     Returns { cast: [...], crew: [...] }
     Each member: id, name, character/job, profile_path, profile_url, order/department
     """
+    tv_id = abs(tv_id)
     cache_key = key_tv_credits(tv_id)
     cached = await get_cached(cache_key)
     if cached and (cached.get("cast") or cached.get("crew")):

@@ -23,7 +23,7 @@ class CollectionUpdate(BaseModel):
 
 
 class AddItemRequest(BaseModel):
-    movie_id: int = Field(..., gt=0)
+    movie_id: int = Field(...)
 
 
 # ── Response models ──────────────────────────────────────────────

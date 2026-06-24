@@ -215,9 +215,9 @@ async def add_item(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "watchlist")
@@ -243,9 +243,9 @@ async def remove_item(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "unwatchlist")

@@ -37,15 +37,15 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
     # Try fetching details from TMDB
     from app.services.tmdb_service import tmdb_service as tmdb
     from datetime import date
+    
+    media_type = "tv" if title_id < 0 else "movie"
+    tmdb_id = abs(title_id)
 
-    # Try movie detail
-    raw = await tmdb.fetch_movie_detail(title_id)
-    media_type = "movie"
-
-    # If movie not found, try TV detail
-    if not raw:
-        raw = await tmdb.fetch_tv_detail(title_id)
-        media_type = "tv"
+    # Fetch detail based on inferred media_type
+    if media_type == "tv":
+        raw = await tmdb.fetch_tv_detail(tmdb_id)
+    else:
+        raw = await tmdb.fetch_movie_detail(tmdb_id)
 
     if not raw:
         raise HTTPException(
@@ -67,7 +67,7 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
     search_vector = func.to_tsvector('english', f"{title_val} {overview_val}")
 
     stub = Movie(
-        id=raw["id"],
+        id=title_id,
         title=title_val,
         original_title=raw.get("original_title") or raw.get("original_name") or title_val,
         overview=overview_val,
@@ -138,9 +138,9 @@ async def mark_watched(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "watched")
@@ -210,9 +210,9 @@ async def remove_from_watch_history(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "unwatched")
@@ -277,9 +277,9 @@ async def add_to_watchlist(
             from app.services.tmdb_service import ingest_item_to_catalog
             from app.services.feedback_service import apply_feedback
 
-            catalog_item = await get_catalog_row(db, movie_id, media_type)
+            catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
             if not catalog_item:
-                catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+                catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
 
             if catalog_item:
                 await apply_feedback(db, user_id, catalog_item, "watchlist")
@@ -323,9 +323,9 @@ async def remove_from_watchlist(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, movie_id, media_type)
+        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
+            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "unwatchlist")
@@ -384,16 +384,20 @@ async def get_watch_status(
         Watchlist.user_id == user_id,
         Watchlist.movie_id == movie_id,
     )
-    rating_stmt = select(Rating.category).where(
+    rating_stmt = select(Rating.id, Rating.category).where(
         Rating.user_id == user_id,
         Rating.movie_id == movie_id,
     )
     watched_count = (await db.execute(watched_stmt)).scalar_one()
     watchlisted_count = (await db.execute(watchlisted_stmt)).scalar_one()
-    user_rating = (await db.execute(rating_stmt)).scalar_one_or_none()
+    
+    rating_row = (await db.execute(rating_stmt)).first()
+    user_rating = rating_row.category if rating_row else None
+    rating_id = rating_row.id if rating_row else None
 
     return {
         "watched": watched_count > 0,
         "watchlisted": watchlisted_count > 0,
         "user_rating": user_rating,
+        "rating_id": rating_id,
     }

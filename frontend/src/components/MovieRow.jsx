@@ -7,7 +7,7 @@ import StaggerContainer, { StaggerItem } from './StaggerContainer'
 import ScrollReveal from './ScrollReveal'
 import './MovieRow.css'
 
-function ViewportRevealCard({ movie, index, showFeedback }) {
+function ViewportRevealCard({ movie, index, showFeedback, renderCard }) {
   const [isVisible, setIsVisible] = useState(false)
   const cardRef = useRef(null)
 
@@ -37,7 +37,7 @@ function ViewportRevealCard({ movie, index, showFeedback }) {
       className={`viewport-reveal-card ${isVisible ? 'visible' : ''}`}
       style={{ transitionDelay: delay }}
     >
-      <MovieCard movie={movie} showFeedback={showFeedback} />
+      {renderCard ? renderCard(movie) : <MovieCard movie={movie} showFeedback={showFeedback} />}
     </div>
   )
 }
@@ -50,6 +50,7 @@ export default function MovieRow({
   premiumScroll = false,
   showFeedback = false,
   emptyText = 'No titles found.',
+  renderCard,
   children
 }) {
   const scrollRowRef = useRef(null)
@@ -341,6 +342,7 @@ export default function MovieRow({
                   index={index}
                   movie={m}
                   showFeedback={showFeedback}
+                  renderCard={renderCard}
                 />
               ))
             )}
@@ -354,7 +356,7 @@ export default function MovieRow({
             ) : (
               movies.map((m, index) => (
                 <StaggerItem key={`${m.id}-${m.media_type || 'movie'}`} index={index}>
-                  <MovieCard movie={m} showFeedback={showFeedback} />
+                  {renderCard ? renderCard(m) : <MovieCard movie={m} showFeedback={showFeedback} />}
                 </StaggerItem>
               ))
             )}
