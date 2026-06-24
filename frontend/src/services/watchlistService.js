@@ -14,10 +14,10 @@ export const watchlistService = {
     api.post('/api/v1/watchlists', { name, description }).then((r) => r.data),
 
   /**
-   * GET /api/v1/watchlists/movie/{movieId}/status — which collections contain this movie
+   * GET /api/v1/watchlists/movie/{mediaType}/{movieId}/status — which collections contain this movie
    */
-  getMovieStatus: (movieId) =>
-    api.get(`/api/v1/watchlists/movie/${movieId}/status`).then((r) => r.data),
+  getMovieStatus: (movieId, mediaType = "movie") =>
+    api.get(`/api/v1/watchlists/movie/${mediaType}/${movieId}/status`).then((r) => r.data),
 
   /**
    * GET /api/v1/watchlists/{collectionId} — collection detail + items
@@ -40,12 +40,12 @@ export const watchlistService = {
   /**
    * POST /api/v1/watchlists/{collectionId}/items — add movie
    */
-  addToCollection: (collectionId, movieId) =>
-    api.post(`/api/v1/watchlists/${collectionId}/items`, { movie_id: movieId }).then((r) => r.data),
+  addToCollection: (collectionId, movieId, mediaType = "movie") =>
+    api.post(`/api/v1/watchlists/${collectionId}/items`, { movie_id: movieId, media_type: mediaType }).then((r) => r.data),
 
   /**
-   * DELETE /api/v1/watchlists/{collectionId}/items/{movieId} — remove movie
+   * DELETE /api/v1/watchlists/{collectionId}/items/{mediaType}/{movieId} — remove movie
    */
-  removeFromCollection: (collectionId, movieId) =>
-    api.delete(`/api/v1/watchlists/${collectionId}/items/${movieId}`).then((r) => r.data),
+  removeFromCollection: (collectionId, movieId, mediaType = "movie") =>
+    api.delete(`/api/v1/watchlists/${collectionId}/items/${mediaType}/${movieId}`).then((r) => r.data),
 }

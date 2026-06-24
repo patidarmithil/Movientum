@@ -162,6 +162,7 @@ async def get_collection_detail(
         items_out.append({
             "id": item.id,
             "movie_id": item.movie_id,
+            "media_type": getattr(item, "media_type", "movie"),
             "added_at": item.added_at,
             "movie": movie_data,
         })
@@ -179,7 +180,7 @@ async def get_collection_detail(
 
 
 async def add_item(
-    db: AsyncSession, user_id: UUID, collection_id: UUID, movie_id: int
+    db: AsyncSession, user_id: UUID, collection_id: UUID, movie_id: int, media_type: str = "movie"
 ) -> WatchlistItem:
     """Add movie to collection. Idempotent — returns existing item if duplicate."""
     await get_collection_or_404(db, user_id, collection_id)  # ownership check
@@ -188,6 +189,7 @@ async def add_item(
     stmt = select(WatchlistItem).where(
         WatchlistItem.collection_id == collection_id,
         WatchlistItem.movie_id == movie_id,
+        WatchlistItem.media_type == media_type,
     )
     result = await db.execute(stmt)
     existing = result.scalar_one_or_none()
@@ -196,9 +198,9 @@ async def add_item(
 
     # Ensure movie/TV stub exists in the database before inserting WatchlistItem
     from app.services.watch_service import _ensure_stub_exists
-    await _ensure_stub_exists(db, movie_id)
+    await _ensure_stub_exists(db, movie_id, media_type)
 
-    item = WatchlistItem(collection_id=collection_id, movie_id=movie_id)
+    item = WatchlistItem(collection_id=collection_id, movie_id=movie_id, media_type=media_type)
     db.add(item)
     await db.commit()
     await db.refresh(item)
@@ -215,9 +217,9 @@ async def add_item(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "watchlist")
@@ -228,7 +230,7 @@ async def add_item(
 
 
 async def remove_item(
-    db: AsyncSession, user_id: UUID, collection_id: UUID, movie_id: int
+    db: AsyncSession, user_id: UUID, collection_id: UUID, movie_id: int, media_type: str = "movie"
 ) -> None:
     await get_collection_or_404(db, user_id, collection_id)  # ownership check
 
@@ -243,9 +245,9 @@ async def remove_item(
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "unwatchlist")
@@ -255,6 +257,7 @@ async def remove_item(
     stmt = delete(WatchlistItem).where(
         WatchlistItem.collection_id == collection_id,
         WatchlistItem.movie_id == movie_id,
+        WatchlistItem.media_type == media_type,
     )
     await db.execute(stmt)
     await db.commit()
@@ -262,7 +265,7 @@ async def remove_item(
 
 
 async def get_movie_collection_status(
-    db: AsyncSession, user_id: UUID, movie_id: int
+    db: AsyncSession, user_id: UUID, movie_id: int, media_type: str = "movie"
 ) -> list[dict]:
     """Return all user collections with has_movie flag for a given movie_id."""
     # All user collections
@@ -280,6 +283,7 @@ async def get_movie_collection_status(
         .join(WatchlistCollection, WatchlistCollection.id == WatchlistItem.collection_id)
         .where(WatchlistCollection.user_id == user_id)
         .where(WatchlistItem.movie_id == movie_id)
+        .where(WatchlistItem.media_type == media_type)
     )
     item_result = await db.execute(item_stmt)
     has_movie_ids = {row[0] for row in item_result.all()}

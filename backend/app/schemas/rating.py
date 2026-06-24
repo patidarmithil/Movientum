@@ -22,6 +22,7 @@ class RatingCategory(str, enum.Enum):
 
 class RatingCreateRequest(BaseModel):
     movie_id: int = Field(...)
+    media_type: str = Field(default="movie")
     category: RatingCategory
 
 
@@ -37,6 +38,7 @@ from app.schemas.movie import MovieListItem
 class RatingResponse(BaseModel):
     id: UUID
     movie_id: int
+    media_type: str = "movie"
     user_id: UUID
     category: RatingCategory
     created_at: datetime

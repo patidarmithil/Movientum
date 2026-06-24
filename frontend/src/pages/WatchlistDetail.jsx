@@ -76,7 +76,7 @@ function MovieCardWithRemove({ movie, onRemove, removing, index }) {
       <MovieCard movie={movie} />
       <button
         className="wld-remove-btn"
-        onClick={(e) => { e.stopPropagation(); onRemove(movie.id) }}
+        onClick={(e) => { e.stopPropagation(); onRemove(movie) }}
         aria-label={`Remove ${movie.title} from collection`}
         title="Remove from collection"
       >
@@ -328,13 +328,17 @@ export default function WatchlistDetail() {
   }
 
   // ── Remove item ─────────────────────────────────────────────────────────────
-  const handleRemove = useCallback((movieId) => {
+  const handleRemove = useCallback((movie) => {
+    const movieId = movie.id ?? movie._item_id
+    const mediaType = movie.media_type || 'movie'
+    const removeKey = `${movieId}-${mediaType}`
+
     // Optimistic remove
-    setRemovingIds((prev) => new Set([...prev, movieId]))
+    setRemovingIds((prev) => new Set([...prev, removeKey]))
     setItems((prev) => prev.filter((m) => m.id !== movieId))
     setCollection((prev) => prev ? { ...prev, item_count: Math.max(0, (prev.item_count || 1) - 1) } : prev)
 
-    watchlistService.removeFromCollection(collectionId, movieId)
+    watchlistService.removeFromCollection(collectionId, movieId, mediaType)
       .catch(() => {
         // Revert — refetch
         fetchCollection()
@@ -342,7 +346,7 @@ export default function WatchlistDetail() {
       .finally(() => {
         setRemovingIds((prev) => {
           const next = new Set(prev)
-          next.delete(movieId)
+          next.delete(removeKey)
           return next
         })
       })
@@ -567,15 +571,18 @@ export default function WatchlistDetail() {
           {/* Real cards grid */}
           {(!loading || !showSkeleton) && filteredItems.length > 0 && (
             <div className="movie-grid wld-grid">
-              {filteredItems.map((movie, idx) => (
-                <MovieCardWithRemove
-                  key={movie.id ?? movie._item_id}
-                  movie={movie}
-                  onRemove={handleRemove}
-                  removing={removingIds.has(movie.id)}
-                  index={idx}
-                />
-              ))}
+              {filteredItems.map((movie, idx) => {
+                const movieKey = `${movie.id ?? movie._item_id}-${movie.media_type || 'movie'}`
+                return (
+                  <MovieCardWithRemove
+                    key={movieKey}
+                    movie={movie}
+                    onRemove={handleRemove}
+                    removing={removingIds.has(movieKey)}
+                    index={idx}
+                  />
+                )
+              })}
             </div>
           )}
 
@@ -610,7 +617,7 @@ export default function WatchlistDetail() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onItemAdded={fetchCollection}
-        existingMovieIds={items.map((m) => m.id).filter(Boolean)}
+        existingItems={items.map((m) => ({ id: m.id, media_type: m.media_type }))}
       />
 
     </main>

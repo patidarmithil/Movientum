@@ -26,9 +26,9 @@ from app.schemas.rating import RatingCategory
 logger = logging.getLogger(__name__)
 
 
-async def _ensure_stub_exists(db: AsyncSession, title_id: int):
+async def _ensure_stub_exists(db: AsyncSession, title_id: int, media_type: str):
     # Check if exists in the Movie catalog
-    stmt = select(Movie).where(Movie.id == title_id)
+    stmt = select(Movie).where(Movie.id == title_id, Movie.type == media_type)
     res = await db.execute(stmt)
     if res.scalar_one_or_none():
         return
@@ -37,8 +37,7 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
     from app.services.tmdb_service import tmdb_service as tmdb
     from datetime import date
     
-    media_type = "tv" if title_id < 0 else "movie"
-    tmdb_id = abs(title_id)
+    tmdb_id = title_id
 
     # Fetch detail based on inferred media_type
     if media_type == "tv":
@@ -88,24 +87,22 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
         await db.rollback()
         logger.error(f"Failed to insert stub for {media_type} {title_id}: {e}")
 
-async def _update_moctale_rating(db: AsyncSession, movie_id: int, old_cat: Optional[str], new_cat: Optional[str]):
+async def _update_moctale_rating(db: AsyncSession, movie_id: int, media_type: str, old_cat: Optional[str], new_cat: Optional[str]):
     if old_cat == new_cat:
         return
 
-    # Check if the content is a TV show or Movie
-    stmt_item = select(Movie).where(Movie.id == movie_id)
-    item = (await db.execute(stmt_item)).scalar_one_or_none()
-    is_tv = item and item.type == 'tv'
+    is_tv = media_type == 'tv'
 
     RatingModel = TvRating if is_tv else MovieRating
 
-    stmt = select(RatingModel).where(RatingModel.id == movie_id)
+    stmt = select(RatingModel).where(RatingModel.id == movie_id, RatingModel.media_type == media_type)
     moctale = (await db.execute(stmt)).scalar_one_or_none()
 
     if not moctale:
         if new_cat:
             moctale = RatingModel(
                 id=movie_id,
+                media_type=media_type,
                 slug=f"{'tv' if is_tv else 'movie'}-{movie_id}",
                 total_votes=1,
                 perfection=100.0 if new_cat == "perfection" else 0.0,
@@ -150,6 +147,7 @@ async def upsert_rating(
     db: AsyncSession,
     user_id: UUID,
     movie_id: int,
+    media_type: str,
     category: RatingCategory,
 ) -> Rating:
     """
@@ -157,9 +155,9 @@ async def upsert_rating(
     Uses PostgreSQL ON CONFLICT DO UPDATE (true upsert).
     Returns the updated/created Rating ORM object.
     """
-    await _ensure_stub_exists(db, movie_id)
+    await _ensure_stub_exists(db, movie_id, media_type)
     
-    stmt_check = select(Rating.category).where(Rating.user_id == user_id, Rating.movie_id == movie_id)
+    stmt_check = select(Rating.category).where(Rating.user_id == user_id, Rating.movie_id == movie_id, Rating.media_type == media_type)
     old_cat = (await db.execute(stmt_check)).scalar_one_or_none()
 
     stmt = (
@@ -167,6 +165,7 @@ async def upsert_rating(
         .values(
             user_id=user_id,
             movie_id=movie_id,
+            media_type=media_type,
             category=category.value,
         )
         .on_conflict_do_update(
@@ -181,16 +180,16 @@ async def upsert_rating(
     result = await db.execute(stmt)
     row = result.scalar_one()
 
-    await _update_moctale_rating(db, movie_id, old_cat, category.value)
+    await _update_moctale_rating(db, movie_id, media_type, old_cat, category.value)
 
     # Automatically mark as watched if not already
     from app.db.orm_models import WatchHistory
-    stmt_check_watched = select(WatchHistory.id).where(WatchHistory.user_id == user_id, WatchHistory.movie_id == movie_id)
+    stmt_check_watched = select(WatchHistory.id).where(WatchHistory.user_id == user_id, WatchHistory.movie_id == movie_id, WatchHistory.media_type == media_type)
     is_watched = (await db.execute(stmt_check_watched)).scalar_one_or_none()
     
     if not is_watched:
         from app.services import watch_service
-        await watch_service.mark_watched(db, user_id=user_id, movie_id=movie_id)
+        await watch_service.mark_watched(db, user_id=user_id, movie_id=movie_id, media_type=media_type)
 
     logger.info(
         "RATING_SUBMITTED",
@@ -199,14 +198,14 @@ async def upsert_rating(
     return row
 
 
-async def get_distribution(db: AsyncSession, movie_id: int) -> dict:
+async def get_distribution(db: AsyncSession, movie_id: int, media_type: str) -> dict:
     """
     Count ratings per category for given movie_id.
     Returns dict: {skip, timepass, go_for_it, perfection, total}.
     """
     stmt = (
         select(Rating.category, func.count(Rating.id).label("cnt"))
-        .where(Rating.movie_id == movie_id)
+        .where(Rating.movie_id == movie_id, Rating.media_type == media_type)
         .group_by(Rating.category)
     )
     result = await db.execute(stmt)
@@ -276,9 +275,10 @@ async def delete_rating(
             detail="Cannot delete another user's rating",
         )
     movie_id = rating.movie_id
+    media_type = rating.media_type
     category = rating.category
     await db.delete(rating)
-    await _update_moctale_rating(db, movie_id, category, None)
+    await _update_moctale_rating(db, movie_id, media_type, category, None)
     
     logger.info(
         "RATING_DELETED",

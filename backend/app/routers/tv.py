@@ -65,7 +65,7 @@ async def persist_tv_full(db: AsyncSession, raw_tmdb: dict):
     Idempotent — uses INSERT ... ON CONFLICT DO UPDATE.
     """
     tv_id = raw_tmdb["id"]
-    db_id = -tv_id  # Store TV shows with negative IDs to avoid collisions
+    db_id = tv_id
     title = raw_tmdb.get("name") or raw_tmdb.get("original_name") or ""
     overview = raw_tmdb.get("overview") or ""
 

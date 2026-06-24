@@ -51,16 +51,24 @@ class Settings(BaseSettings):
     @classmethod
     def default_celery_broker(cls, v, info):
         # Default to redis_url if celery_broker_url not explicitly set
-        if not v:
-            return info.data.get("redis_url", "")
-        return v
+        url = v if v else info.data.get("redis_url", "")
+        if url and url.startswith("rediss://") and "ssl_cert_reqs" not in url:
+            if "?" in url:
+                url = f"{url}&ssl_cert_reqs=none"
+            else:
+                url = f"{url}?ssl_cert_reqs=none"
+        return url
 
     @field_validator("celery_result_backend", mode="before")
     @classmethod
     def default_celery_backend(cls, v, info):
-        if not v:
-            return info.data.get("redis_url", "")
-        return v
+        url = v if v else info.data.get("redis_url", "")
+        if url and url.startswith("rediss://") and "ssl_cert_reqs" not in url:
+            if "?" in url:
+                url = f"{url}&ssl_cert_reqs=none"
+            else:
+                url = f"{url}?ssl_cert_reqs=none"
+        return url
 
     @property
     def allowed_origins_list(self) -> list[str]:

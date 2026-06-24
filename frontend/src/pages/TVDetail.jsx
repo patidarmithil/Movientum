@@ -193,7 +193,7 @@ export default function TVDetail() {
   // ── Fetch watch status (auth-gated) ─────────────────
   const fetchStatus = useCallback(() => {
     if (!isLoggedIn) return
-    watchService.getStatus(-tvId)
+    watchService.getStatus(tvId, 'tv')
       .then((status) => {
         setWatchStatus(status)
         const curr = pageCache.get(cacheKey) || {}
@@ -217,14 +217,14 @@ export default function TVDetail() {
       })
       .catch(() => {})
 
-    watchlistService.getMovieStatus(-tvId)
+    watchlistService.getMovieStatus(tvId, 'tv')
       .then(res => {
         const inAny = res.collections?.some(c => c.has_movie)
         setIsInAnyCollection(inAny)
       })
       .catch(() => {})
 
-    planToWatchService.checkStatus(-tvId)
+    planToWatchService.checkStatus(tvId, 'tv')
       .then(({ inList, listId }) => {
         setPlanToWatch(inList)
         setPlanToWatchId(listId)
@@ -240,11 +240,11 @@ export default function TVDetail() {
     setPlanBusy(true)
     try {
       if (planToWatch) {
-        await planToWatchService.remove(planToWatchId, -tvId)
+        await planToWatchService.remove(planToWatchId, tvId, 'tv')
         setPlanToWatch(false)
         setWatchMsg('Removed from Plan to Watch')
       } else {
-        const { listId } = await planToWatchService.add(-tvId)
+        const { listId } = await planToWatchService.add(tvId, 'tv')
         setPlanToWatchId(listId)
         setPlanToWatch(true)
         setWatchMsg('Added to Plan to Watch!')
@@ -273,17 +273,17 @@ export default function TVDetail() {
         if (watchStatus.rating_id) {
           await ratingService.deleteRating(watchStatus.rating_id)
         }
-        await watchService.removeFromHistory(-tvId)
+        await watchService.removeFromHistory(tvId, 'tv')
         setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
         setWatchMsg('Removed from watch history')
         setTimeout(() => setWatchMsg(null), 2500)
       } else {
-        await watchService.markWatched(-tvId)
+        await watchService.markWatched(tvId, 'tv')
         setWatchStatus((s) => ({ ...s, watched: true }))
         setWatchMsg('Added to watch history!')
         if (planToWatch) {
           try {
-            await planToWatchService.remove(planToWatchId, -tvId)
+            await planToWatchService.remove(planToWatchId, tvId, 'tv')
             setPlanToWatch(false)
             setPlanToWatchId(null)
           } catch (err) {
@@ -317,7 +317,7 @@ export default function TVDetail() {
 
         if (within7) {
           const listId = await planToWatchService.getOrCreate()
-          await watchlistService.addToCollection(listId, -tvId)
+          await watchlistService.addToCollection(listId, tvId, 'tv')
           await watchingTrackerService.track(tvId, nextDate)
           setPlanToWatch(true)
         } else {
@@ -641,10 +641,11 @@ export default function TVDetail() {
             {showRatingMeter ? (
               <div className="animate-rating-reveal">
                 <RatingMeter
-                  movieId={-tvId}
+                  movieId={tvId}
+                  mediaType="tv"
                   onRated={fetchStatus}
                   onRatingRemoved={async () => {
-                    await watchService.removeFromHistory(-tvId)
+                    await watchService.removeFromHistory(tvId, 'tv')
                     setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
                   }}
                   userRating={watchStatus.user_rating}
@@ -671,7 +672,7 @@ export default function TVDetail() {
         </div>
 
         {/* ── Cast & Crew (reuse CastCrew with tvId flag) ── */}
-        <CastCrew movieId={-tvId} isTV />
+        <CastCrew movieId={tvId} isTV />
 
         {/* ── Production Companies & Countries ── */}
         <ProductionTags
@@ -721,7 +722,8 @@ export default function TVDetail() {
 
       {/* Save to Collection Modal */}
       <SaveToCollectionModal
-        movieId={-tvId}
+        movieId={tvId}
+        mediaType="tv"
         isOpen={showCollectionModal}
         onClose={() => {
           setShowCollectionModal(false)
