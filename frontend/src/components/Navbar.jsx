@@ -134,7 +134,7 @@ export default function Navbar() {
         {/* ── Right-Aligned Navigation Icons Group ── */}
         <div className="navbar__right-group">
           
-          {(location.pathname === '/intro' || (location.pathname === '/' && !isLoggedIn)) ? (
+          {(location.pathname === '/intro' || location.pathname === '/about' || (location.pathname === '/' && !isLoggedIn)) ? (
             <>
               <a href="https://github.com/patidarmithil/Movientum" target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm" style={{ marginRight: '8px' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
@@ -193,7 +193,7 @@ export default function Navbar() {
 
               {/* About / Intro page link */}
               <NavLink
-                to="/intro"
+                to="/about"
                 className={({ isActive }) =>
                   `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
                 }
@@ -269,7 +269,7 @@ export default function Navbar() {
           {/* Auth Actions (Avatar dropdown or Login / SignUp buttons) */}
           <div className="navbar__actions">
             {/* Search Trigger Button */}
-            {!(location.pathname === '/intro' || (location.pathname === '/' && !isLoggedIn)) && (
+            {!(location.pathname === '/intro' || location.pathname === '/about' || (location.pathname === '/' && !isLoggedIn)) && (
               <button
                 className="navbar__notif-btn"
                 onClick={() => setSearchOpen(!searchOpen)}
@@ -443,14 +443,14 @@ export default function Navbar() {
                 <Link to="/login" className="btn btn--ghost btn--sm" id="nav-login">
                   Login
                 </Link>
-                <Link to="/register" className="btn btn--primary btn--sm" id="nav-register">
+                <Link to="/signup" className="btn btn--primary btn--sm" id="nav-register">
                   Sign Up
                 </Link>
               </div>
             )}
 
           {/* Search Trigger */}
-          {!(location.pathname === '/intro' || (location.pathname === '/' && !isLoggedIn)) && (
+          {!(location.pathname === '/intro' || location.pathname === '/about' || (location.pathname === '/' && !isLoggedIn)) && (
             <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
           )}
 
@@ -513,7 +513,7 @@ export default function Navbar() {
                 <span>🧭</span> Explore
               </NavLink>
               <NavLink 
-                to="/intro" 
+                to="/about" 
                 className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -624,7 +624,7 @@ export default function Navbar() {
                   <Link to="/login" className="btn btn--secondary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
                     Login
                   </Link>
-                  <Link to="/register" className="btn btn--primary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
+                  <Link to="/signup" className="btn btn--primary btn--md w-full" style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setMobileMenuOpen(false)}>
                     Sign Up
                   </Link>
                 </div>

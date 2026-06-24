@@ -61,6 +61,10 @@ export default function Register() {
   const [apiError, setApiError]   = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    document.title = "Sign Up - Movientum"
+  }, [])
+
   // Already logged in → home
   useEffect(() => {
     if (!isLoading && isLoggedIn) navigate('/', { replace: true })
@@ -133,7 +137,7 @@ export default function Register() {
           </Link>
         </div>
 
-        <h1 className="auth-card__title">Create account</h1>
+        <h1 className="auth-card__title">Sign Up to Movientum</h1>
         <p className="auth-card__subtitle">Join Movientum and discover your next favourite film</p>
 
         {/* Error banner */}

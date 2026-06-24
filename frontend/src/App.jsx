@@ -167,6 +167,7 @@ function AppRoutes() {
           <Route path="/movies/:id" element={<PageTransition><MovieDetail /></PageTransition>} />
           <Route path="/login"      element={<PageTransition><Login /></PageTransition>} />
           <Route path="/register"   element={<PageTransition><Register /></PageTransition>} />
+          <Route path="/signup"     element={<PageTransition><Register /></PageTransition>} />
 
           {/* Protected */}
           <Route
@@ -212,10 +213,12 @@ function AppRoutes() {
           
           {/* Legal Pages (Dual Routed) */}
           <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+          <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
           <Route path="/terms-of-service" element={<PageTransition><TermsOfService /></PageTransition>} />
 
           {/* Landing / Intro page (standalone route) */}
           <Route path="/intro" element={<PageTransition><Intro /></PageTransition>} />
+          <Route path="/about" element={<PageTransition><Intro /></PageTransition>} />
 
           {/* Improvement 1.7 — TV Shows */}
           <Route path="/tv/:id" element={<PageTransition><TVDetail /></PageTransition>} />

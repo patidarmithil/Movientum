@@ -2,6 +2,10 @@ import React from 'react'
 import './Help.css'
 
 export default function Privacy() {
+  React.useEffect(() => {
+    document.title = "Privacy Policy - Movientum";
+  }, []);
+
   return (
     <div className="help-page" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
       <header className="help-header" style={{ textAlign: 'left', marginBottom: '2rem' }}>

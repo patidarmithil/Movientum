@@ -30,6 +30,10 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
 
+  useEffect(() => {
+    document.title = "Login - Movientum"
+  }, [])
+
   // Already logged in → redirect
   useEffect(() => {
     if (!isLoading && isLoggedIn) navigate(redirect, { replace: true })
@@ -95,7 +99,7 @@ export default function Login() {
           </Link>
         </div>
 
-        <h1 className="auth-card__title">{isForgotPassword ? 'Reset Password' : 'Welcome back'}</h1>
+        <h1 className="auth-card__title">{isForgotPassword ? 'Reset Password' : 'Login to Movientum'}</h1>
         <p className="auth-card__subtitle">{isForgotPassword ? 'Enter your email and a new password' : 'Sign in to your account to continue'}</p>
 
         {/* Error/Success banner */}
@@ -195,7 +199,7 @@ export default function Login() {
 
         <p className="auth-card__footer">
           Don't have an account?
-          <Link to="/register" id="go-to-register">Sign up</Link>
+          <Link to="/signup" id="go-to-register">Sign up</Link>
         </p>
       </div>
     </main>
