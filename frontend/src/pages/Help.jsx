@@ -71,7 +71,7 @@ export default function Help() {
           <span>✓ Your Analytics</span>
           <span>✓ Personalized News</span>
         </div>
-        <a href="/register" className="help-btn">Create Free Account →</a>
+        <a href="/signup" className="help-btn">Create Free Account →</a>
       </section>
 
       <section className="help-section">

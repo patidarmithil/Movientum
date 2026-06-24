@@ -28,6 +28,7 @@ export default function Intro() {
   const [showContactModal, setShowContactModal] = useState(false)
 
   useEffect(() => {
+    document.title = "About - Movientum"
     try {
       localStorage.setItem('hasSeenIntro', 'true')
     } catch (err) {
@@ -98,7 +99,7 @@ export default function Intro() {
             Discover, rate, review, and build your watchlists — powered by AI-backed recommendations.
           </p>
           <div className="intro-hero__ctas intro-reveal" style={{ animationDelay: '200ms' }}>
-            <Link to="/register" className="btn btn--primary btn--lg">Get Started &rarr;</Link>
+            <Link to="/signup" className="btn btn--primary btn--lg">Get Started &rarr;</Link>
             <Link to="/explore" className="btn btn--secondary btn--lg">Explore Movies</Link>
           </div>
         </div>
@@ -294,7 +295,7 @@ export default function Intro() {
           <h2>Ready to Watch Smarter?</h2>
           <p>Join Movientum now and get full features access.</p>
           <div className="intro-cta__buttons">
-            <Link to="/register" className="btn btn--primary btn--lg glow-pulse">Create Free Account</Link>
+            <Link to="/signup" className="btn btn--primary btn--lg glow-pulse">Create Free Account</Link>
             <Link to="/home" className="btn btn--ghost btn--lg">Browse Without Account &rarr;</Link>
           </div>
         </div>
@@ -339,7 +340,7 @@ export default function Intro() {
           <div className="intro-footer__links">
             <span>&copy; {new Date().getFullYear()} Movientum</span>
             <Link to="/privacy">Privacy Policy</Link>
-            <Link to="/terms-of-service">Terms of Service</Link>
+            <Link to="/terms">Terms of Service</Link>
           </div>
           <div className="intro-footer__note">BETA · Built with ❤️ · Always improving</div>
         </div>

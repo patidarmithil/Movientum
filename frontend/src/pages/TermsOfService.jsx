@@ -2,6 +2,10 @@ import React from 'react'
 import './Help.css'
 
 export default function TermsOfService() {
+  React.useEffect(() => {
+    document.title = "Terms of Service - Movientum";
+  }, []);
+
   return (
     <div className="help-page" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
       <header className="help-header" style={{ textAlign: 'left', marginBottom: '2rem' }}>
