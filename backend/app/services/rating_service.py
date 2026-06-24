@@ -36,15 +36,15 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
     # Try fetching details from TMDB
     from app.services.tmdb_service import tmdb_service as tmdb
     from datetime import date
+    
+    media_type = "tv" if title_id < 0 else "movie"
+    tmdb_id = abs(title_id)
 
-    # Try movie detail
-    raw = await tmdb.fetch_movie_detail(title_id)
-    media_type = "movie"
-
-    # If movie not found, try TV detail
-    if not raw:
-        raw = await tmdb.fetch_tv_detail(title_id)
-        media_type = "tv"
+    # Fetch detail based on inferred media_type
+    if media_type == "tv":
+        raw = await tmdb.fetch_tv_detail(tmdb_id)
+    else:
+        raw = await tmdb.fetch_movie_detail(tmdb_id)
 
     if not raw:
         raise HTTPException(
@@ -66,7 +66,7 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
     search_vector = func.to_tsvector('english', f"{title_val} {overview_val}")
 
     stub = Movie(
-        id=raw["id"],
+        id=title_id,
         title=title_val,
         original_title=raw.get("original_title") or raw.get("original_name") or title_val,
         overview=overview_val,
@@ -275,8 +275,10 @@ async def delete_rating(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete another user's rating",
         )
+    movie_id = rating.movie_id
+    category = rating.category
     await db.delete(rating)
-    await _update_moctale_rating(db, movie_id, rating.category, None)
+    await _update_moctale_rating(db, movie_id, category, None)
     
     logger.info(
         "RATING_DELETED",

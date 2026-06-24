@@ -174,10 +174,11 @@ export default function RecommendationsContent() {
   // 1. Manage Basket
   const addToBasket = (item) => {
     if (basket.length >= MAX_BASKET_ITEMS) return
-    if (basket.some(b => b.tmdb_id === item.id && b.media_type === (item.media_type || 'movie'))) return
+    const itemId = Math.abs(Number(item.id))
+    if (basket.some(b => b.tmdb_id === itemId && b.media_type === (item.media_type || 'movie'))) return
 
     const newItem = {
-      tmdb_id: item.id,
+      tmdb_id: itemId,
       media_type: item.media_type || 'movie',
       title: item.title || item.name,
       poster_path: item.poster_path
@@ -464,7 +465,7 @@ export default function RecommendationsContent() {
                         <ResultCard
                           key={item.id}
                           item={item}
-                          isAdded={basket.some(b => b.tmdb_id === item.id && b.media_type === (item.media_type || 'movie'))}
+                          isAdded={basket.some(b => b.tmdb_id === Math.abs(Number(item.id)) && b.media_type === (item.media_type || 'movie'))}
                           isLoading={false}
                           onAdd={addToBasket}
                         />

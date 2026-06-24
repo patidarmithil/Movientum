@@ -1,4 +1,2 @@
 User-agent: *
-Allow: /
-
-Sitemap: https://movientum.vercel.app/sitemap.xml
+Disallow: /

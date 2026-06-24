@@ -44,12 +44,14 @@ const GRADIENTS = {
 export default function RatingMeter({
   movieId,
   onRated,
+  onRatingRemoved,
   perfection,
   go_for_it,
   timepass,
   skip,
   total_votes,
-  userRating
+  userRating,
+  userRatingId
 }) {
   const { isLoggedIn } = useAuth()
   
@@ -229,10 +231,28 @@ export default function RatingMeter({
     if (!isLoggedIn || submitting) return
     setSubmitting(true)
     try {
-      await ratingService.submitRating(movieId, category)
-      setMyRating(category)
-      await fetchDist()
-      onRated?.()
+      if (myRating === category) {
+        if (userRatingId) {
+          await ratingService.deleteRating(userRatingId)
+        }
+        setMyRating(null)
+        await fetchDist()
+        onRatingRemoved?.()
+      } else if (myRating !== null) {
+        if (userRatingId) {
+          await ratingService.updateRating(userRatingId, category)
+        } else {
+          await ratingService.submitRating(movieId, category)
+        }
+        setMyRating(category)
+        await fetchDist()
+        onRated?.()
+      } else {
+        await ratingService.submitRating(movieId, category)
+        setMyRating(category)
+        await fetchDist()
+        onRated?.()
+      }
     } catch {
       setError('Rating failed — are you logged in?')
     } finally {

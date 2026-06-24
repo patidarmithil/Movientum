@@ -423,6 +423,21 @@ class WatchingTracker(Base):
     def __repr__(self):
         return f"<WatchingTracker user={self.user_id} tv={self.tv_id}>"
 
+class TempTracker(Base):
+    __tablename__ = "temp_tracker"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    tv_id = Column(Integer, nullable=False)
+    added_at = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        Index("idx_temp_tracker_user_tv", "user_id", "tv_id", unique=True),
+    )
+
+    def __repr__(self):
+        return f"<TempTracker user={self.user_id} tv={self.tv_id}>"
+
 
 class Notification(Base):
     __tablename__ = "notifications"

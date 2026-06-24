@@ -11,7 +11,7 @@
  *  - No similar-movies row (TV similarity out of scope for 1.7)
  */
 import { useParams, Link, useLocation } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../utils/api'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
@@ -27,6 +27,8 @@ import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import ProductionTags from '../components/ProductionTags'
 import { pageCache } from '../utils/pageCache'
 import { watchlistService } from '../services/watchlistService'
+import { planToWatchService } from '../services/planToWatchService'
+import { tempTrackerService } from '../services/tempTrackerService'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
 import './MovieDetail.css'   // reuse same layout CSS
@@ -67,11 +69,18 @@ export default function TVDetail() {
 
   const [showRatingMeter, setShowRatingMeter] = useState(false)
   const [posterLoaded, setPosterLoaded] = useState(false)
+  const posterRef = useRef(null)
 
   useEffect(() => {
     setPosterLoaded(false)
     setShowRatingMeter(false)
   }, [tvId])
+
+  useEffect(() => {
+    if (posterRef.current && posterRef.current.complete) {
+      setPosterLoaded(true)
+    }
+  }, [show])
 
   useEffect(() => {
     if (!loading) {
@@ -95,6 +104,10 @@ export default function TVDetail() {
 
   const [showCollectionModal, setShowCollectionModal] = useState(false)
   const [isInAnyCollection, setIsInAnyCollection] = useState(false)
+
+  const [planToWatch, setPlanToWatch] = useState(false)
+  const [planToWatchId, setPlanToWatchId] = useState(null)
+  const [planBusy, setPlanBusy] = useState(false)
 
   const [videosData,    setVideosData]    = useState(cachedData?.videosData || null)
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
@@ -180,7 +193,7 @@ export default function TVDetail() {
   // ── Fetch watch status (auth-gated) ─────────────────
   const fetchStatus = useCallback(() => {
     if (!isLoggedIn) return
-    watchService.getStatus(tvId)
+    watchService.getStatus(-tvId)
       .then((status) => {
         setWatchStatus(status)
         const curr = pageCache.get(cacheKey) || {}
@@ -189,35 +202,127 @@ export default function TVDetail() {
       .catch(() => {})
     watchingTrackerService.getStatus(tvId)
       .then(res => {
-        setTrackingStatus(res.tracked)
-        const curr = pageCache.get(cacheKey) || {}
-        pageCache.set(cacheKey, { ...curr, trackingStatus: res.tracked })
+        if (res.tracked) {
+          setTrackingStatus(true)
+          const curr = pageCache.get(cacheKey) || {}
+          pageCache.set(cacheKey, { ...curr, trackingStatus: true })
+        } else {
+          tempTrackerService.getAll().then((data) => {
+            const inTemp = data.temp_trackers?.some(t => t.tv_id === tvId)
+            setTrackingStatus(inTemp)
+            const curr = pageCache.get(cacheKey) || {}
+            pageCache.set(cacheKey, { ...curr, trackingStatus: inTemp })
+          }).catch(() => {})
+        }
       })
       .catch(() => {})
 
-    watchlistService.getMovieStatus(tvId)
+    watchlistService.getMovieStatus(-tvId)
       .then(res => {
         const inAny = res.collections?.some(c => c.has_movie)
         setIsInAnyCollection(inAny)
+      })
+      .catch(() => {})
+
+    planToWatchService.checkStatus(-tvId)
+      .then(({ inList, listId }) => {
+        setPlanToWatch(inList)
+        setPlanToWatchId(listId)
       })
       .catch(() => {})
   }, [tvId, isLoggedIn])
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
-  // ── Toggle tracking ───────────────────────────────────
+  // ── Toggle Plan to Watch ─────────────────────────────
+  const handlePlanToWatch = async () => {
+    if (!isLoggedIn || planBusy) return
+    setPlanBusy(true)
+    try {
+      if (planToWatch) {
+        await planToWatchService.remove(planToWatchId, -tvId)
+        setPlanToWatch(false)
+        setWatchMsg('Removed from Plan to Watch')
+      } else {
+        const { listId } = await planToWatchService.add(-tvId)
+        setPlanToWatchId(listId)
+        setPlanToWatch(true)
+        setWatchMsg('Added to Plan to Watch!')
+      }
+      setTimeout(() => setWatchMsg(null), 2500)
+    } catch {
+      setWatchMsg('Failed — try again')
+      setTimeout(() => setWatchMsg(null), 2500)
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  const isReturningSeries = show?.status === "Returning Series"
+  const daysBetween = (dateStr) => {
+    const diff = new Date(dateStr) - new Date()
+    return diff / (1000 * 60 * 60 * 24)
+  }
+
+  // ── Toggle watched (Ended series) ───────────────────────────────────
+  const handleMarkWatched = async () => {
+    if (!isLoggedIn || watchBusy) return
+    setWatchBusy(true)
+    try {
+      if (watchStatus.watched) {
+        if (watchStatus.rating_id) {
+          await ratingService.deleteRating(watchStatus.rating_id)
+        }
+        await watchService.removeFromHistory(-tvId)
+        setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
+        setWatchMsg('Removed from watch history')
+        setTimeout(() => setWatchMsg(null), 2500)
+      } else {
+        await watchService.markWatched(-tvId)
+        setWatchStatus((s) => ({ ...s, watched: true }))
+        setWatchMsg('Added to watch history!')
+        if (planToWatch) {
+          try {
+            await planToWatchService.remove(planToWatchId, -tvId)
+            setPlanToWatch(false)
+            setPlanToWatchId(null)
+          } catch (err) {
+            console.error("Failed to automatically remove from Plan to Watch:", err)
+          }
+        }
+        setTimeout(() => setWatchMsg(null), 2500)
+      }
+    } catch {
+      setWatchMsg('Failed — try again')
+      setTimeout(() => setWatchMsg(null), 2500)
+    } finally {
+      setWatchBusy(false)
+    }
+  }
+
+  // ── Toggle tracking (Returning Series) ───────────────────────────────────
   const handleTrackingToggle = async () => {
     if (!isLoggedIn || trackingBusy) return
     setTrackingBusy(true)
     try {
       if (trackingStatus) {
         await watchingTrackerService.untrack(tvId)
+        await tempTrackerService.remove(tvId).catch(() => {})
         setTrackingStatus(false)
         setWatchMsg('Stopped tracking')
         setTimeout(() => setWatchMsg(null), 2500)
       } else {
-        const nextDate = show.next_episode_to_air ? show.next_episode_to_air.air_date : null
-        await watchingTrackerService.track(tvId, nextDate)
+        const nextDate = show?.next_episode_to_air?.air_date
+        const within7 = nextDate && daysBetween(nextDate) <= 7
+
+        if (within7) {
+          const listId = await planToWatchService.getOrCreate()
+          await watchlistService.addToCollection(listId, -tvId)
+          await watchingTrackerService.track(tvId, nextDate)
+          setPlanToWatch(true)
+        } else {
+          await tempTrackerService.add(tvId)
+        }
         setTrackingStatus(true)
         setWatchMsg('Tracking new episodes!')
         setTimeout(() => setWatchMsg(null), 2500)
@@ -299,6 +404,7 @@ export default function TVDetail() {
           <div className="movie-detail__poster-col">
             {posterUrl && !hasImgError ? (
               <img
+                ref={posterRef}
                 src={posterUrl}
                 alt={`${show.title} poster`}
                 className={`movie-detail__poster clickable-poster poster-progressive ${posterLoaded ? 'poster-progressive--loaded' : ''}`}
@@ -417,15 +523,38 @@ export default function TVDetail() {
             <div className="movie-detail__actions animate-fade-lift">
               {isLoggedIn ? (
                 <>
-                  <button
-                    id={`btn-watched-${tvId}`}
-                    className={`btn btn--md ${trackingStatus ? 'btn--success' : 'btn--secondary'}`}
-                    onClick={handleTrackingToggle}
-                    disabled={trackingBusy}
-                    aria-label={trackingStatus ? 'Untrack show' : 'Track show'}
-                  >
-                    {trackingStatus ? '✓ Watching' : '▶ Watching'}
-                  </button>
+                  {isReturningSeries ? (
+                    <button
+                      id={`btn-watched-${tvId}`}
+                      className={`btn btn--md ${trackingStatus ? 'btn--success' : 'btn--secondary'}`}
+                      onClick={handleTrackingToggle}
+                      disabled={trackingBusy}
+                      aria-label={trackingStatus ? 'Untrack show' : 'Track show'}
+                    >
+                      {trackingStatus ? '✓ Watching' : '▶ Watching'}
+                    </button>
+                  ) : (
+                    <button
+                      id={`btn-watched-${tvId}`}
+                      className={`btn btn--md ${watchStatus.watched ? 'btn--success' : 'btn--secondary'}`}
+                      onClick={handleMarkWatched}
+                      disabled={watchBusy}
+                      aria-label={watchStatus.watched ? 'Remove from watched' : 'Mark as watched'}
+                    >
+                      {watchStatus.watched ? '✓ Watched' : '○ Mark Watched'}
+                    </button>
+                  )}
+                  {(!watchStatus.watched && !watchStatus.user_rating) && (
+                    <button
+                      id={`btn-plantowatch-${tvId}`}
+                      className={`btn btn--md ${planToWatch ? 'btn--accent' : 'btn--secondary'}`}
+                      onClick={handlePlanToWatch}
+                      disabled={planBusy}
+                      aria-label={planToWatch ? 'Remove from Plan to Watch' : 'Plan to Watch'}
+                    >
+                      {planToWatch ? '✓ Plan to Watch' : '+ Plan to Watch'}
+                    </button>
+                  )}
                   <button
                     id={`btn-watchlist-${tvId}`}
                     className={`btn btn--md ${isInAnyCollection ? 'btn--accent' : 'btn--secondary'}`}
@@ -448,7 +577,7 @@ export default function TVDetail() {
                     + Watchlist
                   </Link>
                   <Link to="/login" className="btn btn--secondary btn--md">
-                    ▶ Watching
+                    {isReturningSeries ? '▶ Watching' : '○ Mark Watched'}
                   </Link>
                   <button
                     className="btn btn--secondary btn--md btn--trailer"
@@ -512,9 +641,14 @@ export default function TVDetail() {
             {showRatingMeter ? (
               <div className="animate-rating-reveal">
                 <RatingMeter
-                  movieId={tvId}
+                  movieId={-tvId}
                   onRated={fetchStatus}
+                  onRatingRemoved={async () => {
+                    await watchService.removeFromHistory(-tvId)
+                    setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
+                  }}
                   userRating={watchStatus.user_rating}
+                  userRatingId={watchStatus.rating_id}
                   {...(show.moctale_rating || {})}
                 />
               </div>
@@ -537,7 +671,7 @@ export default function TVDetail() {
         </div>
 
         {/* ── Cast & Crew (reuse CastCrew with tvId flag) ── */}
-        <CastCrew movieId={tvId} isTV />
+        <CastCrew movieId={-tvId} isTV />
 
         {/* ── Production Companies & Countries ── */}
         <ProductionTags
@@ -587,7 +721,7 @@ export default function TVDetail() {
 
       {/* Save to Collection Modal */}
       <SaveToCollectionModal
-        movieId={tvId}
+        movieId={-tvId}
         isOpen={showCollectionModal}
         onClose={() => {
           setShowCollectionModal(false)

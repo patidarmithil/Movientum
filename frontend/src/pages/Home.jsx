@@ -26,8 +26,10 @@ import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import ScrollReveal from '../components/ScrollReveal'
 import MovieRow from '../components/MovieRow'
+import WatchlistSection from '../components/WatchlistSection'
 import { AnimatePresence } from 'motion/react'
 import ColdStartLoader from '../components/ColdStartLoader'
+import ErrorPage from './ErrorPage'
 import './Home.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -61,6 +63,7 @@ function formatDate(dateStr) {
 export default function Home() {
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
+  const [hasError, setHasError] = useState(false)
 
   // Main columns states
   const [trending, setTrending] = useSessionState('home_trending', [])
@@ -107,7 +110,10 @@ export default function Home() {
       .then((data) => {
         setTrending(data?.movies || data || [])
       })
-      .catch(() => setTrending([]))
+      .catch(() => {
+        setTrending([])
+        setHasError(true)
+      })
       .finally(() => setTrendLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -123,7 +129,10 @@ export default function Home() {
       .then((data) => {
         setTopRated(data?.movies || data || [])
       })
-      .catch(() => setTopRated([]))
+      .catch(() => {
+        setTopRated([])
+        setHasError(true)
+      })
       .finally(() => setTopRatedLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -140,7 +149,10 @@ export default function Home() {
       .then((data) => {
         setGenreMovies(data?.movies || data || [])
       })
-      .catch(() => setGenreMovies([]))
+      .catch(() => {
+        setGenreMovies([])
+        setHasError(true)
+      })
       .finally(() => setGenreLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGenreId])
@@ -177,7 +189,10 @@ export default function Home() {
       .then((data) => {
         setUpcoming(data?.movies || data || [])
       })
-      .catch(() => setUpcoming([]))
+      .catch(() => {
+        setUpcoming([])
+        setHasError(true)
+      })
       .finally(() => setUpcomingLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingFilter])
@@ -188,6 +203,16 @@ export default function Home() {
   }
 
   const selectedGenreName = GENRE_OPTIONS.find(g => g.id === selectedGenreId)?.name || 'Genre'
+
+  if (hasError) {
+    return (
+      <ErrorPage
+        type="500"
+        message="sorry our server are down we are working on it please try again sometime later or try to refresh once"
+        onRetry={() => window.location.reload()}
+      />
+    )
+  }
 
   return (
     <>
@@ -222,13 +247,16 @@ export default function Home() {
 
           {/* For You (Personalized Recommendations) — Logged-in only */}
           {isLoggedIn && (
-            <MovieRow 
-              title="For You 🎯" 
-              movies={forYou} 
-              loading={forYouLoad} 
-              seeAllHref="/recommendations"
-              premiumScroll={true}
-            />
+            <>
+              <MovieRow 
+                title="For You 🎯" 
+                movies={forYou} 
+                loading={forYouLoad} 
+                seeAllHref="/recommendations"
+                premiumScroll={true}
+              />
+              <WatchlistSection />
+            </>
           )}
 
           {/* Top Rated */}

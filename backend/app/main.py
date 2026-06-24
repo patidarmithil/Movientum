@@ -56,6 +56,19 @@ async def cleanup_old_movies():
     except Exception as e:
         logger.warning(f"Failed to run movie table cleanup: {e}")
 
+async def process_temp_tracker():
+    """Daily check of temp_tracker items to move them to Plan to Watch if within 7 days."""
+    import asyncio
+    from app.db.database import AsyncSessionLocal
+    from sqlalchemy import text
+    try:
+        await asyncio.sleep(5)
+        # This is a placeholder for the actual logic that fetches TMDB dates.
+        # In a real environment, you'd fetch from TMDB and then move the records.
+        # For this prototype, we'll just log that the job is running.
+        logger.info("Running daily process_temp_tracker check...")
+    except Exception as e:
+        logger.warning(f"Failed to run process_temp_tracker: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -95,6 +108,16 @@ async def lifespan(app: FastAPI):
                     CONSTRAINT idx_user_tv UNIQUE (user_id, tv_id)
                 );
                 """))
+
+                await db.execute(text("""
+                CREATE TABLE IF NOT EXISTS temp_tracker (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+                    tv_id INT NOT NULL,
+                    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    CONSTRAINT idx_temp_tracker_user_tv UNIQUE (user_id, tv_id)
+                );
+                """))
                 
                 await db.execute(text("""
                 CREATE TABLE IF NOT EXISTS notifications (
@@ -111,12 +134,13 @@ async def lifespan(app: FastAPI):
                 await db.execute(text("CREATE INDEX IF NOT EXISTS idx_notif_user_seen ON notifications (user_id, seen);"))
                 
                 await db.commit()
-            logger.info("✓ Checked/Created tables rating_needed, watching_tracker, and notifications")
+            logger.info("✓ Checked/Created tables rating_needed, watching_tracker, temp_tracker, and notifications")
         except Exception as e:
             logger.error(f"Failed to check/create dynamic tables: {e}")
 
         import asyncio
         asyncio.create_task(cleanup_old_movies())
+        asyncio.create_task(process_temp_tracker())
 
         # ── Phase 3: Warm up in-memory content graph ─────────────
         try:
@@ -313,9 +337,10 @@ app.include_router(news.router, prefix="/api/v1/news", tags=["News"])
 from app.routers import requests
 app.include_router(requests.router, prefix="/api/v1/requests", tags=["Requests"])
 
-# ── Watching Tracker Router ─────────────────────────────────
-from app.routers import watching_tracker
+# ── Phase 7: Watching Tracker & Temp Tracker Router ───────
+from app.routers import watching_tracker, temp_tracker
 app.include_router(watching_tracker.router, prefix="/api/v1/watching-tracker", tags=["Watching Tracker"])
+app.include_router(temp_tracker.router, prefix="/api/v1/temp-tracker", tags=["Temp Tracker"])
 
 # ── Notifications Router ────────────────────────────────────
 from app.routers import notifications
@@ -336,3 +361,8 @@ app.include_router(
 # ── Multi-Watchlist Router ──────────────────────────────────────────────────
 from app.routers import watchlist
 app.include_router(watchlist.router, prefix="/api/v1/watchlists", tags=["Watchlists"])
+
+# ── Internal/Cron Router ────────────────────────────────────────────────────
+from app.routers import internal
+app.include_router(internal.router, prefix="/internal", tags=["Internal Jobs"])
+

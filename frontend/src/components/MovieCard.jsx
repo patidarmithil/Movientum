@@ -26,8 +26,10 @@ const MOCTALE_SYMBOLS = {
  *   variant?:     'standard' | 'compact' | 'featured'  (default: 'standard')
  *   showFeedback?: boolean — render thumbs-up/down overlay and track scroll-ignore
  *                  Pass true only from authenticated recommendation carousels.
+ *   dateBadge?:   string — optional text to show in a badge at the top right (e.g. "17 Jul")
+ *   hideRating?:  boolean — optional flag to hide the rating
  */
-const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false }) {
+const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false, dateBadge = null, hideRating = false }) {
   const navigate = useNavigate()
   const [hasError, setHasError]               = useState(false)
   const [imageLoaded, setImageLoaded]         = useState(false)
@@ -35,6 +37,13 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
   const [isVisible, setIsVisible]             = useState(false)
   const cardRef                               = useRef(null)
   const impressionLogged                      = useRef(false)
+  const imageRef                              = useRef(null)
+
+  useEffect(() => {
+    if (imageRef.current && imageRef.current.complete) {
+      setImageLoaded(true)
+    }
+  }, [movie])
 
   const isTV     = movie.media_type === 'tv'
   const tmdbId   = movie.tmdb_id ?? movie.id
@@ -44,16 +53,13 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     ? `${TMDB_IMAGE_BASE}/w342${movie.poster_path}`
     : null
 
-  // Route TV shows to /tv/:id, movies to /movies/:id
   const handleClick = useCallback(() => {
-    // Fire click signal before navigating (non-blocking)
     if (showFeedback && tmdbId) {
       recFeedback.click(tmdbId, mediaType)
     }
     navigate(isTV ? `/tv/${movie.id}` : `/movies/${movie.id}`)
   }, [isTV, movie.id, showFeedback, tmdbId, mediaType, navigate])
 
-  // ── Card Reveal entry animation via IntersectionObserver ─────────
   useEffect(() => {
     const parentEl = cardRef.current
     if (!parentEl) return
@@ -75,7 +81,6 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     return () => observer.disconnect()
   }, [])
 
-  // ── Implicit ignore detection via IntersectionObserver ──────────
   useEffect(() => {
     const parentEl = cardRef.current
     if (!showFeedback || !parentEl || !tmdbId) return
@@ -88,7 +93,6 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          // Card visible for 2 s without interaction → log "ignore"
           timeout.id = setTimeout(() => {
             if (!impressionLogged.current) {
               impressionLogged.current = true
@@ -109,11 +113,10 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     }
   }, [tmdbId, mediaType, showFeedback])
 
-  // ── Explicit feedback ─────────────────────────────────────────
   const sendExplicit = useCallback((signalType, e) => {
-    e.stopPropagation()   // don't trigger card click / navigation
-    e.preventDefault()    // don't trigger link navigation
-    impressionLogged.current = true  // cancel pending ignore timer
+    e.stopPropagation()
+    e.preventDefault()
+    impressionLogged.current = true
 
     if (signalType === 'thumbs_up') {
       recFeedback.thumbsUp(tmdbId, mediaType)
@@ -125,7 +128,6 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
   }, [tmdbId, mediaType])
 
   const handleLinkClick = useCallback(() => {
-    // Fire click signal (non-blocking)
     if (showFeedback && tmdbId) {
       recFeedback.click(tmdbId, mediaType)
     }
@@ -161,6 +163,7 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
           <div className="movie-card__poster-wrap">
             {posterUrl && !hasError ? (
               <img
+                ref={imageRef}
                 src={posterUrl}
                 alt={`${movie.title} poster`}
                 className={`movie-card__poster poster-progressive ${imageLoaded ? 'poster-progressive--loaded' : ''}`}
@@ -174,32 +177,49 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
               </div>
             )}
 
-            {/* Premium bottom glow overlay */}
             {ratingCategory && (
               <div className={`movie-card__glow movie-card__glow--${ratingCategory}`} />
             )}
 
-            {/* Rating badge — Our logo badge preferred over TMDB */}
-            {hasMoctale ? (
-              <div
-                className="movie-card__rating movie-card__rating--moctale"
-                style={{ color: MOCTALE_COLORS[mr.dominant_category], flexDirection: 'row', gap: '4px' }}
-              >
-                <span>{MOCTALE_SYMBOLS[mr.dominant_category]}</span>
-                <span className="movie-card__rating-pct">{Math.round(mr.dominant_pct)}%</span>
+            {dateBadge && (
+              <div className="movie-card__date-badge" style={{
+                position: 'absolute',
+                top: '8px',
+                left: '8px',
+                backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                color: '#fff',
+                padding: '4px 8px',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                backdropFilter: 'blur(4px)',
+                zIndex: 2,
+                border: '1px solid rgba(255,255,255,0.1)'
+              }}>
+                {dateBadge}
               </div>
-            ) : movie.vote_average > 0 ? (
-              <div className="movie-card__rating" style={{ color: ratingColor }}>
-                {movie.vote_average.toFixed(1)}
-              </div>
-            ) : null}
+            )}
 
-            {/* TV badge */}
+            {!hideRating && (
+              hasMoctale ? (
+                <div
+                  className="movie-card__rating movie-card__rating--moctale"
+                  style={{ color: MOCTALE_COLORS[mr.dominant_category], flexDirection: 'row', gap: '4px' }}
+                >
+                  <span>{MOCTALE_SYMBOLS[mr.dominant_category]}</span>
+                  <span className="movie-card__rating-pct">{Math.round(mr.dominant_pct)}%</span>
+                </div>
+              ) : movie.vote_average > 0 ? (
+                <div className="movie-card__rating" style={{ color: ratingColor }}>
+                  {movie.vote_average.toFixed(1)}
+                </div>
+              ) : null
+            )}
+
             {isTV && (
               <div className="movie-card__tv-badge">TV</div>
             )}
 
-            {/* Phase 6: Thumbs feedback overlay — authenticated recs carousels only */}
             {showFeedback && (
               <div className="movie-card__feedback-overlay" aria-label="Rate this recommendation">
                 <button

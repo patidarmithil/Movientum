@@ -523,6 +523,15 @@ async def ingest_item_to_catalog(
     release_date = details.get("release_date") or details.get("first_air_date") or ""
     year = int(release_date[:4]) if release_date and len(release_date) >= 4 else None
 
+    # 4.5 Check if exists to avoid unique constraint violation on surrogate primary key 'id'
+    from sqlalchemy import select
+    stmt = select(ContentCatalog.id).where(
+        ContentCatalog.tmdb_id == tmdb_id,
+        ContentCatalog.media_type == media_type
+    )
+    res = await db.execute(stmt)
+    existing_id = res.scalar_one_or_none()
+
     row = ContentCatalog(
         tmdb_id           = tmdb_id,
         media_type        = media_type,
@@ -542,6 +551,8 @@ async def ingest_item_to_catalog(
         poster_path       = details.get("poster_path"),
         is_seed           = False,
     )
+    if existing_id is not None:
+        row.id = existing_id
 
     # 5. Upsert (INSERT on conflict UPDATE to refresh stale data)
     await db.merge(row)

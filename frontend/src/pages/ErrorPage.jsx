@@ -2,15 +2,15 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './ErrorPage.css';
 
-const ErrorPage = ({ type = '404', onRetry }) => {
+const ErrorPage = ({ type = '404', message: customMessage, onRetry }) => {
   const navigate = useNavigate();
 
   const isNotFound = type === '404';
 
   const title = isNotFound ? "404 — Page Not Found" : "500 — Something went wrong";
-  const message = isNotFound 
+  const message = customMessage || (isNotFound 
     ? "The page you are looking for doesn't exist or has been moved." 
-    : "We experienced an unexpected error while loading this page. Please try again or return home.";
+    : "We experienced an unexpected error while loading this page. Please try again or return home.");
 
   const handleRetry = () => {
     if (onRetry) {

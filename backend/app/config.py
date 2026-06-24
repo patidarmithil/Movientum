@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     debug: bool = False
+    cron_secret_token: str = "super-secret-cron-token-change-me"
 
     # ── CORS ───────────────────────────────────────────────────────
     allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://movientum.vercel.app"

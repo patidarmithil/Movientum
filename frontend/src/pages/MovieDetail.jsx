@@ -9,7 +9,7 @@
  *  - Similar Movies row → GET /api/v1/recommendations/similar/{id}
  */
 import { useParams, Link, useLocation } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { movieService } from '../services/movieService'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
@@ -24,6 +24,7 @@ import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import { pageCache } from '../utils/pageCache'
 import { watchlistService } from '../services/watchlistService'
+import { planToWatchService } from '../services/planToWatchService'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
 import './MovieDetail.css'
@@ -82,16 +83,27 @@ export default function MovieDetail() {
   const [showCollectionModal, setShowCollectionModal] = useState(false)
   const [isInAnyCollection, setIsInAnyCollection] = useState(false)
   
+  const [planToWatch, setPlanToWatch] = useState(false)
+  const [planToWatchId, setPlanToWatchId] = useState(null)
+  const [planBusy, setPlanBusy] = useState(false)
+  
   const [videosData,    setVideosData]    = useState(cachedData?.videosData || null)
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false)
 
   const [showRatingMeter, setShowRatingMeter] = useState(false)
   const [posterLoaded, setPosterLoaded] = useState(false)
+  const posterRef = useRef(null)
 
   useEffect(() => {
     setPosterLoaded(false)
     setShowRatingMeter(false)
   }, [movieId])
+
+  useEffect(() => {
+    if (posterRef.current && posterRef.current.complete) {
+      setPosterLoaded(true)
+    }
+  }, [movie])
 
   useEffect(() => {
     if (!loading) {
@@ -197,9 +209,40 @@ export default function MovieDetail() {
         setIsInAnyCollection(inAny)
       })
       .catch(() => {})
+
+    planToWatchService.checkStatus(movieId)
+      .then(({ inList, listId }) => {
+        setPlanToWatch(inList)
+        setPlanToWatchId(listId)
+      })
+      .catch(() => {})
   }, [movieId, isLoggedIn])
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
+
+  // ── Toggle Plan to Watch ─────────────────────────────
+  const handlePlanToWatch = async () => {
+    if (!isLoggedIn || planBusy) return
+    setPlanBusy(true)
+    try {
+      if (planToWatch) {
+        await planToWatchService.remove(planToWatchId, movieId)
+        setPlanToWatch(false)
+        setWatchMsg('Removed from Plan to Watch')
+      } else {
+        const { listId } = await planToWatchService.add(movieId)
+        setPlanToWatchId(listId)
+        setPlanToWatch(true)
+        setWatchMsg('Added to Plan to Watch!')
+      }
+      setTimeout(() => setWatchMsg(null), 2500)
+    } catch {
+      setWatchMsg('Failed — try again')
+      setTimeout(() => setWatchMsg(null), 2500)
+    } finally {
+      setPlanBusy(false)
+    }
+  }
 
   // ── Toggle watched ───────────────────────────────────
   const handleWatchedToggle = async () => {
@@ -207,14 +250,26 @@ export default function MovieDetail() {
     setWatchBusy(true)
     try {
       if (watchStatus.watched) {
+        if (watchStatus.rating_id) {
+          await ratingService.deleteRating(watchStatus.rating_id)
+        }
         await watchService.removeFromHistory(movieId)
-        setWatchStatus((s) => ({ ...s, watched: false }))
+        setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
         setWatchMsg('Removed from watch history')
         setTimeout(() => setWatchMsg(null), 2500)
       } else {
         await watchService.markWatched(movieId)
         setWatchStatus((s) => ({ ...s, watched: true }))
         setWatchMsg('Added to watch history!')
+        if (planToWatch) {
+          try {
+            await planToWatchService.remove(planToWatchId, movieId)
+            setPlanToWatch(false)
+            setPlanToWatchId(null)
+          } catch (err) {
+            console.error("Failed to automatically remove from Plan to Watch:", err)
+          }
+        }
         setTimeout(() => setWatchMsg(null), 2500)
       }
     } catch {
@@ -294,6 +349,7 @@ export default function MovieDetail() {
           <div className="movie-detail__poster-col">
             {posterUrl && !hasImgError ? (
               <img
+                ref={posterRef}
                 src={posterUrl}
                 alt={`${movie.title} poster`}
                 className={`movie-detail__poster clickable-poster poster-progressive ${posterLoaded ? 'poster-progressive--loaded' : ''}`}
@@ -396,6 +452,17 @@ export default function MovieDetail() {
                     >
                       {watchStatus.watched ? '✓ Watched' : '○ Mark Watched'}
                     </button>
+                    {!watchStatus.watched && (
+                      <button
+                        id={`btn-plantowatch-${movieId}`}
+                        className={`btn btn--md ${planToWatch ? 'btn--accent' : 'btn--secondary'}`}
+                        onClick={handlePlanToWatch}
+                        disabled={planBusy}
+                        aria-label={planToWatch ? 'Remove from Plan to Watch' : 'Plan to Watch'}
+                      >
+                        {planToWatch ? '✓ Plan to Watch' : '+ Plan to Watch'}
+                      </button>
+                    )}
                     <button
                       id={`btn-watchlist-${movieId}`}
                       className={`btn btn--md ${isInAnyCollection ? 'btn--accent' : 'btn--secondary'}`}
@@ -481,7 +548,12 @@ export default function MovieDetail() {
                 <RatingMeter
                   movieId={movieId}
                   onRated={fetchStatus}
+                  onRatingRemoved={async () => {
+                    await watchService.removeFromHistory(movieId)
+                    setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
+                  }}
                   userRating={watchStatus.user_rating}
+                  userRatingId={watchStatus.rating_id}
                   {...(movie.moctale_rating || {})}
                 />
               </div>
