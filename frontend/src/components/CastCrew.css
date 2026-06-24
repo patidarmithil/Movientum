@@ -186,4 +186,31 @@
   .castcrew__crew-grid {
     grid-template-columns: 1fr;
   }
+  .castcrew {
+    padding-top: var(--space-4) !important;
+  }
+  .castcrew__heading {
+    font-size: var(--text-base) !important;
+    margin-bottom: var(--space-2) !important;
+  }
+  .castcrew__heading--crew {
+    margin-top: var(--space-4) !important;
+  }
+  .cast-card {
+    flex: 0 0 76px !important;
+  }
+  .cast-avatar__img,
+  .cast-avatar__fallback {
+    width: 64px !important;
+    height: 64px !important;
+  }
+  .crew-card {
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+  .crew-avatar .cast-avatar__img,
+  .crew-avatar .cast-avatar__fallback {
+    width: 40px !important;
+    height: 40px !important;
+  }
 }

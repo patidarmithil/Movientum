@@ -224,16 +224,26 @@ async def logout(
 )
 async def me(
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Return basic profile from JWT payload.
-    No DB round-trip — token payload contains sub/email/role.
+    Return basic profile from JWT payload + DB fetch for fresh dynamic fields.
     """
+    from uuid import UUID
+    user_id = UUID(current_user["sub"])
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
     return {
         "data": MeResponse(
-            id=current_user["sub"],
-            email=current_user["email"],
-            username=current_user.get("username", ""),
-            role=current_user.get("role", "user"),
+            id=str(user.id),
+            email=user.email,
+            username=user.username,
+            role=user.role,
+            avatar_url=user.avatar_url,
+            bio=user.bio,
         )
     }

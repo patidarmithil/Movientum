@@ -290,6 +290,32 @@
   }
 }
 
+@media (max-width: 480px) {
+  .person-page__avatar,
+  .person-page__avatar-skeleton {
+    width: 120px !important;
+    height: 180px !important;
+  }
+  .person-page__avatar--fallback {
+    font-size: 36px !important;
+  }
+  .person-page__name {
+    font-size: 1.5rem !important;
+  }
+  .person-page__hero {
+    gap: var(--space-4) !important;
+    padding-top: var(--space-4) !important;
+    padding-bottom: var(--space-3) !important;
+  }
+  .person-page__bio {
+    padding-bottom: var(--space-4) !important;
+  }
+  .person-page__bio-text {
+    font-size: var(--text-sm) !important;
+    line-height: 1.6 !important;
+  }
+}
+
 @media (max-width: 768px) {
   .person-page__content-wrapper {
     grid-template-columns: 1fr;

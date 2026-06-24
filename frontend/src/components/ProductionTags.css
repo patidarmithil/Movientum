@@ -114,3 +114,23 @@
     font-size: var(--text-xs);
   }
 }
+
+@media (max-width: 480px) {
+  .prod-tags {
+    padding-top: var(--space-4) !important;
+    gap: var(--space-4) !important;
+  }
+  .prod-tags__block {
+    gap: var(--space-2) !important;
+  }
+  .prod-tags__heading {
+    font-size: var(--text-base) !important;
+  }
+  .prod-tags__row {
+    gap: 8px !important;
+  }
+  .prod-tag {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+  }
+}

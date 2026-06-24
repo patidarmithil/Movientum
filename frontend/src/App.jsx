@@ -16,6 +16,7 @@ import PageTransition from './components/PageTransition'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import InstallPrompt from './components/InstallPrompt'
+import InfoBanner from './components/InfoBanner'
 import { Analytics } from '@vercel/analytics/react'
 import ProtectedRoute from './components/ProtectedRoute'
 import Home from './pages/Home'
@@ -147,6 +148,7 @@ function AppRoutes() {
       <ScrollRestore />
       <Navbar />
       <InstallPrompt />
+      <InfoBanner />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public */}

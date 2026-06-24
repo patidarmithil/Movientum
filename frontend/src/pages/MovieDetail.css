@@ -266,6 +266,43 @@
   }
 }
 
+@media (max-width: 480px) {
+  .movie-detail__backdrop-container,
+  .movie-detail__backdrop-overlay {
+    height: 40vh !important;
+  }
+  .movie-detail__top {
+    padding-top: 10vh !important;
+    gap: var(--space-4) !important;
+    padding-bottom: var(--space-4) !important;
+  }
+  .movie-detail__poster,
+  .movie-detail__poster-fallback {
+    width: 120px !important;
+  }
+  .movie-detail__poster-fallback {
+    height: 180px !important;
+  }
+  .movie-detail__title {
+    font-size: 1.5rem !important;
+  }
+  .movie-detail__overview {
+    font-size: var(--text-sm) !important;
+    line-height: 1.5 !important;
+  }
+  .movie-detail__actions {
+    gap: 8px !important;
+  }
+  .movie-detail__actions .btn {
+    padding: 6px 12px !important;
+    font-size: var(--text-xs) !important;
+    border-radius: var(--radius-sm) !important;
+  }
+  .movie-detail__rating-sidebar {
+    margin-top: var(--space-3) !important;
+  }
+}
+
 /* ── Rating Needed Box (Glassmorphic) ── */
 .rating-needed-box {
   margin-top: var(--space-4, 16px);
@@ -527,6 +564,25 @@
   border-color: rgba(255, 255, 255, 0.25) !important;
   color: #fff !important;
   transform: translateY(-1px);
+}
+
+/* Decrease card sizes on mobile so 3 cards fit in horizontal scroll list of similar movies/shows */
+@media (max-width: 480px) {
+  .movie-detail__similar .scroll-row {
+    gap: 8px !important;
+  }
+  .movie-detail__similar .viewport-reveal-card,
+  .movie-detail__similar .stagger-item-wrap,
+  .movie-detail__similar .movie-card--standard,
+  .movie-detail__similar .movie-card-skeleton {
+    width: calc((100vw - 32px - 16px) / 3) !important;
+  }
+  .movie-detail__similar .movie-card--standard .movie-card__poster-wrap,
+  .movie-detail__similar .movie-card-skeleton__poster {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 2 / 3 !important;
+  }
 }
 
 

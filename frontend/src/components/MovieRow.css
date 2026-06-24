@@ -31,6 +31,32 @@
   opacity: 0.8;
 }
 
+.see-all-link--highlighted {
+  display: inline-block;
+  animation: pulseTextGlow 1.5s infinite;
+  color: #fff !important;
+  font-weight: 700 !important;
+  background: rgba(176, 72, 255, 0.15) !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  border: 1px dashed var(--accent) !important;
+}
+
+@keyframes pulseTextGlow {
+  0% {
+    text-shadow: 0 0 0px rgba(176, 72, 255, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(176, 72, 255, 0.8), 0 0 16px rgba(176, 72, 255, 0.4);
+    transform: scale(1.05);
+  }
+  100% {
+    text-shadow: 0 0 0px rgba(176, 72, 255, 0);
+    transform: scale(1);
+  }
+}
+
 .movie-row__pills-container {
   margin-bottom: var(--space-4);
   width: 100%;

@@ -100,8 +100,7 @@ api.interceptors.response.use(
         // Call refresh directly (avoid circular import with AuthContext)
         const response = await axios.post(
           `${BASE_URL}/api/v1/auth/refresh`,
-          {},
-          { headers: { Authorization: `Bearer ${storedRefresh}` } }
+          { refresh_token: storedRefresh }
         )
         const { access_token, refresh_token } = response.data.data
         storage.setItem(KEYS.access,  access_token)

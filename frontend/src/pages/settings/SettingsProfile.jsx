@@ -9,6 +9,7 @@ const SettingsProfile = () => {
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(null);
   const [preview, setPreview] = useState(user?.avatar_url ? `http://localhost:8000${user.avatar_url}` : '/default-avatar.png');
+  const [imgError, setImgError] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,6 +26,7 @@ const SettingsProfile = () => {
       }
       setAvatar(file);
       setPreview(URL.createObjectURL(file));
+      setImgError(false);
       setError('');
     }
   };
@@ -65,7 +67,18 @@ const SettingsProfile = () => {
       <form onSubmit={handleSubmit}>
         <div className="avatar-upload">
           <div className="avatar-preview-wrapper" onClick={handleAvatarClick}>
-            <img src={preview} alt="Avatar Preview" className="avatar-preview" />
+            {!imgError ? (
+              <img 
+                src={preview} 
+                alt="Avatar" 
+                className="avatar-preview" 
+                onError={() => setImgError(true)} 
+              />
+            ) : (
+              <div className="avatar-preview-fallback">
+                {username ? username[0].toUpperCase() : 'U'}
+              </div>
+            )}
             <div className="avatar-overlay">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
