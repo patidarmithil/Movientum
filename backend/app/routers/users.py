@@ -90,7 +90,28 @@ async def update_profile(
             raise HTTPException(status_code=400, detail="Invalid image format")
             
         os.makedirs("uploads/avatars", exist_ok=True)
-        filename = f"{user.id}.jpg"
+        
+        # Delete any previous avatar files for this user
+        import glob
+        import time
+        
+        pattern = os.path.join("uploads/avatars", f"{user.id}_*.jpg")
+        for old_file in glob.glob(pattern):
+            try:
+                os.remove(old_file)
+            except Exception as e:
+                logger.error(f"Failed to delete old avatar file {old_file}: {e}")
+                
+        legacy_file = os.path.join("uploads/avatars", f"{user.id}.jpg")
+        if os.path.exists(legacy_file):
+            try:
+                os.remove(legacy_file)
+            except Exception as e:
+                logger.error(f"Failed to delete legacy avatar file {legacy_file}: {e}")
+                
+        # Generate a unique timestamped filename to prevent browser caching issues
+        timestamp = int(time.time())
+        filename = f"{user.id}_{timestamp}.jpg"
         filepath = os.path.join("uploads/avatars", filename)
         
         try:

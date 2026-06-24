@@ -1,0 +1,175 @@
+/* InfoBanner.css */
+
+.info-banner-overlay {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 9998; /* Just below PWA install prompt */
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.info-banner-modal {
+  pointer-events: auto;
+  background: rgba(18, 18, 22, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  position: relative;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  animation: slideUpFadeBanner 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUpFadeBanner {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.info-banner-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  transition: color 0.2s;
+  outline: none;
+}
+
+.info-banner-close:hover {
+  color: #fff;
+}
+
+.info-banner-title {
+  margin: 0 0 8px 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  padding-right: 16px;
+}
+
+.info-banner-desc {
+  margin: 0 0 16px 0;
+  font-size: 0.9rem;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+.info-banner-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.info-banner-btn {
+  flex: 1;
+  background: #B048FF;
+  border: 1px solid #B048FF;
+  border-radius: 8px;
+  color: #fff;
+  padding: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+.info-banner-btn:hover {
+  background: #a038ef;
+  border-color: #a038ef;
+  box-shadow: 0 0 12px rgba(176, 72, 255, 0.4);
+}
+
+.info-banner-dontshow {
+  display: flex;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.info-banner-dontshow label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  width: auto;
+}
+
+.info-banner__checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: all 0.15s ease;
+  margin: 0;
+}
+
+.info-banner__checkbox:checked {
+  background: #B048FF;
+  border-color: #B048FF;
+}
+
+.info-banner__checkbox:checked::before {
+  content: "";
+  width: 7px;
+  height: 3px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+/* Mobile compatibility overrides */
+@media (max-width: 480px) {
+  .info-banner-overlay {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+  }
+  
+  .info-banner-modal {
+    padding: 16px 20px;
+    border-radius: 12px;
+  }
+
+  .info-banner-title {
+    font-size: 1.1rem;
+  }
+
+  .info-banner-desc {
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+  }
+
+  .info-banner-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+}

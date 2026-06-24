@@ -357,3 +357,23 @@
   right: 0;
 }
 
+/* Decrease card sizes on mobile so 3 cards fit in horizontal scroll list */
+@media (max-width: 480px) {
+  .home .movie-row .scroll-row {
+    gap: 8px !important;
+  }
+  .home .movie-row .viewport-reveal-card,
+  .home .movie-row .stagger-item-wrap,
+  .home .movie-row .movie-card--standard,
+  .home .movie-row .movie-card-skeleton {
+    width: calc((100vw - 32px - 16px) / 3) !important;
+  }
+  .home .movie-row .movie-card--standard .movie-card__poster-wrap,
+  .home .movie-row .movie-card-skeleton__poster {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 2 / 3 !important;
+  }
+}
+
+

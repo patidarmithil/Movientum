@@ -35,6 +35,17 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  const [highlightExplore, setHighlightExplore] = useState(false)
+
+  // Listen to explore page highlight requests
+  useEffect(() => {
+    const handleHighlight = (e) => {
+      setHighlightExplore(e.detail)
+    }
+    window.addEventListener('mv:highlightExplore', handleHighlight)
+    return () => window.removeEventListener('mv:highlightExplore', handleHighlight)
+  }, [])
+
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
@@ -139,7 +150,7 @@ export default function Navbar() {
               <NavLink
                 to="/explore"
                 className={({ isActive }) =>
-                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}${highlightExplore ? ' navbar__link--highlighted' : ''}`
                 }
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">

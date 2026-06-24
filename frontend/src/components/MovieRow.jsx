@@ -73,6 +73,18 @@ export default function MovieRow({
   const [leftFadeOpacity, setLeftFadeOpacity] = useState(0)
   const [rightFadeOpacity, setRightFadeOpacity] = useState(1)
 
+  const [highlightForYou, setHighlightForYou] = useState(false)
+
+  useEffect(() => {
+    if (title === "For You 🎯") {
+      const handleHighlight = (e) => {
+        setHighlightForYou(e.detail)
+      }
+      window.addEventListener('mv:highlightForYouSeeAll', handleHighlight)
+      return () => window.removeEventListener('mv:highlightForYouSeeAll', handleHighlight)
+    }
+  }, [title])
+
   // Track progress and fades
   const updateScrollStats = useCallback(() => {
     const el = scrollRowRef.current
@@ -292,7 +304,7 @@ export default function MovieRow({
             <ShinyText text={title} />
           </h2>
         </div>
-        <Link to={seeAllHref} className="see-all-link">See all →</Link>
+        <Link to={seeAllHref} className={`see-all-link${highlightForYou ? ' see-all-link--highlighted' : ''}`}>See all →</Link>
       </div>
 
       {children && <div className="movie-row__pills-container">{children}</div>}

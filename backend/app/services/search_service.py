@@ -32,14 +32,13 @@ def _is_adult_or_blacklist(item: dict) -> bool:
     if item.get("adult"):
         return True
     title = (item.get("title") or item.get("name") or "").lower()
-    overview = (item.get("overview") or "").lower()
     
     for b_title in BLACKLIST_TITLES:
         if b_title in title:
             return True
             
     for word in BLACKLIST_WORDS:
-        if word in title or word in overview:
+        if word in title:
             return True
             
     return False

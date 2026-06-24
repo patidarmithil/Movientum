@@ -271,3 +271,28 @@
   color: #8b5cf6;
   text-decoration: underline;
 }
+
+@media (max-width: 480px) {
+  .rating-meter {
+    padding: 16px !important;
+    gap: 12px !important;
+  }
+  .rating-meter__svg {
+    max-width: 170px !important;
+  }
+  .rating-meter__legend {
+    padding-top: 10px !important;
+    margin-top: 4px !important;
+    gap: 8px !important;
+  }
+  .rating-meter__pills {
+    padding-top: 10px !important;
+  }
+  .rating-meter__pills-label {
+    margin-bottom: 6px !important;
+  }
+  .rating-meter__pill {
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+  }
+}

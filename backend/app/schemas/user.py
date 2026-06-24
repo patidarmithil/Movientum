@@ -78,6 +78,8 @@ class MeResponse(BaseModel):
     email: str
     username: str
     role: str
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
 
 
 class WrappedTokenResponse(BaseModel):

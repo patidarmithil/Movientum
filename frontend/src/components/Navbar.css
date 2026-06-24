@@ -135,6 +135,28 @@
   flex-shrink: 0;
 }
 
+.navbar__link--highlighted {
+  animation: pulseGlow 1.5s infinite;
+  background: rgba(176, 72, 255, 0.15) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--accent) !important;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(176, 72, 255, 0.4);
+    border-color: rgba(176, 72, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(176, 72, 255, 0);
+    border-color: var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(176, 72, 255, 0);
+    border-color: rgba(176, 72, 255, 0.4);
+  }
+}
+
 /* Icon Buttons (Calendar, Coffee, Bookmark, Grid, Bell) */
 .navbar__icon-link {
   color: var(--text-muted);
@@ -287,12 +309,12 @@
   top: calc(100% + 10px);
   right: 0;
   min-width: 220px;
-  background: rgba(18, 18, 24, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  background: rgba(18, 18, 24, 1.5) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7) !important;
   z-index: 1100;
   padding: 12px;
   display: flex;
@@ -699,12 +721,12 @@
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  background: rgba(18, 18, 24, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  background: rgba(18, 18, 24, 0.99) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7) !important;
   z-index: 1100;
   width: 280px;
   padding: 12px;
