@@ -24,6 +24,7 @@ class CollectionUpdate(BaseModel):
 
 class AddItemRequest(BaseModel):
     movie_id: int = Field(...)
+    media_type: str = Field(default="movie")
 
 
 # ── Response models ──────────────────────────────────────────────
@@ -44,6 +45,7 @@ class CollectionItemOut(BaseModel):
     """Single item inside a collection."""
     id: UUID
     movie_id: int
+    media_type: str = "movie"
     added_at: datetime
     movie: Optional[CollectionMovieOut] = None
 
@@ -91,4 +93,5 @@ class MovieCollectionStatus(BaseModel):
 
 class MovieStatusResponse(BaseModel):
     movie_id: int
+    media_type: str = "movie"
     collections: list[MovieCollectionStatus]

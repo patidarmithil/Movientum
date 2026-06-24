@@ -68,6 +68,7 @@ async def mark_watched(
         db,
         user_id=user_id,
         movie_id=body.movie_id,
+        media_type=body.media_type,
         watch_source=body.watch_source,
         rewatched=body.rewatched,
     )
@@ -99,6 +100,7 @@ async def mark_watched(
     return WatchHistoryItem(
         id=entry.id,
         movie_id=entry.movie_id,
+        media_type=entry.media_type,
         user_id=entry.user_id,
         watched_at=entry.watched_at,
         watch_source=entry.watch_source,
@@ -106,20 +108,21 @@ async def mark_watched(
     )
 
 
-# ── DELETE /watch/{movie_id} ──────────────────────────────────────
+# ── DELETE /watch/{media_type}/{movie_id} ──────────────────────────────────────
 
 @router.delete(
-    "/{movie_id}",
+    "/{media_type}/{movie_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove movie from watch history",
 )
 async def remove_from_watch_history(
     movie_id: int,
+    media_type: str,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> None:
     user_id = UUID(current_user["sub"])
-    await watch_service.remove_from_watch_history(db, user_id=user_id, movie_id=movie_id)
+    await watch_service.remove_from_watch_history(db, user_id=user_id, movie_id=movie_id, media_type=media_type)
     # Invalidate recommendations + history + prefs
     await invalidate(_recs_key(str(user_id)))
     await invalidate(f"movie:detail:{movie_id}")
@@ -169,6 +172,7 @@ async def get_watch_history(
         {
             "id": r.id,
             "movie_id": r.movie_id,
+            "media_type": getattr(r, "media_type", "movie"),
             "movie": {
                 "id": r.movie.id,
                 "title": r.movie.title,
@@ -211,7 +215,7 @@ async def add_to_watchlist(
 ) -> WatchlistItem:
     """Idempotent: adding a movie already on watchlist is a no-op."""
     user_id = UUID(current_user["sub"])
-    entry = await watch_service.add_to_watchlist(db, user_id=user_id, movie_id=body.movie_id)
+    entry = await watch_service.add_to_watchlist(db, user_id=user_id, movie_id=body.movie_id, media_type=body.media_type)
     await invalidate(key_user_watchlist(str(user_id)))  # invalidate watchlist cache
 
     # Taste Profile Update
@@ -231,25 +235,27 @@ async def add_to_watchlist(
     return WatchlistItem(
         id=entry.id,
         movie_id=entry.movie_id,
+        media_type=entry.media_type,
         user_id=entry.user_id,
         added_at=entry.added_at,
     )
 
 
-# ── DELETE /watch/watchlist/{movie_id} ───────────────────────────
+# ── DELETE /watch/watchlist/{media_type}/{movie_id} ───────────────────────────
 
 @router.delete(
-    "/watchlist/{movie_id}",
+    "/watchlist/{media_type}/{movie_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove movie from watchlist",
 )
 async def remove_from_watchlist(
     movie_id: int,
+    media_type: str,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> None:
     user_id = UUID(current_user["sub"])
-    await watch_service.remove_from_watchlist(db, user_id=user_id, movie_id=movie_id)
+    await watch_service.remove_from_watchlist(db, user_id=user_id, movie_id=movie_id, media_type=media_type)
     await invalidate(key_user_watchlist(str(user_id)))  # invalidate watchlist cache
 
 
@@ -275,6 +281,7 @@ async def get_watchlist(
         {
             "id": r.id,
             "movie_id": r.movie_id,
+            "media_type": getattr(r, "media_type", "movie"),
             "movie": {
                 "id": r.movie.id,
                 "title": r.movie.title,
@@ -302,18 +309,19 @@ async def get_watchlist(
     return result
 
 
-# ── GET /watch/status/{movie_id} ──────────────────────────────────
+# ── GET /watch/status/{media_type}/{movie_id} ──────────────────────────────────
 
 @router.get(
-    "/status/{movie_id}",
+    "/status/{media_type}/{movie_id}",
     response_model=WatchStatusResponse,
     summary="Get watch + watchlist status for a movie",
 )
 async def get_watch_status(
     movie_id: int,
+    media_type: str,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> WatchStatusResponse:
     user_id = UUID(current_user["sub"])
-    status_data = await watch_service.get_watch_status(db, user_id=user_id, movie_id=movie_id)
-    return WatchStatusResponse(movie_id=movie_id, **status_data)
+    status_data = await watch_service.get_watch_status(db, user_id=user_id, movie_id=movie_id, media_type=media_type)
+    return WatchStatusResponse(movie_id=movie_id, media_type=media_type, **status_data)

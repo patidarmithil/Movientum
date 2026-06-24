@@ -4,7 +4,7 @@ import { watchService } from '../services/watchService'
 import { watchlistService } from '../services/watchlistService'
 import './SaveToCollectionModal.css'
 
-function SaveToCollectionModal({ movieId, isOpen, onClose }) {
+function SaveToCollectionModal({ movieId, mediaType = "movie", isOpen, onClose }) {
   const [collections, setCollections] = useState([])
   const [checkedState, setCheckedState] = useState({})
   const [loadingIds, setLoadingIds] = useState(new Set())
@@ -38,7 +38,7 @@ function SaveToCollectionModal({ movieId, isOpen, onClose }) {
 
     Promise.all([
       watchlistService.getCollections(),
-      watchlistService.getMovieStatus(movieId),
+      watchlistService.getMovieStatus(movieId, mediaType),
     ])
       .then(([collRes, statRes]) => {
         if (!isMounted) return
@@ -71,11 +71,11 @@ function SaveToCollectionModal({ movieId, isOpen, onClose }) {
 
     try {
       if (willCheck) {
-        await watchlistService.addToCollection(cid, movieId)
+        await watchlistService.addToCollection(cid, movieId, mediaType)
         // Also add to old flat table for signals
-        await watchService.addToWatchlist(movieId).catch(() => {}) 
+        await watchService.addToWatchlist(movieId, mediaType).catch(() => {}) 
       } else {
-        await watchlistService.removeFromCollection(cid, movieId)
+        await watchlistService.removeFromCollection(cid, movieId, mediaType)
       }
     } catch (err) {
       console.error("Failed to toggle collection:", err)
@@ -100,10 +100,10 @@ function SaveToCollectionModal({ movieId, isOpen, onClose }) {
       const newColl = await watchlistService.createCollection(newName.trim(), newDesc.trim() || null)
       
       // 2. Add movie to it
-      await watchlistService.addToCollection(newColl.id, movieId)
+      await watchlistService.addToCollection(newColl.id, movieId, mediaType)
       
       // 3. Add to old flat table
-      await watchService.addToWatchlist(movieId).catch(() => {})
+      await watchService.addToWatchlist(movieId, mediaType).catch(() => {})
 
       // 4. Update local state
       setCollections([newColl, ...collections])

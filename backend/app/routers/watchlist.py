@@ -121,22 +121,24 @@ async def create_collection(
     }
 
 
-# ── GET /watchlists/movie/{movie_id}/status ───────────────────────
+# ── GET /watchlists/movie/{media_type}/{movie_id}/status ───────────────────────
 # NOTE: must be defined BEFORE /{collection_id} to avoid routing conflict
 
 @router.get(
-    "/movie/{movie_id}/status",
+    "/movie/{media_type}/{movie_id}/status",
     summary="Get which collections contain a given movie",
 )
 async def movie_collection_status(
     movie_id: int,
+    media_type: str,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     user_id = UUID(current_user["sub"])
-    statuses = await watchlist_repo.get_movie_collection_status(db, user_id, movie_id)
+    statuses = await watchlist_repo.get_movie_collection_status(db, user_id, movie_id, media_type)
     return {
         "movie_id": movie_id,
+        "media_type": media_type,
         "collections": [
             {"id": str(s["id"]), "name": s["name"], "has_movie": s["has_movie"]}
             for s in statuses
@@ -247,32 +249,34 @@ async def add_item(
 ) -> dict:
     user_id = UUID(current_user["sub"])
     item = await watchlist_repo.add_item(
-        db, user_id=user_id, collection_id=collection_id, movie_id=body.movie_id
+        db, user_id=user_id, collection_id=collection_id, movie_id=body.movie_id, media_type=body.media_type
     )
     await _bust_collection(str(collection_id), str(user_id))
     return {
         "id": str(item.id),
         "collection_id": str(item.collection_id),
         "movie_id": item.movie_id,
+        "media_type": item.media_type,
         "added_at": item.added_at.isoformat(),
     }
 
 
-# ── DELETE /watchlists/{collection_id}/items/{movie_id} ──────────
+# ── DELETE /watchlists/{collection_id}/items/{media_type}/{movie_id} ──────────
 
 @router.delete(
-    "/{collection_id}/items/{movie_id}",
+    "/{collection_id}/items/{media_type}/{movie_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove movie/tv from collection",
 )
 async def remove_item(
     collection_id: UUID,
     movie_id: int,
+    media_type: str,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> None:
     user_id = UUID(current_user["sub"])
     await watchlist_repo.remove_item(
-        db, user_id=user_id, collection_id=collection_id, movie_id=movie_id
+        db, user_id=user_id, collection_id=collection_id, movie_id=movie_id, media_type=media_type
     )
     await _bust_collection(str(collection_id), str(user_id))

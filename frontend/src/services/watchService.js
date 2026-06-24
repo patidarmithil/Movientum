@@ -9,14 +9,14 @@ export const watchService = {
   /**
    * POST /api/v1/watch — mark movie watched
    */
-  markWatched: (movieId) =>
-    api.post('/api/v1/watch', { movie_id: movieId }).then((r) => r.data),
+  markWatched: (movieId, mediaType = "movie") =>
+    api.post('/api/v1/watch', { movie_id: movieId, media_type: mediaType }).then((r) => r.data),
 
   /**
-   * DELETE /api/v1/watch/{movieId}
+   * DELETE /api/v1/watch/{mediaType}/{movieId}
    */
-  removeFromHistory: (movieId) =>
-    api.delete(`/api/v1/watch/${movieId}`).then((r) => r.data),
+  removeFromHistory: (movieId, mediaType = "movie") =>
+    api.delete(`/api/v1/watch/${mediaType}/${movieId}`).then((r) => r.data),
 
   /**
    * GET /api/v1/watch/history — paginated watch history
@@ -27,14 +27,14 @@ export const watchService = {
   /**
    * POST /api/v1/watch/watchlist — add to watchlist
    */
-  addToWatchlist: (movieId) =>
-    api.post('/api/v1/watch/watchlist', { movie_id: movieId }).then((r) => r.data),
+  addToWatchlist: (movieId, mediaType = "movie") =>
+    api.post('/api/v1/watch/watchlist', { movie_id: movieId, media_type: mediaType }).then((r) => r.data),
 
   /**
-   * DELETE /api/v1/watch/watchlist/{movieId}
+   * DELETE /api/v1/watch/watchlist/{mediaType}/{movieId}
    */
-  removeFromWatchlist: (movieId) =>
-    api.delete(`/api/v1/watch/watchlist/${movieId}`).then((r) => r.data),
+  removeFromWatchlist: (movieId, mediaType = "movie") =>
+    api.delete(`/api/v1/watch/watchlist/${mediaType}/${movieId}`).then((r) => r.data),
 
   /**
    * GET /api/v1/watch/watchlist — get watchlist
@@ -43,9 +43,9 @@ export const watchService = {
     api.get('/api/v1/watch/watchlist', { params: { page, limit } }).then((r) => r.data),
 
   /**
-   * GET /api/v1/watch/status/{movieId}
+   * GET /api/v1/watch/status/{mediaType}/{movieId}
    * @returns {{ watched: bool, watchlisted: bool }}
    */
-  getStatus: (movieId) =>
-    api.get(`/api/v1/watch/status/${movieId}`).then((r) => r.data),
+  getStatus: (movieId, mediaType = "movie") =>
+    api.get(`/api/v1/watch/status/${mediaType}/${movieId}`).then((r) => r.data),
 }

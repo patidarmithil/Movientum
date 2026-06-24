@@ -51,7 +51,8 @@ export default function RatingMeter({
   skip,
   total_votes,
   userRating,
-  userRatingId
+  userRatingId,
+  mediaType = "movie"
 }) {
   const { isLoggedIn } = useAuth()
   
@@ -184,7 +185,7 @@ export default function RatingMeter({
   const fetchDist = useCallback(async () => {
     if (hasPropsData) return
     try {
-      const data = await ratingService.getDistribution(movieId)
+      const data = await ratingService.getDistribution(movieId, mediaType)
       setDist(data)
     } catch {
       setError('Failed to load ratings')
@@ -242,13 +243,13 @@ export default function RatingMeter({
         if (userRatingId) {
           await ratingService.updateRating(userRatingId, category)
         } else {
-          await ratingService.submitRating(movieId, category)
+          await ratingService.submitRating(movieId, mediaType, category)
         }
         setMyRating(category)
         await fetchDist()
         onRated?.()
       } else {
-        await ratingService.submitRating(movieId, category)
+        await ratingService.submitRating(movieId, mediaType, category)
         setMyRating(category)
         await fetchDist()
         onRated?.()

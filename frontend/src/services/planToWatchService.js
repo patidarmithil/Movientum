@@ -1,4 +1,4 @@
-﻿import api from '../utils/api'
+import api from '../utils/api'
 import { watchlistService } from './watchlistService'
 
 export const planToWatchService = {
@@ -11,9 +11,9 @@ export const planToWatchService = {
     return created.id
   },
 
-  checkStatus: async (mediaId) => {
+  checkStatus: async (mediaId, mediaType = "movie") => {
     try {
-      const status = await watchlistService.getMovieStatus(mediaId)
+      const status = await watchlistService.getMovieStatus(mediaId, mediaType)
       const collections = status.collections || []
       const planToWatch = collections.find(c => c.name === "Plan to Watch")
       return {
@@ -25,15 +25,15 @@ export const planToWatchService = {
     }
   },
 
-  add: async (mediaId) => {
+  add: async (mediaId, mediaType = "movie") => {
     const listId = await planToWatchService.getOrCreate()
-    await watchlistService.addToCollection(listId, mediaId)
+    await watchlistService.addToCollection(listId, mediaId, mediaType)
     return { listId }
   },
 
-  remove: async (listId, mediaId) => {
+  remove: async (listId, mediaId, mediaType = "movie") => {
     if (listId) {
-      await watchlistService.removeFromCollection(listId, mediaId)
+      await watchlistService.removeFromCollection(listId, mediaId, mediaType)
     }
   },
 

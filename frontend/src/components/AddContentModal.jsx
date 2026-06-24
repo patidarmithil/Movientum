@@ -1,7 +1,7 @@
 /**
  * AddContentModal.jsx — Phase 5
  *
- * Props: { collectionId, isOpen, onClose, onItemAdded, existingMovieIds? }
+ * Props: { collectionId, isOpen, onClose, onItemAdded, existingItems? }
  *
  * Features:
  *  - Autofocused search bar (debounced 300 ms)
@@ -72,14 +72,13 @@ function ResultCard({ item, isAdded, isLoading, onAdd }) {
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
-export default function AddContentModal({ collectionId, isOpen, onClose, onItemAdded, existingMovieIds = [] }) {
+export default function AddContentModal({ collectionId, isOpen, onClose, onItemAdded, existingItems = [] }) {
   const [query, setQuery]       = useState('')
   const [results, setResults]   = useState([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState(null)
 
-  // Track which IDs are in collection (init from prop, grows as user adds)
-  const [addedIds, setAddedIds] = useState(new Set())
+  const [addedIds, setAddedIds] = useState(new Set()) // Stores strings like "id-media_type"
   // Track per-card loading state
   const [loadingIds, setLoadingIds] = useState(new Set())
 
@@ -90,7 +89,7 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
   // Sync existingMovieIds into addedIds when modal opens
   useEffect(() => {
     if (isOpen) {
-      setAddedIds(new Set(existingMovieIds.map(Number)))
+      setAddedIds(new Set(existingItems.map(item => `${item.id}-${item.media_type || 'movie'}`)))
       setQuery('')
       setResults([])
       setSearchError(null)
@@ -145,29 +144,30 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
   const handleAdd = useCallback(async (item) => {
     const isTv = item.media_type === 'tv' || item.type === 'tv'
     const absId = Math.abs(Number(item.id))
-    const movieId = isTv ? -absId : absId
+    const mediaType = isTv ? 'tv' : 'movie'
+    const addedKey = `${absId}-${mediaType}`
 
     // Optimistic
-    setAddedIds((prev) => new Set([...prev, movieId]))
-    setLoadingIds((prev) => new Set([...prev, movieId]))
+    setAddedIds((prev) => new Set([...prev, addedKey]))
+    setLoadingIds((prev) => new Set([...prev, addedKey]))
 
     try {
-      await watchlistService.addToCollection(collectionId, movieId)
+      await watchlistService.addToCollection(collectionId, absId, mediaType)
       // Dual-write to old flat table (fire-and-forget)
-      watchService.addToWatchlist(movieId).catch(() => {})
+      watchService.addToWatchlist(absId, mediaType).catch(() => {})
       // Notify parent to refetch
       onItemAdded?.()
     } catch {
       // Revert optimistic add
       setAddedIds((prev) => {
         const next = new Set(prev)
-        next.delete(movieId)
+        next.delete(addedKey)
         return next
       })
     } finally {
       setLoadingIds((prev) => {
         const next = new Set(prev)
-        next.delete(movieId)
+        next.delete(addedKey)
         return next
       })
     }
@@ -253,13 +253,13 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
                 {results.map((item) => {
                   const isTv = item.media_type === 'tv' || item.type === 'tv'
                   const absId = Math.abs(Number(item.id))
-                  const movieId = isTv ? -absId : absId
+                  const addedKey = `${absId}-${isTv ? 'tv' : 'movie'}`
                   return (
                     <ResultCard
                       key={item.id}
                       item={item}
-                      isAdded={addedIds.has(movieId)}
-                      isLoading={loadingIds.has(movieId)}
+                      isAdded={addedIds.has(addedKey)}
+                      isLoading={loadingIds.has(addedKey)}
                       onAdd={handleAdd}
                     />
                   )

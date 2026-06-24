@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Boolean, BigInteger, Column, Date, DateTime, Float,
     ForeignKey, Integer, String, Text, UniqueConstraint,
-    CheckConstraint, Index, text
+    CheckConstraint, Index, text, ForeignKeyConstraint
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR, ARRAY
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -67,7 +67,7 @@ class Movie(Base):
     revenue = Column(BigInteger, default=0)
     original_language = Column(String(10), nullable=True)  # ISO code: en, fr, ja
     imdb_id = Column(String(20), nullable=True)
-    type = Column(String(10), nullable=False, default='movie', server_default='movie')  # 'movie' | 'tv'
+    type = Column(String(10), primary_key=True, nullable=False, default='movie', server_default='movie')  # 'movie' | 'tv'
     metadata_ = Column("metadata", JSONB, default=dict)    # flexible extra TMDB data
     search_vector = Column(TSVECTOR, nullable=True)         # Full-text search index
     fetched_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
@@ -96,8 +96,13 @@ class MovieGenre(Base):
     """Junction table: Movie ↔ Genre (many-to-many)."""
     __tablename__ = "movie_genres"
 
-    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    movie_id = Column(Integer, primary_key=True)
+    media_type = Column(String(10), primary_key=True, default='movie', server_default='movie')
     genre_id = Column(Integer, ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True)
+
+    __table_args__ = (
+        ForeignKeyConstraint(["movie_id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+    )
 
     movie = relationship("Movie", back_populates="genres")
     genre = relationship("Genre", back_populates="movies")
@@ -125,8 +130,13 @@ class MovieDirector(Base):
     """Junction table: Movie ↔ Director (many-to-many)."""
     __tablename__ = "movie_directors"
 
-    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    movie_id = Column(Integer, primary_key=True)
+    media_type = Column(String(10), primary_key=True, default='movie', server_default='movie')
     director_id = Column(Integer, ForeignKey("directors.id", ondelete="CASCADE"), primary_key=True)
+
+    __table_args__ = (
+        ForeignKeyConstraint(["movie_id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+    )
 
     movie = relationship("Movie", back_populates="directors")
     director = relationship("Director", back_populates="movies")
@@ -178,7 +188,8 @@ class Rating(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, nullable=False)
+    media_type = Column(String(10), nullable=False, default='movie', server_default='movie')
 
     # Category enum: skip | timepass | go_for_it | perfection
     category = Column(String(20), nullable=False)
@@ -190,13 +201,14 @@ class Rating(Base):
     movie = relationship("Movie", back_populates="ratings")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "movie_id", name="uq_rating_user_movie"),
+        ForeignKeyConstraint(["movie_id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+        UniqueConstraint("user_id", "movie_id", "media_type", name="uq_rating_user_movie"),
         CheckConstraint(
             "category IN ('skip', 'timepass', 'go_for_it', 'perfection')",
             name="chk_rating_category",
         ),
         Index("idx_ratings_user_id", "user_id"),
-        Index("idx_ratings_movie_id", "movie_id"),
+        Index("idx_ratings_movie_id", "movie_id", "media_type"),
         Index("idx_ratings_category", "category"),
     )
 
@@ -210,7 +222,8 @@ class WatchHistory(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, nullable=False)
+    media_type = Column(String(10), nullable=False, default='movie', server_default='movie')
     watched_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     watch_source = Column(String(50), nullable=True)    # theater, netflix, etc.
     rewatched = Column(Boolean, default=False)
@@ -219,7 +232,8 @@ class WatchHistory(Base):
     movie = relationship("Movie", back_populates="watch_histories")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "movie_id", name="uq_watch_user_movie"),
+        ForeignKeyConstraint(["movie_id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+        UniqueConstraint("user_id", "movie_id", "media_type", name="uq_watch_user_movie"),
         Index("idx_watch_user_id", "user_id"),
         Index("idx_watch_watched_at", "user_id", "watched_at"),
     )
@@ -234,14 +248,16 @@ class Watchlist(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, nullable=False)
+    media_type = Column(String(10), nullable=False, default='movie', server_default='movie')
     added_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     user = relationship("User", back_populates="watchlist_entries")
     movie = relationship("Movie", back_populates="watchlist_entries")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "movie_id", name="uq_watchlist_user_movie"),
+        ForeignKeyConstraint(["movie_id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+        UniqueConstraint("user_id", "movie_id", "media_type", name="uq_watchlist_user_movie"),
         Index("idx_watchlist_user_id", "user_id"),
     )
 
@@ -283,14 +299,16 @@ class WatchlistItem(Base):
 
     id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     collection_id = Column(UUID(as_uuid=True), ForeignKey("watchlist_collections.id", ondelete="CASCADE"), nullable=False)
-    movie_id      = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    movie_id      = Column(Integer, nullable=False)
+    media_type    = Column(String(10), nullable=False, default='movie', server_default='movie')
     added_at      = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     collection = relationship("WatchlistCollection", back_populates="items")
     movie      = relationship("Movie", backref="watchlist_collection_items")
 
     __table_args__ = (
-        UniqueConstraint("collection_id", "movie_id", name="uq_wlitem_coll_movie"),
+        ForeignKeyConstraint(["movie_id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+        UniqueConstraint("collection_id", "movie_id", "media_type", name="uq_wlitem_coll_movie"),
         Index("idx_wlitem_collection_id", "collection_id"),
         Index("idx_wlitem_collection_added", "collection_id", "added_at"),
     )
@@ -340,7 +358,8 @@ class MovieRating(Base):
     """Imported ratings from moctale_scrapper for meter display."""
     __tablename__ = "movie_ratings"
 
-    id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    id = Column(Integer, primary_key=True)
+    media_type = Column(String(10), primary_key=True, default='movie', server_default='movie')
     slug = Column(Text, nullable=False)
     title = Column(Text, nullable=True)
     year = Column(Integer, nullable=True)
@@ -354,6 +373,10 @@ class MovieRating(Base):
 
     movie = relationship("Movie", backref="movie_rating", uselist=False)
 
+    __table_args__ = (
+        ForeignKeyConstraint(["id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+    )
+
     def __repr__(self):
         return f"<MovieRating id={self.id} score={self.score}>\n"
 
@@ -362,7 +385,8 @@ class TvRating(Base):
     """Imported TV ratings from moctale_scrapper for meter display."""
     __tablename__ = "tv_ratings"
 
-    id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    id = Column(Integer, primary_key=True)
+    media_type = Column(String(10), primary_key=True, default='tv', server_default='tv')
     slug = Column(Text, nullable=False)
     title = Column(Text, nullable=True)
     year = Column(Integer, nullable=True)
@@ -375,6 +399,10 @@ class TvRating(Base):
     fetched_at = Column(DateTime(timezone=True), nullable=True)
 
     movie = relationship("Movie", backref="tv_rating", uselist=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(["id", "media_type"], ["movies.id", "movies.type"], ondelete="CASCADE"),
+    )
 
     def __repr__(self):
         return f"<TvRating id={self.id} score={self.score}>\n"

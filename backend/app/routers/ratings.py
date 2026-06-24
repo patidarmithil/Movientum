@@ -43,25 +43,25 @@ logger = logging.getLogger(__name__)
 _DIST_TTL = 300  # 5 min
 
 
-def _dist_key(movie_id: int) -> str:
-    return f"rating:dist:{movie_id}"
+def _dist_key(movie_id: int, media_type: str) -> str:
+    return f"rating:dist:{media_type}:{movie_id}"
 
 
 def _recs_key(user_id: str) -> str:
     return f"user:recs:{user_id}"
 
 
-async def _invalidate_caches(movie_id: int, user_id: str) -> None:
+async def _invalidate_caches(movie_id: int, media_type: str, user_id: str) -> None:
     """Invalidate distribution + recommendation caches after any mutation."""
-    await invalidate(_dist_key(movie_id))
+    await invalidate(_dist_key(movie_id, media_type))
     await invalidate(_recs_key(user_id))
-    await invalidate(f"movie:detail:{movie_id}")
+    await invalidate(f"movie:detail:{movie_id}") # Note: update later if movie/tv caches are split
     await invalidate(f"movie:similar:{movie_id}:movie")
     await invalidate(key_user_ratings(user_id))  # dashboard ratings cache
     await invalidate(key_user_prefs(user_id))    # news personalization prefs
     logger.info(
         "CACHE_INVALIDATED",
-        extra={"keys": [_dist_key(movie_id), _recs_key(user_id), f"movie:detail:{movie_id}", f"movie:similar:{movie_id}:movie", key_user_ratings(user_id), key_user_prefs(user_id)]},
+        extra={"keys": [_dist_key(movie_id, media_type), _recs_key(user_id), f"movie:detail:{movie_id}", f"movie:similar:{movie_id}:movie", key_user_ratings(user_id), key_user_prefs(user_id)]},
     )
 
 
@@ -84,9 +84,9 @@ async def submit_rating(
     """
     user_id = UUID(current_user["sub"])
     rating = await rating_service.upsert_rating(
-        db, user_id=user_id, movie_id=body.movie_id, category=body.category
+        db, user_id=user_id, movie_id=body.movie_id, media_type=body.media_type, category=body.category
     )
-    await _invalidate_caches(body.movie_id, str(user_id))
+    await _invalidate_caches(body.movie_id, body.media_type, str(user_id))
     logger.info(
         "RATING_SUBMITTED",
         extra={
@@ -98,6 +98,7 @@ async def submit_rating(
     return RatingResponse(
         id=rating.id,
         movie_id=rating.movie_id,
+        media_type=rating.media_type,
         user_id=rating.user_id,
         category=rating.category,
         created_at=rating.created_at,
@@ -127,6 +128,7 @@ async def get_my_ratings(
         {
             "id": r.id,
             "movie_id": r.movie_id,
+            "media_type": r.media_type,
             "category": r.category,
             "movie": {
                 "id": r.movie.id,
@@ -155,26 +157,27 @@ async def get_my_ratings(
     return result
 
 
-# ── GET /ratings/distribution/{movie_id} ─────────────────────────
+# ── GET /ratings/distribution/{media_type}/{movie_id} ─────────────────────────
 
 @router.get(
-    "/distribution/{movie_id}",
+    "/distribution/{media_type}/{movie_id}",
     response_model=DistributionResponse,
     summary="Get rating distribution for a movie",
 )
 async def get_distribution(
     movie_id: int,
+    media_type: str,
     db: AsyncSession = Depends(get_db),
 ) -> DistributionResponse:
     """Public endpoint — no auth required. Cached 5 min."""
-    cache_key = _dist_key(movie_id)
+    cache_key = _dist_key(movie_id, media_type)
     cached = await get_cached(cache_key)
     if cached:
         logger.info("CACHE_HIT", extra={"key": cache_key})
         return DistributionResponse(**cached)
 
     logger.info("CACHE_MISS", extra={"key": cache_key})
-    dist = await rating_service.get_distribution(db, movie_id)
+    dist = await rating_service.get_distribution(db, movie_id, media_type)
     await set_cached(cache_key, dist, _DIST_TTL)
     return DistributionResponse(**dist)
 
@@ -203,12 +206,13 @@ async def update_rating(
 
     # Re-upsert with new category
     updated = await rating_service.upsert_rating(
-        db, user_id=user_id, movie_id=rating.movie_id, category=body.category
+        db, user_id=user_id, movie_id=rating.movie_id, media_type=rating.media_type, category=body.category
     )
-    await _invalidate_caches(rating.movie_id, str(user_id))
+    await _invalidate_caches(rating.movie_id, rating.media_type, str(user_id))
     return RatingResponse(
         id=updated.id,
         movie_id=updated.movie_id,
+        media_type=updated.media_type,
         user_id=updated.user_id,
         category=updated.category,
         created_at=updated.created_at,
@@ -236,9 +240,10 @@ async def delete_rating(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rating not found")
 
     movie_id = rating.movie_id
+    media_type = rating.media_type
     deleted = await rating_service.delete_rating(db, rating_id, user_id)
     if deleted:
-        await _invalidate_caches(movie_id, str(user_id))
+        await _invalidate_caches(movie_id, media_type, str(user_id))
 
 
 # ── POST /ratings/needed ─────────────────────────────────────────

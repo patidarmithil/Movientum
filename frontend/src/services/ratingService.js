@@ -25,19 +25,20 @@ export const ratingService = {
   /**
    * POST /api/v1/ratings — upsert rating (one per user per movie)
    * @param {number} movieId
+   * @param {string} mediaType
    * @param {'skip'|'timepass'|'go_for_it'|'perfection'} category
    */
-  submitRating: (movieId, category) =>
-    api.post('/api/v1/ratings', { movie_id: movieId, category }).then((r) => r.data),
+  submitRating: (movieId, mediaType, category) =>
+    api.post('/api/v1/ratings', { movie_id: movieId, media_type: mediaType, category }).then((r) => r.data),
 
   /**
-   * GET /api/v1/ratings/distribution/{movieId}
+   * GET /api/v1/ratings/distribution/{mediaType}/{movieId}
    * @returns {{ skip, timepass, go_for_it, perfection, total }}
    */
-  getDistribution: (movieId) => {
+  getDistribution: (movieId, mediaType = "movie") => {
     const numericId = Number(movieId)
     const mock = MOCKED_RATINGS[numericId]
-    if (mock) {
+    if (mock && mediaType === "movie") {
       const perfection = Math.round((mock.perfection / 100) * mock.total)
       const go_for_it = Math.round((mock.go_for_it / 100) * mock.total)
       const timepass = Math.round((mock.timepass / 100) * mock.total)
@@ -50,7 +51,7 @@ export const ratingService = {
         total: mock.total,
       })
     }
-    return api.get(`/api/v1/ratings/distribution/${movieId}`).then((r) => r.data)
+    return api.get(`/api/v1/ratings/distribution/${mediaType}/${movieId}`).then((r) => r.data)
   },
 
   /**

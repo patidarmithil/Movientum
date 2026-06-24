@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 
 # ── Watch History ────────────────────────────────────────────────
 
-async def _ensure_stub_exists(db: AsyncSession, title_id: int):
+async def _ensure_stub_exists(db: AsyncSession, title_id: int, media_type: str):
     # Check if exists in the Movie catalog
-    stmt = select(Movie).where(Movie.id == title_id)
+    stmt = select(Movie).where(Movie.id == title_id, Movie.type == media_type)
     res = await db.execute(stmt)
     if res.scalar_one_or_none():
         return
@@ -38,8 +38,7 @@ async def _ensure_stub_exists(db: AsyncSession, title_id: int):
     from app.services.tmdb_service import tmdb_service as tmdb
     from datetime import date
     
-    media_type = "tv" if title_id < 0 else "movie"
-    tmdb_id = abs(title_id)
+    tmdb_id = title_id
 
     # Fetch detail based on inferred media_type
     if media_type == "tv":
@@ -94,6 +93,7 @@ async def mark_watched(
     db: AsyncSession,
     user_id: UUID,
     movie_id: int,
+    media_type: str,
     watch_source: str | None = None,
     rewatched: bool = False,
 ) -> WatchHistory:
@@ -101,12 +101,13 @@ async def mark_watched(
     Insert or update watch history row for (user_id, movie_id).
     ON CONFLICT updates watched_at + watch_source (handles re-watch tracking).
     """
-    await _ensure_stub_exists(db, movie_id)
+    await _ensure_stub_exists(db, movie_id, media_type)
     stmt = (
         pg_insert(WatchHistory)
         .values(
             user_id=user_id,
             movie_id=movie_id,
+            media_type=media_type,
             watch_source=watch_source,
             rewatched=rewatched,
         )
@@ -129,18 +130,13 @@ async def mark_watched(
 
     # Trigger Taste Profile Update
     try:
-        movie_stmt = select(Movie).where(Movie.id == movie_id)
-        movie_res = await db.execute(movie_stmt)
-        movie_item = movie_res.scalar_one_or_none()
-        media_type = movie_item.type if movie_item else "movie"
-
         from app.services.advanced_recs import get_catalog_row
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "watched")
@@ -180,6 +176,7 @@ async def remove_from_watch_history(
     db: AsyncSession,
     user_id: UUID,
     movie_id: int,
+    media_type: str,
 ) -> bool:
     """
     Remove movie/TV show from watch history.
@@ -189,6 +186,7 @@ async def remove_from_watch_history(
     stmt = select(WatchHistory).where(
         WatchHistory.user_id == user_id,
         WatchHistory.movie_id == movie_id,
+        WatchHistory.media_type == media_type,
     )
     result = await db.execute(stmt)
     entry = result.scalar_one_or_none()
@@ -201,18 +199,13 @@ async def remove_from_watch_history(
 
     # Trigger Taste Profile Update before delete
     try:
-        movie_stmt = select(Movie).where(Movie.id == movie_id)
-        movie_res = await db.execute(movie_stmt)
-        movie_item = movie_res.scalar_one_or_none()
-        media_type = movie_item.type if movie_item else "movie"
-
         from app.services.advanced_recs import get_catalog_row
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "unwatched")
@@ -233,15 +226,16 @@ async def add_to_watchlist(
     db: AsyncSession,
     user_id: UUID,
     movie_id: int,
+    media_type: str,
 ) -> WatchHistory:
     """
     Add movie to watchlist. Idempotent: second call is a no-op (ON CONFLICT DO NOTHING).
     Returns the Watchlist row.
     """
-    await _ensure_stub_exists(db, movie_id)
+    await _ensure_stub_exists(db, movie_id, media_type)
     stmt = (
         pg_insert(Watchlist)
-        .values(user_id=user_id, movie_id=movie_id)
+        .values(user_id=user_id, movie_id=movie_id, media_type=media_type)
         .on_conflict_do_nothing(constraint="uq_watchlist_user_movie")
         .returning(Watchlist)
     )
@@ -256,6 +250,7 @@ async def add_to_watchlist(
             select(Watchlist).where(
                 Watchlist.user_id == user_id,
                 Watchlist.movie_id == movie_id,
+                Watchlist.media_type == media_type,
             )
         )
         row = existing.scalar_one()
@@ -268,18 +263,13 @@ async def add_to_watchlist(
     # Trigger Taste Profile Update if it's newly added
     if is_new:
         try:
-            movie_stmt = select(Movie).where(Movie.id == movie_id)
-            movie_res = await db.execute(movie_stmt)
-            movie_item = movie_res.scalar_one_or_none()
-            media_type = movie_item.type if movie_item else "movie"
-
             from app.services.advanced_recs import get_catalog_row
             from app.services.tmdb_service import ingest_item_to_catalog
             from app.services.feedback_service import apply_feedback
 
-            catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
+            catalog_item = await get_catalog_row(db, movie_id, media_type)
             if not catalog_item:
-                catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
+                catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
 
             if catalog_item:
                 await apply_feedback(db, user_id, catalog_item, "watchlist")
@@ -293,6 +283,7 @@ async def remove_from_watchlist(
     db: AsyncSession,
     user_id: UUID,
     movie_id: int,
+    media_type: str,
 ) -> bool:
     """
     Remove movie from watchlist.
@@ -302,6 +293,7 @@ async def remove_from_watchlist(
     stmt = select(Watchlist).where(
         Watchlist.user_id == user_id,
         Watchlist.movie_id == movie_id,
+        Watchlist.media_type == media_type,
     )
     result = await db.execute(stmt)
     entry = result.scalar_one_or_none()
@@ -314,18 +306,13 @@ async def remove_from_watchlist(
 
     # Trigger Taste Profile Update before delete
     try:
-        movie_stmt = select(Movie).where(Movie.id == movie_id)
-        movie_res = await db.execute(movie_stmt)
-        movie_item = movie_res.scalar_one_or_none()
-        media_type = movie_item.type if movie_item else "movie"
-
         from app.services.advanced_recs import get_catalog_row
         from app.services.tmdb_service import ingest_item_to_catalog
         from app.services.feedback_service import apply_feedback
 
-        catalog_item = await get_catalog_row(db, abs(movie_id), media_type)
+        catalog_item = await get_catalog_row(db, movie_id, media_type)
         if not catalog_item:
-            catalog_item = await ingest_item_to_catalog(db, abs(movie_id), media_type)
+            catalog_item = await ingest_item_to_catalog(db, movie_id, media_type)
 
         if catalog_item:
             await apply_feedback(db, user_id, catalog_item, "unwatchlist")
@@ -370,6 +357,7 @@ async def get_watch_status(
     db: AsyncSession,
     user_id: UUID,
     movie_id: int,
+    media_type: str,
 ) -> dict:
     """
     Return {watched: bool, watchlisted: bool, user_rating: str|None} for a single movie+user pair.
@@ -379,14 +367,17 @@ async def get_watch_status(
     watched_stmt = select(func.count(WatchHistory.id)).where(
         WatchHistory.user_id == user_id,
         WatchHistory.movie_id == movie_id,
+        WatchHistory.media_type == media_type,
     )
     watchlisted_stmt = select(func.count(Watchlist.id)).where(
         Watchlist.user_id == user_id,
         Watchlist.movie_id == movie_id,
+        Watchlist.media_type == media_type,
     )
     rating_stmt = select(Rating.id, Rating.category).where(
         Rating.user_id == user_id,
         Rating.movie_id == movie_id,
+        Rating.media_type == media_type,
     )
     watched_count = (await db.execute(watched_stmt)).scalar_one()
     watchlisted_count = (await db.execute(watchlisted_stmt)).scalar_one()

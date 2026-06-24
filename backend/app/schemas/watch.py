@@ -17,6 +17,7 @@ from app.schemas.movie import MovieListItem
 
 class WatchMarkRequest(BaseModel):
     movie_id: int = Field(...)
+    media_type: str = Field(default="movie")
     watch_source: Optional[str] = Field(None, max_length=50)  # theater, netflix, etc.
     rewatched: bool = False
 
@@ -24,6 +25,7 @@ class WatchMarkRequest(BaseModel):
 class WatchHistoryItem(BaseModel):
     id: UUID
     movie_id: int
+    media_type: str = "movie"
     user_id: UUID
     watched_at: datetime
     watch_source: Optional[str] = None
@@ -44,11 +46,13 @@ class WatchHistoryResponse(BaseModel):
 
 class WatchlistAddRequest(BaseModel):
     movie_id: int = Field(...)
+    media_type: str = Field(default="movie")
 
 
 class WatchlistItem(BaseModel):
     id: UUID
     movie_id: int
+    media_type: str = "movie"
     user_id: UUID
     added_at: datetime
     movie: Optional[MovieListItem] = None
@@ -67,6 +71,7 @@ class WatchlistResponse(BaseModel):
 
 class WatchStatusResponse(BaseModel):
     movie_id: int
+    media_type: str = "movie"
     watched: bool
     watchlisted: bool
     user_rating: Optional[str] = None
