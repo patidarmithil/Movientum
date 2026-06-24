@@ -364,5 +364,7 @@ app.include_router(watchlist.router, prefix="/api/v1/watchlists", tags=["Watchli
 
 # ── Internal/Cron Router ────────────────────────────────────────────────────
 from app.routers import internal
+app.include_router(internal.router, prefix="/api/v1/internal", tags=["Internal Jobs"])
 app.include_router(internal.router, prefix="/internal", tags=["Internal Jobs"])
+
 
