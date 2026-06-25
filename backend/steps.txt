@@ -1,6 +1,0 @@
-docker build -t patidarmithil/movientum-backend:latest .
-
-docker push patidarmithil/movientum-backend:latest
-
-
-docker images
