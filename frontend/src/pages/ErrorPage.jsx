@@ -2,15 +2,19 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './ErrorPage.css';
 
-const ErrorPage = ({ type = '404', message: customMessage, onRetry }) => {
+const ErrorPage = ({ type = '404', message: customMessage, errorCode, error, errorInfo, onRetry }) => {
   const navigate = useNavigate();
 
   const isNotFound = type === '404';
 
   const title = isNotFound ? "404 — Page Not Found" : "500 — Something went wrong";
-  const message = customMessage || (isNotFound 
+  let message = customMessage || (isNotFound 
     ? "The page you are looking for doesn't exist or has been moved." 
     : "We experienced an unexpected error while loading this page. Please try again or return home.");
+
+  if (errorCode) {
+    message = `${message} [${errorCode}]`;
+  }
 
   const handleRetry = () => {
     if (onRetry) {
@@ -42,6 +46,17 @@ const ErrorPage = ({ type = '404', message: customMessage, onRetry }) => {
         
         <h1 className="error-title">{title}</h1>
         <p className="error-message">{message}</p>
+        
+        {errorInfo && (
+          <details className="error-details" style={{ marginTop: '1rem', textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', fontSize: '0.85rem', overflow: 'auto' }}>
+            <summary style={{ cursor: 'pointer', opacity: 0.8 }}>View technical details</summary>
+            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', color: '#ff8a8a', fontFamily: 'monospace' }}>
+              {error && error.toString()}
+              <br />
+              {errorInfo.componentStack}
+            </div>
+          </details>
+        )}
         
         <div className="error-actions">
           {isNotFound ? (

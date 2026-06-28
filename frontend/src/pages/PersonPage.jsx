@@ -6,7 +6,7 @@
  * No DB — TMDB passthrough, 24 h Redis cache.
  */
 import { useParams, Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../utils/api'
 import Aurora from '../components/Aurora'
 import { pageCache } from '../utils/pageCache'
@@ -37,6 +37,10 @@ export default function PersonPage() {
   const [creditsLoading, setCreditsLoading] = useState(!cachedData?.credits)
   const [currentImgIdx, setCurrentImgIdx] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalIdx, setModalIdx] = useState(0)
+  const [slideDir, setSlideDir] = useState('init')
+  const [touchStart, setTouchStart] = useState(null)
+  const wheelTimeout = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -84,6 +88,53 @@ export default function PersonPage() {
     }, 4000)
     return () => clearInterval(timer)
   }, [images.length, isModalOpen])
+
+  const navigateModal = (direction) => {
+    setSlideDir(direction)
+    if (direction === 'next') {
+      setModalIdx((prev) => (prev + 1) % images.length)
+    } else {
+      setModalIdx((prev) => (prev - 1 + images.length) % images.length)
+    }
+  }
+
+  useEffect(() => {
+    if (!isModalOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight') navigateModal('next')
+      if (e.key === 'ArrowLeft') navigateModal('prev')
+      if (e.key === 'Escape') setIsModalOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isModalOpen, images.length])
+
+  const handleTouchStart = (e) => {
+    setTouchStart(e.touches[0].clientX)
+  }
+
+  const handleTouchEnd = (e) => {
+    if (touchStart === null) return
+    const touchEnd = e.changedTouches[0].clientX
+    const deltaX = touchEnd - touchStart
+    if (deltaX > 50) navigateModal('prev')
+    if (deltaX < -50) navigateModal('next')
+    setTouchStart(null)
+  }
+
+  const handleWheel = (e) => {
+    if (wheelTimeout.current) return
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+    if (Math.abs(delta) < 20) return
+    if (delta > 0) {
+      navigateModal('next')
+    } else {
+      navigateModal('prev')
+    }
+    wheelTimeout.current = setTimeout(() => {
+      wheelTimeout.current = null
+    }, 120)
+  }
 
   if (loading) {
     return (
@@ -146,7 +197,13 @@ export default function PersonPage() {
               {/* Avatar Carousel */}
               <div 
                 className={`person-page__avatar-wrap ${images.length > 0 ? 'clickable' : ''}`}
-                onClick={() => images.length > 0 && setIsModalOpen(true)}
+                onClick={() => {
+                  if (images.length > 0) {
+                    setModalIdx(currentImgIdx);
+                    setSlideDir('init');
+                    setIsModalOpen(true);
+                  }
+                }}
               >
                 {images.length > 0 ? (
                   <div className="person-page__avatar" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -295,14 +352,37 @@ export default function PersonPage() {
         <div 
           className="person-page-image-modal" 
           onClick={() => setIsModalOpen(false)}
+          onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           <button className="person-page-image-modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+
+          <button 
+            className="person-page-image-modal-nav prev" 
+            onClick={(e) => { e.stopPropagation(); navigateModal('prev'); }}
+          >
+            ‹
+          </button>
+
           <img 
-            src={images[currentImgIdx]} 
+            key={modalIdx}
+            src={images[modalIdx]} 
             alt={person.name} 
-            className="person-page-image-modal-img"
+            className={`person-page-image-modal-img slide-${slideDir}`}
             onClick={(e) => e.stopPropagation()}
           />
+
+          <button 
+            className="person-page-image-modal-nav next" 
+            onClick={(e) => { e.stopPropagation(); navigateModal('next'); }}
+          >
+            ›
+          </button>
+
+          <div className="person-page-image-modal-counter">
+            {modalIdx + 1}/{images.length}
+          </div>
         </div>
       )}
     </main>

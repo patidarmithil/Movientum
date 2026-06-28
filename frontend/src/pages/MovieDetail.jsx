@@ -39,8 +39,65 @@ const formatUSD = (val) => {
 const formatINR = (val) => {
   if (!val) return 'N/A';
   const inrVal = val * 83.5;
+  if (inrVal >= 10000000) {
+    return `Rs. ${(inrVal / 10000000).toFixed(2).replace(/\.00$/, '')} Cr.`;
+  } else if (inrVal >= 100000) {
+    return `Rs. ${(inrVal / 100000).toFixed(2).replace(/\.00$/, '')} Lakh`;
+  }
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(inrVal);
 };
+
+// ── Collection Box (Sequel/Prequel) ──────────────────────────────
+function CollectionBox({ name, parts }) {
+  const scrollRef = useRef(null)
+  const CARD_W = 160
+  const VISIBLE = 3
+
+  const scroll = (dir) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: dir * CARD_W * VISIBLE, behavior: 'smooth' })
+    }
+  }
+
+  return (
+    <div className="movie-detail__collection-box">
+      <h4 className="collection-box__title">{name}</h4>
+      <div className="collection-box__scroll-wrap">
+        {parts.length > VISIBLE && (
+          <button className="collection-box__arrow left" onClick={() => scroll(-1)} aria-label="Scroll left">‹</button>
+        )}
+        <div className="collection-box__row" ref={scrollRef}>
+          {parts.map(part => (
+            <Link
+              key={part.id}
+              to={`/movies/${part.id}`}
+              className="collection-card"
+            >
+              <div className="collection-card__poster-wrap">
+                <img
+                  src={`${TMDB_IMAGE_BASE}/w185${part.poster_path}`}
+                  alt={part.title}
+                  className="collection-card__poster"
+                  loading="lazy"
+                />
+                <span className={`collection-card__badge badge--${part.badge.toLowerCase().replace(' ', '-')}`}>
+                  {part.badge}
+                </span>
+              </div>
+              <p className="collection-card__title">{part.title}</p>
+              {part.release_date && (
+                <p className="collection-card__year">{part.release_date.slice(0, 4)}</p>
+              )}
+            </Link>
+          ))}
+        </div>
+        {parts.length > VISIBLE && (
+          <button className="collection-box__arrow right" onClick={() => scroll(1)} aria-label="Scroll right">›</button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function MovieDetail() {
   const { id } = useParams()
@@ -94,10 +151,202 @@ export default function MovieDetail() {
   const [posterLoaded, setPosterLoaded] = useState(false)
   const posterRef = useRef(null)
 
+  const [videoReady, setVideoReady] = useState(false)
+  const [showVideo, setShowVideo] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true)
+  const isPlayingRef = useRef(true)
+  const [isMuted, setIsMuted] = useState(true)
+  const playerRef = useRef(null)
+  const backdropContainerRef = useRef(null)
+
+  const trailerKey = videosData?.trailer_key || null
+
+  const [collection, setCollection] = useState(null)
+
   useEffect(() => {
     setPosterLoaded(false)
     setShowRatingMeter(false)
+    setVideoReady(false)
   }, [movieId])
+
+  useEffect(() => {
+    // Check performance guards for autoplay
+    if (window.matchMedia('(max-width: 767px) or (hover: none)').matches) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (navigator.connection && (navigator.connection.effectiveType === '2g' || navigator.connection.effectiveType === 'slow-2g')) return
+    setShowVideo(true)
+  }, [])
+
+  useEffect(() => {
+    if (!showVideo || !trailerKey || !backdropContainerRef.current) return;
+
+    let isApiReady = !!window.YT && !!window.YT.Player;
+
+    const initPlayer = () => {
+      if (playerRef.current) return; // already init
+      playerRef.current = new window.YT.Player(`yt-player-${movieId}`, {
+        videoId: trailerKey,
+        playerVars: {
+          autoplay: 1,
+          mute: 1,
+          controls: 1,
+          modestbranding: 1,
+          showinfo: 0,
+          rel: 0,
+          disablekb: 0,
+          playsinline: 1
+        },
+        events: {
+          onReady: (event) => {
+            event.target.playVideo();
+          },
+          onStateChange: (event) => {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              setVideoReady(true);
+            } else if (event.data === window.YT.PlayerState.ENDED) {
+              event.target.playVideo();
+            }
+          }
+        }
+      });
+    };
+
+    const loadYoutubeApi = () => {
+      if (isApiReady) {
+        initPlayer();
+      } else {
+        if (!document.getElementById('youtube-iframe-api')) {
+          const tag = document.createElement('script');
+          tag.id = 'youtube-iframe-api';
+          tag.src = 'https://www.youtube.com/iframe_api';
+          const firstScriptTag = document.getElementsByTagName('script')[0];
+          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+        // Save original callback if exists
+        const oldCallback = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+          if (oldCallback) oldCallback();
+          isApiReady = true;
+          initPlayer();
+        };
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadYoutubeApi();
+          if (playerRef.current && typeof playerRef.current.playVideo === 'function' && isPlayingRef.current) {
+            playerRef.current.playVideo();
+          }
+        } else {
+          if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+            playerRef.current.pauseVideo();
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(backdropContainerRef.current);
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+          playerRef.current.pauseVideo();
+        }
+      } else {
+        if (playerRef.current && typeof playerRef.current.playVideo === 'function' && isPlayingRef.current) {
+          if (backdropContainerRef.current && backdropContainerRef.current.getBoundingClientRect().top < window.innerHeight) {
+             playerRef.current.playVideo();
+          }
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      setVideoReady(false);
+    };
+  }, [showVideo, trailerKey, movieId]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const iframe = document.getElementById(`yt-player-${movieId}`);
+      if (!iframe) return;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        iframe.style.pointerEvents = 'none';
+      } else {
+        iframe.style.pointerEvents = 'auto';
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, [movieId]);
+
+  const togglePlay = () => {
+    if (!playerRef.current || typeof playerRef.current.getPlayerState !== 'function') return;
+    if (isPlayingRef.current) {
+      playerRef.current.pauseVideo();
+      setIsPlaying(false);
+      isPlayingRef.current = false;
+    } else {
+      playerRef.current.playVideo();
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+    }
+  };
+
+  const toggleMute = () => {
+    if (!playerRef.current || typeof playerRef.current.isMuted !== 'function') return;
+    if (isMuted) {
+      playerRef.current.unMute();
+      setIsMuted(false);
+    } else {
+      playerRef.current.mute();
+      setIsMuted(true);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    const iframe = document.getElementById(`yt-player-${movieId}`);
+    if (!iframe) return;
+    if (!document.fullscreenElement) {
+      if (iframe.requestFullscreen) {
+        iframe.requestFullscreen();
+      } else if (iframe.webkitRequestFullscreen) {
+        iframe.webkitRequestFullscreen();
+      } else if (iframe.msRequestFullscreen) {
+        iframe.msRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  const handleBackdropClick = (e) => {
+    // Ignore clicks on buttons, links, posters, or the controls overlay
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.clickable-poster') || e.target.closest('.backdrop-controls')) {
+      return;
+    }
+    togglePlay();
+  };
 
   useEffect(() => {
     if (posterRef.current && posterRef.current.complete) {
@@ -164,6 +413,34 @@ export default function MovieDetail() {
 
     return () => { cancelled = true }
   }, [movieId])
+
+  // ── Fetch collection (sequel/prequel) ──────────────────────
+  useEffect(() => {
+    if (!movie?.belongs_to_collection) { setCollection(null); return }
+    const collId = movie.belongs_to_collection.id
+    let cancelled = false
+    import('../utils/api').then(({ default: api }) =>
+      api.get(`/api/v1/movies/collection/${collId}`)
+        .then(r => {
+          if (!cancelled) {
+            // filter out current movie, tag each part
+            const currentDate = movie.release_date || ''
+            const parts = (r.data.parts || [])
+              .filter(p => p.id !== movieId)
+              .map((p, idx, arr) => {
+                let badge = `PART ${idx + 1}`
+                if (p.release_date && currentDate) {
+                  badge = p.release_date < currentDate ? 'PREQUEL' : 'SEQUEL'
+                }
+                return { ...p, badge }
+              })
+            if (parts.length > 0) setCollection({ name: r.data.name, parts })
+          }
+        })
+        .catch(() => {})
+    )
+    return () => { cancelled = true }
+  }, [movieId, movie?.belongs_to_collection?.id])
 
   // ── Fetch similar movies ─────────────────────────────
   useEffect(() => {
@@ -329,18 +606,41 @@ export default function MovieDetail() {
   const directors  = movie.directors || []
 
   return (
-    <main className="movie-detail page-content">
+    <main className="movie-detail page-content" onClick={handleBackdropClick}>
       {/* ── Backdrop ── */}
       {backdropUrl && (
-        <div className="movie-detail__backdrop-container">
+        <div ref={backdropContainerRef} className="movie-detail__backdrop-container">
           <div
-            className="movie-detail__backdrop"
+            className="movie-detail__backdrop movie-detail__backdrop-img"
             style={{ backgroundImage: `url(${backdropUrl})` }}
             aria-hidden="true"
           />
+          {trailerKey && showVideo && (
+            <div className={`movie-detail__backdrop-video ${videoReady ? 'ready' : ''}`}>
+              <div id={`yt-player-${movieId}`} />
+            </div>
+          )}
         </div>
       )}
       <div className="movie-detail__backdrop-overlay" aria-hidden="true" />
+
+      {/* Controls Overlay */}
+      {trailerKey && showVideo && videoReady && (
+        <div className="backdrop-controls">
+          <button className="backdrop-btn" onClick={toggleFullscreen} aria-label="Fullscreen">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+          </button>
+          <button className="backdrop-btn" onClick={toggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'}>
+            {isMuted ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="container">
         {/* ── Top: poster + info ── */}
@@ -571,6 +871,15 @@ export default function MovieDetail() {
                   {reqNeededState.success ? '✓ Requested' : reqNeededState.loading ? 'Requesting...' : 'Request Rating'}
                 </button>
               </div>
+            )}
+
+            {/* Collection Box */}
+            {collection && (
+              <CollectionBox
+                name={collection.name}
+                parts={collection.parts}
+                currentMovieDate={movie.release_date}
+              />
             )}
           </div>
         </div>

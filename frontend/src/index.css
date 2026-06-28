@@ -196,6 +196,9 @@ button {
 
 .animate-rating-reveal {
   animation: ratingRevealPlay 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @keyframes ratingRevealPlay {
