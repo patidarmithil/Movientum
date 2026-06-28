@@ -62,6 +62,26 @@ api.interceptors.response.use(
     // ── Basic error logging ──────────────────────────────────
     console.error('[API Error]', original?.url, error.response?.status, error.message)
 
+    let errorCode = 'MV-FNW01';
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      errorCode = 'MV-FNW02';
+    } else if (error.response) {
+      if (error.response.status === 401) {
+        errorCode = 'MV-FAU01';
+      } else if (error.response.data?.code) {
+        errorCode = error.response.data.code;
+      } else {
+        errorCode = 'MV-BSV01';
+      }
+    }
+
+    if (errorCode) {
+      error.message = `${error.message} [${errorCode}]`;
+      if (error.response?.data && typeof error.response.data === 'object') {
+        error.response.data.message = `${error.response.data.message || error.message} [${errorCode}]`;
+      }
+    }
+
     // Skip retry for refresh endpoint itself — prevents infinite loop
     if (original?.url?.includes('/auth/refresh')) {
       // Refresh failed → force logout
@@ -122,6 +142,7 @@ api.interceptors.response.use(
         storage.removeItem('mv_user')
         window.dispatchEvent(new Event('mv:logout'))
 
+        refreshError.message = `${refreshError.message} [MV-FAU02]`;
         return Promise.reject(refreshError)
       }
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './InfoBanner.css';
@@ -9,6 +9,7 @@ export default function InfoBanner() {
   const navigate = useNavigate();
   const [activeBanner, setActiveBanner] = useState(null);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const modalRef = useRef(null);
 
   useEffect(() => {
     const path = location.pathname;
@@ -28,8 +29,8 @@ export default function InfoBanner() {
       return isDismissedPermanent(bannerId) || isDismissedSession(bannerId);
     };
 
-    // Random choice utility (60% probability for "sometimes" to ensure they show up reliably during tests/usage)
-    const rollDice = () => Math.random() < 0.6;
+    // Random choice utility (40% probability for "sometimes" to ensure they show up reliably during tests/usage)
+    const rollDice = () => Math.random() < 0.4;
 
     let selectedBanner = null;
 
@@ -93,8 +94,6 @@ export default function InfoBanner() {
     };
   }, [location.pathname, isLoggedIn, user]);
 
-  if (!activeBanner) return null;
-
   const handleDismiss = () => {
     if (isLoggedIn && user?.username) {
       if (dontShowAgain) {
@@ -114,6 +113,23 @@ export default function InfoBanner() {
 
     setActiveBanner(null);
   };
+
+  useEffect(() => {
+    if (!activeBanner) return;
+
+    const handleClickOutside = (event) => {
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        handleDismiss();
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [activeBanner, dontShowAgain, isLoggedIn, user]);
+
+  if (!activeBanner) return null;
 
   const handleAction = () => {
     if (activeBanner === 'home-for-you-more') {
@@ -171,7 +187,7 @@ export default function InfoBanner() {
 
   return (
     <div className="info-banner-overlay">
-      <div className="info-banner-modal">
+      <div className="info-banner-modal" ref={modalRef}>
         <button className="info-banner-close" onClick={handleDismiss} aria-label="Close">&times;</button>
         <h3 className="info-banner-title">{current.title}</h3>
         <p className="info-banner-desc">{current.desc}</p>

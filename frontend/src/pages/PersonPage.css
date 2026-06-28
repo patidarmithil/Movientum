@@ -389,7 +389,6 @@
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-  animation: modalZoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes modalFadeIn {
@@ -400,4 +399,72 @@
 @keyframes modalZoomIn {
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* Image Modal Navigation Features */
+.person-page-image-modal-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: white;
+  font-size: 48px;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  z-index: 10001;
+  transition: background 0.2s;
+  padding-bottom: 4px; /* visually center the arrow */
+}
+.person-page-image-modal-nav:hover {
+  background: rgba(255,255,255,0.2);
+}
+.person-page-image-modal-nav.prev {
+  left: 20px;
+}
+.person-page-image-modal-nav.next {
+  right: 20px;
+}
+
+@media (hover: none) {
+  .person-page-image-modal-nav {
+    display: none;
+  }
+}
+
+.person-page-image-modal-counter {
+  position: absolute;
+  bottom: 30px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  z-index: 10001;
+  background: rgba(0,0,0,0.5);
+  padding: 6px 16px;
+  border-radius: 16px;
+}
+
+/* Modal Animations */
+.person-page-image-modal-img.slide-init {
+  animation: modalZoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.person-page-image-modal-img.slide-next {
+  animation: slideInRight 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+.person-page-image-modal-img.slide-prev {
+  animation: slideInLeft 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
