@@ -328,6 +328,18 @@ export default function MovieDetail() {
   const toggleFullscreen = () => {
     const iframe = document.getElementById(`yt-player-${movieId}`);
     if (!iframe) return;
+
+    if (!iframe.requestFullscreen && !iframe.webkitRequestFullscreen && !iframe.msRequestFullscreen) {
+      // Fallback for iOS Safari which doesn't support element fullscreen
+      setIsTrailerModalOpen(true);
+      if (playerRef.current && isPlayingRef.current) {
+        playerRef.current.pauseVideo();
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+      }
+      return;
+    }
+
     if (!document.fullscreenElement) {
       if (iframe.requestFullscreen) {
         iframe.requestFullscreen();
