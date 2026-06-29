@@ -55,6 +55,7 @@ import SettingsImport from './pages/settings/SettingsImport'
 import ScrollRestore from './components/ScrollRestore'
 import ErrorBoundary from './components/ErrorBoundary'
 import ErrorPage from './pages/ErrorPage'
+import AnalyticsLoader from './components/AnalyticsLoader'
 import './index.css'
 import './components/Navbar.css'
 
@@ -284,6 +285,7 @@ export default function App() {
     <BrowserRouter>
       <ErrorBoundary>
         <AuthProvider>
+          <AnalyticsLoader />
           <AppRoutes />
           <Analytics />
         </AuthProvider>
