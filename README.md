@@ -48,7 +48,7 @@ Movientum is a cinematic discovery platform where users browse movies & TV shows
 | **python-jose + passlib[bcrypt]** | JWT auth + password hashing |
 | **Pydantic v2** | Request/response validation |
 
-**Deployed on:** Railway / self-hosted VPS with Docker
+**Deployed on:** Azure with Docker
 
 ### Infrastructure & Data
 | Service | Role |
@@ -264,7 +264,9 @@ backend/
 │   │   ├── requests.py          # Catalog addition requests
 │   │   ├── users.py             # Profile details and generic updates
 │   │   ├── watching_tracker.py  # User media playbacks monitoring
-│   │   └── recommendation_signals.py # ML training logs metadata
+│   │   ├── temp_tracker.py      # Temp interest tracker, auto-promotes to Plan to Watch
+│   │   ├── internal.py          # Internal/admin endpoints (cron triggers, cleanup)
+│   │   └── recommendation_signals.py # Explicit rec feedback signals (thumbs, not-interested)
 │   ├── services/                # Business logic and computations layers
 │   │   ├── auth_service.py      # BCrypt hashing, JWT generation, session validations
 │   │   ├── tmdb_service.py      # TMDB remote integrations, candidate ingestion pipeline
@@ -277,7 +279,8 @@ backend/
 │   │   ├── click_service.py     # Click-through tracking metrics processing
 │   │   ├── analysis_service.py  # User behavior visualizations statistics computations
 │   │   ├── news_service.py      # News feeds collection, parsing & caching
-│   │   └── recommendation_service.py # Baseline recommendations and fallback matching rules
+│   │   ├── recommendation_service.py # Baseline recommendations and fallback matching rules
+│   │   └── content_recs_service.py  # Content-based filtering using metadata embeddings
 │   ├── tasks/                   # Celery scheduled micro-processes (news updates, nightly runs)
 │   ├── schemas/                 # Pydantic schemas validating input/output contracts
 │   └── utils/                   # Shared dependency files (security, db dependencies)
@@ -307,13 +310,16 @@ frontend/
 │   │   ├── watchlistService.js  # Dedicated user list groupings
 │   │   ├── newsService.js       # Global movie news articles dispatcher
 │   │   ├── notificationService.js # User actions system alarms
-│   │   └── watchingTrackerService.js # View durations monitoring API
+│   │   ├── watchingTrackerService.js # View durations monitoring API
+│   │   ├── planToWatchService.js  # Plan-to-watch list
+│   │   ├── tempTrackerService.js  # Temp interest tracker API
+│   │   └── settingsService.js     # User settings
 │   ├── pages/                   # Main page layouts (JS logic + matching Vanilla CSS sheets)
 │   │   ├── Intro.jsx / .css     # Dynamic WebGL Aurora introductory lander
 │   │   ├── Home.jsx / .css      # Profile headers, carousels, customizable movie rows
 │   │   ├── Explore.jsx / .css   # Filtering catalog listings interface
-│   │   ├── MovieDetail.jsx / .css # Movie metadata details, cast lists, trailers, and similar
-│   │   ├── TVDetail.jsx         # Television metadata panels
+│   │   ├── MovieDetail.jsx / .css # Movie metadata details, cast lists, trailers, and similar (fs disabled on mobile)
+│   │   ├── TVDetail.jsx         # Television metadata panels (fs disabled on mobile)
 │   │   ├── PersonPage.jsx / .css # Actor/director bios & complete filmographies
 │   │   ├── Search.jsx / .css    # Autocomplete lists & full-text results page
 │   │   ├── Login.jsx / .css     # Glassmorphic user entry login form
@@ -328,6 +334,14 @@ frontend/
 │   │   ├── CountryPage.jsx      # Regional filters details page
 │   │   ├── AdminDashboard.jsx / .css # System administration dashboard
 │   │   └── ErrorPage.jsx / .css # HTTP error responses handlers
+│   ├── hooks/
+│   │   ├── useScrollRestore.js  # Restore scroll on back-navigation
+│   │   └── useSessionState.js   # sessionStorage-backed state hook
+│   ├── utils/
+│   │   ├── api.js               # Axios instance, auth interceptors, 401 → mv:logout event
+│   │   ├── pageCache.js         # In-memory page-level API response cache
+│   │   ├── storage.js           # LocalStorage helpers (JSON parse/stringify)
+│   │   └── analytics.js         # Umami queue helpers — trackPageView, trackEvent; flushes on load
 │   └── components/              # Reusable page widgets
 │       ├── MovieCard.jsx / .css # Glassmorphic movie metadata cover widget
 │       ├── MovieCardSkeleton.jsx # Ghost loadings templates placeholders
@@ -354,7 +368,13 @@ frontend/
 │       ├── ScrollRestore.jsx    # Scroll position updates recorder
 │       ├── ScrollReveal.jsx     # On-scroll entry animations
 │       ├── ShinyText.jsx / .css # Textured glowing heading typography styles
-│       └── StaggerContainer.jsx # Delayed cards entrances wrapper
+│       ├── StaggerContainer.jsx  # Delayed cards entrances wrapper
+│       ├── AnalyticsLoader.jsx   # Lazy Umami script mount; adblock fetch fallback; queue flush
+│       ├── ColdStartLoader.jsx   # Loading state for cold-start recs
+│       ├── InfoBanner.jsx        # Global info/alert banner
+│       ├── FilterDropdown.jsx    # Generic filter dropdown
+│       ├── WatchlistSection.jsx  # Watchlist section in dashboard
+│       └── ProtectedRoute.jsx    # Auth guard wrapper for protected routes
 ├── index.html                   # Base HTML index template
 ├── vite.config.js               # Vite configurations (plugins, server ports)
 └── package.json                 # Node modules catalog dependencies specifications

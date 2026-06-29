@@ -113,7 +113,8 @@ export default function TVDetail() {
           showinfo: 0,
           rel: 0,
           disablekb: 0,
-          playsinline: 1
+          playsinline: 1,
+          fs: window.innerWidth < 768 ? 0 : 1
         },
         events: {
           onReady: (event) => {
