@@ -91,7 +91,6 @@ export default function TVDetail() {
   }, [tvId])
 
   useEffect(() => {
-    if (window.matchMedia('(max-width: 767px) or (hover: none)').matches) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     if (navigator.connection && (navigator.connection.effectiveType === '2g' || navigator.connection.effectiveType === 'slow-2g')) return
     setShowVideo(true)
