@@ -97,10 +97,49 @@ export default function AnalyticsLoader() {
         setTimeout(flushQueue, 100);
       };
 
+      // Fallback API implementation for Adblockers
+      const setupFallback = () => {
+        console.info("Umami script blocked. Using fallback API.");
+        const apiUrl = scriptUrl.replace('/script.js', '/api/send');
+        
+        window.umami = {
+          track: (eventName, data) => {
+            try {
+              const payload = {
+                website: websiteId,
+                hostname: window.location.hostname,
+                language: navigator.language,
+                screen: `${window.screen.width}x${window.screen.height}`,
+                url: window.location.pathname + window.location.search,
+              };
+
+              if (typeof eventName === 'function') {
+                Object.assign(payload, eventName(payload));
+              } else if (typeof eventName === 'string') {
+                payload.name = eventName;
+                if (data) payload.data = data;
+              }
+
+              fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ type: 'event', payload }),
+                keepalive: true
+              }).catch(() => {});
+            } catch (e) {
+              console.error("Fallback analytics failed", e);
+            }
+          }
+        };
+        flushQueue();
+      };
+
       // Handle ad blockers
       script.onerror = () => {
-        console.info("Umami blocked or unavailable.");
         stopRetryLoop();
+        setupFallback();
       };
       
       document.head.appendChild(script);
@@ -113,7 +152,12 @@ export default function AnalyticsLoader() {
           flushQueue();
         } else {
           retries++;
-          if (retries >= 30) stopRetryLoop();
+          if (retries >= 30) {
+            stopRetryLoop();
+            if (!window.umami) {
+              setupFallback();
+            }
+          }
         }
       }, 1000);
     };

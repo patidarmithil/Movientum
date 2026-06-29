@@ -343,6 +343,18 @@
   .movie-detail__info-col {
     padding-top: 0;
   }
+
+  .movie-detail__backdrop-video {
+    min-height: 70vh !important;
+    min-width: 124.44vh !important;
+    top: 50% !important;
+  }
+
+  .backdrop-controls {
+    opacity: 1 !important;
+    transform: scale(0.9);
+    right: 2%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -363,6 +375,17 @@
   }
   .movie-detail__backdrop {
     background-position: center center !important;
+  }
+  .movie-detail__backdrop-video {
+    min-height: 50vh !important;
+    min-width: 88.88vh !important;
+    top: 50% !important;
+  }
+  .backdrop-controls {
+    opacity: 1 !important;
+    transform: scale(0.85);
+    right: 2%;
+    top: calc(var(--navbar-h) + 12px);
   }
   .movie-detail__backdrop-overlay {
     background: linear-gradient(
