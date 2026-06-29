@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getQueue, setQueue, track } from '../utils/analytics';
+import { getQueue, setQueue, trackPageView } from '../utils/analytics';
 
 export default function AnalyticsLoader() {
   const location = useLocation();
@@ -15,9 +15,7 @@ export default function AnalyticsLoader() {
     if (previousPath.current === location.pathname) return;
     previousPath.current = location.pathname;
 
-    track("pageview", {
-      url: location.pathname + location.search
-    });
+    trackPageView(location.pathname + location.search);
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -56,27 +54,38 @@ export default function AnalyticsLoader() {
         const now = Date.now();
         const FIVE_MIN = 5 * 60 * 1000;
         
-        // Flush safely in strict chronological order
-        queue.sort((a, b) => a.timestamp - b.timestamp);
-
-        while (queue.length) {
-          const event = queue.shift();
-          
-          // Expire stale events
-          if (now - event.timestamp > FIVE_MIN) {
-            continue;
-          }
+        // 1. Flush pageviews first
+        queue.pageviews.sort((a, b) => a.timestamp - b.timestamp);
+        while (queue.pageviews.length) {
+          const pv = queue.pageviews.shift();
+          if (now - pv.timestamp > FIVE_MIN) continue;
           
           try {
-            if (event.data) {
-              window.umami.track(event.name, event.data);
-            } else {
-              window.umami.track(event.name);
-            }
+            window.umami.track((props) => ({ ...props, url: pv.url }));
           } catch (error) {
-            // Put it back and stop if it fails
-            queue.unshift(event);
+            queue.pageviews.unshift(pv);
             break;
+          }
+        }
+
+        // 2. Flush custom events next
+        // Only if pageviews flushed successfully to preserve overall session ordering
+        if (queue.pageviews.length === 0) {
+          queue.events.sort((a, b) => a.timestamp - b.timestamp);
+          while (queue.events.length) {
+            const event = queue.events.shift();
+            if (now - event.timestamp > FIVE_MIN) continue;
+            
+            try {
+              if (event.data) {
+                window.umami.track(event.name, event.data);
+              } else {
+                window.umami.track(event.name);
+              }
+            } catch (error) {
+              queue.events.unshift(event);
+              break;
+            }
           }
         }
         

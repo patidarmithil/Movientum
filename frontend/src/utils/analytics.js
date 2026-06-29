@@ -5,10 +5,17 @@ const FIVE_MIN = 5 * 60 * 1000;
 export const getQueue = () => {
   try {
     const q = sessionStorage.getItem(QUEUE_KEY);
-    return q ? JSON.parse(q) : [];
+    if (q) {
+      const parsed = JSON.parse(q);
+      if (Array.isArray(parsed)) {
+        return { pageviews: [], events: [] };
+      }
+      return parsed;
+    }
   } catch {
-    return [];
+    // ignore
   }
+  return { pageviews: [], events: [] };
 };
 
 export const setQueue = (queue) => {
@@ -17,11 +24,37 @@ export const setQueue = (queue) => {
   } catch {}
 };
 
-export const track = (eventName, data) => {
-  // Respect browser privacy settings
-  if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || navigator.doNotTrack === "yes") {
-    return;
+const checkPrivacy = () => {
+  return navigator.doNotTrack === "1" || window.doNotTrack === "1" || navigator.doNotTrack === "yes";
+};
+
+export const trackPageView = (url) => {
+  if (checkPrivacy()) return;
+
+  if (window.umami) {
+    // Use Umami's official SPA pageview API
+    window.umami.track((props) => ({ ...props, url }));
+  } else {
+    let queue = getQueue();
+    const now = Date.now();
+    
+    queue.pageviews = queue.pageviews.filter(e => now - e.timestamp < FIVE_MIN);
+
+    queue.pageviews.push({
+      url,
+      timestamp: now
+    });
+    
+    if (queue.pageviews.length > MAX_QUEUE) {
+      queue.pageviews.shift();
+    }
+    
+    setQueue(queue);
   }
+};
+
+export const trackEvent = (eventName, data) => {
+  if (checkPrivacy()) return;
 
   if (window.umami) {
     if (data) {
@@ -33,20 +66,21 @@ export const track = (eventName, data) => {
     let queue = getQueue();
     const now = Date.now();
     
-    // Expire events during insertion
-    queue = queue.filter(e => now - e.timestamp < FIVE_MIN);
+    queue.events = queue.events.filter(e => now - e.timestamp < FIVE_MIN);
 
-    queue.push({
+    queue.events.push({
       name: eventName,
       data,
       timestamp: now
     });
     
-    // Limit queue size
-    if (queue.length > MAX_QUEUE) {
-      queue.shift(); // Remove oldest
+    if (queue.events.length > MAX_QUEUE) {
+      queue.events.shift();
     }
     
     setQueue(queue);
   }
 };
+
+// Aliased for backward compatibility if any old code uses track()
+export const track = trackEvent;
