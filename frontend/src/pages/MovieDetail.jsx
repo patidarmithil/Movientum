@@ -203,6 +203,12 @@ export default function MovieDetail() {
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
               setVideoReady(true);
+              setIsPlaying(true);
+              isPlayingRef.current = true;
+            } else if (event.data === window.YT.PlayerState.PAUSED || event.data === window.YT.PlayerState.UNSTARTED) {
+              setVideoReady(true); // make sure it's visible so user can click it
+              setIsPlaying(false);
+              isPlayingRef.current = false;
             } else if (event.data === window.YT.PlayerState.ENDED) {
               event.target.playVideo();
             }
@@ -628,6 +634,13 @@ export default function MovieDetail() {
       {/* Controls Overlay */}
       {trailerKey && showVideo && videoReady && (
         <div className="backdrop-controls">
+          <button className="backdrop-btn" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
+            {isPlaying ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            )}
+          </button>
           <button className="backdrop-btn" onClick={toggleFullscreen} aria-label="Fullscreen">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>

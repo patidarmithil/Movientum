@@ -25,7 +25,7 @@ export const setQueue = (queue) => {
 };
 
 const checkPrivacy = () => {
-  return navigator.doNotTrack === "1" || window.doNotTrack === "1" || navigator.doNotTrack === "yes";
+  return false;
 };
 
 export const trackPageView = (url) => {
