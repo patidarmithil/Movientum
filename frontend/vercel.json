@@ -11,6 +11,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/st/track.js", "destination": "https://umami-analytics-e0d9.onrender.com/script.js" },
+    { "source": "/st/api/send", "destination": "https://umami-analytics-e0d9.onrender.com/api/send" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
     { "source": "/logo.png", "destination": "/logo.png" },
