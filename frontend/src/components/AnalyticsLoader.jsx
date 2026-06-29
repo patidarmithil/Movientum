@@ -8,10 +8,6 @@ export default function AnalyticsLoader() {
 
   // Avoid duplicate pageviews
   useEffect(() => {
-    if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || navigator.doNotTrack === "yes") {
-      return;
-    }
-
     if (previousPath.current === location.pathname) return;
     previousPath.current = location.pathname;
 
@@ -19,11 +15,6 @@ export default function AnalyticsLoader() {
   }, [location.pathname, location.search]);
 
   useEffect(() => {
-    // Respect browser privacy settings
-    if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || navigator.doNotTrack === "yes") {
-      return;
-    }
-
     let fallbackPoll = null;
 
     const stopRetryLoop = () => {
