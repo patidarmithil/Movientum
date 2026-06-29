@@ -33,7 +33,7 @@ export default function AnalyticsLoader() {
     const loadUmami = () => {
       // Use environment variables
       const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID || '5ff5b833-03c6-4c4f-9264-e239a3ea74da';
-      const scriptUrl = import.meta.env.VITE_UMAMI_SCRIPT || 'https://umami-analytics-e0d9.onrender.com/script.js';
+      const scriptUrl = import.meta.env.VITE_UMAMI_SCRIPT || '/st/track.js';
 
       // Deduplicate script injection
       if (window.umami) return;
@@ -100,7 +100,9 @@ export default function AnalyticsLoader() {
       // Fallback API implementation for Adblockers
       const setupFallback = () => {
         console.info("Umami script blocked. Using fallback API.");
-        const apiUrl = scriptUrl.replace('/script.js', '/api/send');
+        const apiUrl = scriptUrl.includes('/track.js') 
+          ? scriptUrl.replace('/track.js', '/api/send')
+          : scriptUrl.replace('/script.js', '/api/send');
         
         window.umami = {
           track: (eventName, data) => {

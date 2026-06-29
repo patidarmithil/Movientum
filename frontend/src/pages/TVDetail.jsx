@@ -117,6 +117,7 @@ export default function TVDetail() {
         },
         events: {
           onReady: (event) => {
+            event.target.mute();
             event.target.playVideo();
           },
           onStateChange: (event) => {
@@ -155,6 +156,7 @@ export default function TVDetail() {
         if (entries[0].isIntersecting) {
           loadYoutubeApi();
           if (playerRef.current && typeof playerRef.current.playVideo === 'function' && isPlayingRef.current) {
+            playerRef.current.mute();
             playerRef.current.playVideo();
           }
         } else {
