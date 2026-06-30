@@ -191,20 +191,6 @@ export default function Navbar() {
                 <span>DNA</span>
               </NavLink>
 
-              {/* About / Intro page link */}
-              <NavLink
-                to="/about"
-                className={({ isActive }) =>
-                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-                }
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <span>About</span>
-              </NavLink>
 
               {isLoggedIn && (
                 <>
@@ -249,20 +235,7 @@ export default function Navbar() {
                 </>
               )}
 
-              {/* Help nav button */}
-              <NavLink
-                to="/help"
-                className={({ isActive }) =>
-                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
-                }
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                <span>Help</span>
-              </NavLink>
+
             </>
           )}
 
@@ -416,6 +389,23 @@ export default function Navbar() {
                     >
                       <span>⚙️</span> Settings
                     </Link>
+                    <Link
+                      to="/help"
+                      className="navbar__dropdown-item"
+                      role="menuitem"
+                      onClick={() => setDropOpen(false)}
+                    >
+                      <span>❓</span> Help
+                    </Link>
+                    <Link
+                      to="/about"
+                      className="navbar__dropdown-item"
+                      role="menuitem"
+                      onClick={() => setDropOpen(false)}
+                    >
+                      <span>✨</span> About
+                    </Link>
+
                     {user?.role === 'admin' && (
                       <Link
                         to="/admin"

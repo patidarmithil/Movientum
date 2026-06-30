@@ -421,6 +421,61 @@ export default function RecommendationsContent() {
           </p>
         </header>
 
+        <div style={{
+          background: 'rgba(255, 165, 0, 0.1)',
+          border: '1px solid rgba(255, 165, 0, 0.3)',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          margin: '0 auto 24px auto',
+          maxWidth: '600px',
+          color: '#ffb74d',
+          textAlign: 'center',
+          fontSize: '14px',
+          fontWeight: '500'
+        }}>
+          🚧 Work in Progress: We're upgrading this section to show how our Graph DNA Model works!
+        </div>
+
+        {/* DNA Graph Preview Animation */}
+        <div style={{
+          maxWidth: '800px',
+          margin: '0 auto 32px auto',
+          background: 'rgba(18, 18, 18, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '24px'
+        }}>
+          <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.7)' }}>
+            <strong>How it works:</strong> Our AI extracts content DNA (Genres, Keywords, Cast) to build a relational graph.
+          </div>
+          <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
+            {/* Mock Node 1 */}
+            <div style={{
+              width: '100px', height: '140px', background: 'var(--surface-card)',
+              borderRadius: '8px', border: '1px solid rgba(0, 194, 255, 0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 15px rgba(0, 194, 255, 0.2)', fontSize: '32px'
+            }}>🎬</div>
+            {/* Edges */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#00C2FF', fontSize: '12px', fontWeight: 'bold' }}>
+              <span style={{ borderBottom: '2px dashed rgba(0, 194, 255, 0.4)', paddingBottom: '4px' }}>Shared Genre ↔</span>
+              <span style={{ borderBottom: '2px dashed rgba(123, 47, 190, 0.4)', paddingBottom: '4px', color: '#c084fc' }}>Same Director ↔</span>
+              <span style={{ borderBottom: '2px dashed rgba(255, 0, 128, 0.4)', paddingBottom: '4px', color: '#FF0080' }}>Shared Vibe ↔</span>
+            </div>
+            {/* Mock Node 2 */}
+            <div style={{
+              width: '100px', height: '140px', background: 'var(--surface-card)',
+              borderRadius: '8px', border: '1px solid rgba(255, 0, 128, 0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 15px rgba(255, 0, 128, 0.2)', fontSize: '32px'
+            }}>📺</div>
+          </div>
+        </div>
+
         <section className="reccontent-search-section">
           {/* ACM Panel integrated directly */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>

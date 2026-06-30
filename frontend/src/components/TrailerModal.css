@@ -257,3 +257,25 @@
   transform: translateY(-1px);
 }
 
+.trailer-view-btn {
+  margin-left: auto;
+  background: var(--surface-button);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.trailer-view-btn:hover {
+  background: rgba(176, 72, 255, 0.15);
+  border-color: rgba(176, 72, 255, 0.4);
+  color: #c084fc;
+  transform: translateY(-2px);
+}
+

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import './TrailerModal.css'
 
 import api from '../utils/api'
 
-export default function TrailerModal({ isOpen, onClose, data, seasons, tvId }) {
+export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, directVideoKey, contentId, mediaType }) {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("trailer") // "trailer" | "teaser"
   const [selectedSeason, setSelectedSeason] = useState("all")
   const [seasonVideos, setSeasonVideos] = useState(null)
@@ -51,11 +53,26 @@ export default function TrailerModal({ isOpen, onClose, data, seasons, tvId }) {
   if (!isOpen) return null;
 
   const currentData = selectedSeason === "all" ? data : seasonVideos
-  const currentKey = activeTab === "trailer" ? currentData?.trailer_key : currentData?.teaser_key
+  
+  // If directVideoKey is passed, we override the normal flow and just play that
+  const currentKey = directVideoKey 
+    ? directVideoKey 
+    : (activeTab === "trailer" ? currentData?.trailer_key : currentData?.teaser_key)
+    
   const currentQuery = activeTab === "trailer" ? currentData?.fallback_queries?.trailer : currentData?.fallback_queries?.teaser
 
   // Determine iframe src URL
   const embedUrl = currentKey ? `https://www.youtube-nocookie.com/embed/${currentKey}?autoplay=0&rel=0&origin=${window.location.origin}` : "";
+
+  const handleViewClick = (e) => {
+    e.stopPropagation();
+    onClose();
+    if (mediaType === 'tv') {
+      navigate(`/tv/${contentId}`);
+    } else {
+      navigate(`/movies/${contentId}`);
+    }
+  };
 
   return createPortal(
     <div className="trailer-modal-overlay" onClick={onClose}>
@@ -140,20 +157,27 @@ export default function TrailerModal({ isOpen, onClose, data, seasons, tvId }) {
               )}
             </div>
           )}
-          <div className="trailer-tab-bar">
-            <button 
-              className={activeTab === "trailer" ? "active" : ""} 
-              onClick={() => setActiveTab("trailer")}
-            >
-              Trailer
+          {!directVideoKey && (
+            <div className="trailer-tab-bar">
+              <button 
+                className={activeTab === "trailer" ? "active" : ""} 
+                onClick={() => setActiveTab("trailer")}
+              >
+                Trailer
+              </button>
+              <button 
+                className={activeTab === "teaser" ? "active" : ""} 
+                onClick={() => setActiveTab("teaser")}
+              >
+                Teaser
+              </button>
+            </div>
+          )}
+          {directVideoKey && contentId && (
+            <button className="trailer-view-btn" onClick={handleViewClick}>
+              View Details ↗
             </button>
-            <button 
-              className={activeTab === "teaser" ? "active" : ""} 
-              onClick={() => setActiveTab("teaser")}
-            >
-              Teaser
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>,

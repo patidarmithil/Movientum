@@ -11,6 +11,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authService } from '../services/authService'
 import { storage } from '../utils/storage'
+import { getOrCreateDeviceId, getDeviceId } from '../utils/deviceId'
 
 const AuthContext = createContext(null)
 
@@ -18,6 +19,24 @@ const KEYS = {
   access:  'mv_access_token',
   refresh: 'mv_refresh_token',
   user:    'mv_user',
+}
+
+const REFRESH_LOCK_KEY = 'mv_refreshing'
+const REFRESH_LOCK_TTL_MS = 5000  // 5 seconds max for a refresh cycle
+
+function acquireRefreshLock() {
+  try {
+    const existing = localStorage.getItem(REFRESH_LOCK_KEY)
+    if (existing && Date.now() - parseInt(existing, 10) < REFRESH_LOCK_TTL_MS) {
+      return false  // another tab holds the lock
+    }
+    localStorage.setItem(REFRESH_LOCK_KEY, Date.now().toString())
+    return true
+  } catch { return true }  // if localStorage fails, proceed anyway
+}
+
+function releaseRefreshLock() {
+  try { localStorage.removeItem(REFRESH_LOCK_KEY) } catch { /* ignore */ }
 }
 
 export function AuthProvider({ children }) {
@@ -58,6 +77,19 @@ export function AuthProvider({ children }) {
       const storedUser    = storage.getItem(KEYS.user)
 
       if (!storedAccess || !storedRefresh) {
+        // Tokens gone -> try device session fallback
+        const deviceId = getDeviceId()
+        if (deviceId) {
+          try {
+            const data = await authService.deviceLogin(deviceId)
+            persist(data.access_token, data.refresh_token, data.user)
+            // Renew device session TTL on backend
+            await authService.createDeviceSession(deviceId).catch(() => {})
+            return
+          } catch {
+            // Device session expired — user must re-login
+          }
+        }
         setIsLoading(false)
         return
       }
@@ -79,7 +111,18 @@ export function AuthProvider({ children }) {
           const data = await authService.refreshToken(storedRefresh)
           persist(data.access_token, data.refresh_token, data.user ?? JSON.parse(storedUser))
         } catch {
-          clearSession()
+          // Refresh failed too → try device session
+          const deviceId = getDeviceId()
+          if (deviceId) {
+            try {
+              const data = await authService.deviceLogin(deviceId)
+              persist(data.access_token, data.refresh_token, data.user)
+            } catch {
+              clearSession()
+            }
+          } else {
+            clearSession()
+          }
         }
       } finally {
         setIsLoading(false)
@@ -93,6 +136,13 @@ export function AuthProvider({ children }) {
     storage.setRememberMe(rememberMe)
     const data = await authService.login(email, password)
     persist(data.access_token, data.refresh_token, data.user)
+
+    // Register device session (non-blocking, best-effort)
+    const deviceId = getOrCreateDeviceId()
+    if (deviceId) {
+      authService.createDeviceSession(deviceId).catch(() => {})
+    }
+
     return data
   }, [persist])
 
@@ -104,12 +154,31 @@ export function AuthProvider({ children }) {
   }, [persist])
 
   const logout = useCallback(async () => {
-    try { await authService.logout() } catch { /* best-effort */ }
+    try {
+      await authService.logout()
+      // Clean up device session from Redis
+      const deviceId = getDeviceId()
+      if (deviceId) {
+        await authService.deleteDeviceSession(deviceId).catch(() => {})
+      }
+    } catch { /* best-effort */ }
     clearSession()
   }, [clearSession])
 
   const refreshToken = useCallback(async () => {
     if (refreshingRef.current) return null
+
+    if (!acquireRefreshLock()) {
+      // Another tab is refreshing — wait and read new token
+      await new Promise(r => setTimeout(r, 1500))
+      const newAccess = storage.getItem(KEYS.access)
+      if (newAccess) {
+        setAccessToken(newAccess)
+        return newAccess
+      }
+      return null
+    }
+
     refreshingRef.current = true
     try {
       const storedRefresh = storage.getItem(KEYS.refresh)
@@ -123,6 +192,7 @@ export function AuthProvider({ children }) {
       throw new Error('Session expired')
     } finally {
       refreshingRef.current = false
+      releaseRefreshLock()
     }
   }, [persist, clearSession])
 

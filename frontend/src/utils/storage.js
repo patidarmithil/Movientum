@@ -1,8 +1,8 @@
 /**
  * storage.js — Unified Storage Utility (Remember Me support)
  *
- * Modified to force localStorage for all authentication keys with a 2-day expiration
- * and sliding/rolling window logic, ensuring login persists on all browsers for 2 days.
+ * Modified to force localStorage for all authentication keys with a 7-day expiration
+ * and sliding/rolling window logic, ensuring login persists on all browsers for 7 days.
  */
 
 const KEYS = {
@@ -16,7 +16,7 @@ const KEYS = {
 export const storage = {
   /**
    * Determine the target storage mechanism.
-   * Force localStorage to remember sessions across browser closures for 2 days.
+   * Force localStorage to remember sessions across browser closures for 7 days.
    */
   getStorage() {
     return localStorage
@@ -24,7 +24,7 @@ export const storage = {
 
   /**
    * Reads a key from current storage, falling back to either storage if not found.
-   * Enforces a 2-day session timeout and slides expiration if active.
+   * Enforces a 7-day session timeout and slides expiration if active.
    */
   getItem(key) {
     const expiresAt = localStorage.getItem(KEYS.expires)
@@ -40,8 +40,8 @@ export const storage = {
         }
         return null
       } else {
-        // Sliding window: user is active, slide expiration for another 2 days
-        const newExpiresAt = Date.now() + 2 * 24 * 60 * 60 * 1000
+        // Sliding window: user is active, slide expiration for another 7 days
+        const newExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000
         localStorage.setItem(KEYS.expires, newExpiresAt.toString())
       }
     }
@@ -55,13 +55,13 @@ export const storage = {
   },
 
   /**
-   * Writes a key to current storage and updates 2-day expiration timestamp.
+   * Writes a key to current storage and updates 7-day expiration timestamp.
    */
   setItem(key, value) {
     this.getStorage().setItem(key, value)
 
     if (key === KEYS.access || key === KEYS.refresh || key === KEYS.user) {
-      const expiresAt = Date.now() + 2 * 24 * 60 * 60 * 1000
+      const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000
       localStorage.setItem(KEYS.expires, expiresAt.toString())
     }
   },

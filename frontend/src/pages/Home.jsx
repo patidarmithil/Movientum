@@ -26,7 +26,10 @@ import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import ScrollReveal from '../components/ScrollReveal'
 import MovieRow from '../components/MovieRow'
+import TrailerRow from '../components/TrailerRow'
+import TrailerModal from '../components/TrailerModal'
 import WatchlistSection from '../components/WatchlistSection'
+import { getHomeTrailers } from '../services/trailerService'
 import { AnimatePresence } from 'motion/react'
 import ColdStartLoader from '../components/ColdStartLoader'
 import ErrorPage from './ErrorPage'
@@ -89,6 +92,18 @@ export default function Home() {
 
   const [forYou, setForYou] = useSessionState('home_forYou', [])
   const [forYouLoad, setForYouLoad] = useState(isLoggedIn && forYou.length === 0)
+
+  // Trailers state (not cached in session — region changes need fresh data)
+  const [trailers, setTrailers] = useState([])
+  const [trailersLoad, setTrailersLoad] = useState(true)
+  
+  // Trailer Modal state
+  const [trailerModalOpen, setTrailerModalOpen] = useState(false)
+  const [trailerModalData, setTrailerModalData] = useState(null)
+
+  // Trailer Region State
+  const [trailerRegion, setTrailerRegion] = useSessionState('home_trailerRegion', 'All')
+  const TRAILER_REGIONS = ['All', 'India', 'Anime', 'Hollywood', 'Other']
 
   // Sidebar states
   const [upcomingFilter, setUpcomingFilter] = useSessionState('home_upcomingFilter', 'month') // Default: month
@@ -177,6 +192,22 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 
+  // Fetch Trailers — re-fetch whenever region pill changes
+  useEffect(() => {
+    setTrailersLoad(true)
+    setTrailers([])
+    getHomeTrailers(trailerRegion)
+      .then((data) => {
+        setTrailers(data?.data || [])
+      })
+      .catch(() => {
+        setTrailers([])
+      })
+      .finally(() => setTrailersLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, trailerRegion])
+
+
   // Fetch Upcoming
   useEffect(() => {
     if (lastUpcomingFilterRef.current === upcomingFilter && upcoming.length > 0) {
@@ -200,6 +231,11 @@ export default function Home() {
   const handleItemClick = (item) => {
     const isTV = item.media_type === 'tv'
     navigate(isTV ? `/tv/${item.id}` : `/movies/${item.id}`, { state: { movie: item } })
+  }
+
+  const handlePlayTrailer = (item) => {
+    setTrailerModalData(item)
+    setTrailerModalOpen(true)
   }
 
   const selectedGenreName = GENRE_OPTIONS.find(g => g.id === selectedGenreId)?.name || 'Genre'
@@ -245,6 +281,28 @@ export default function Home() {
             premiumScroll={true}
           />
 
+          {!isLoggedIn && (
+            <TrailerRow 
+              title="Trailers 🎬" 
+              items={trailers} 
+              loading={trailersLoad} 
+              onPlayTrailer={handlePlayTrailer}
+              premiumScroll={true}
+            >
+              <div className="movie-row__pills-container">
+                {TRAILER_REGIONS.map(region => (
+                  <button
+                    key={region}
+                    className={`genre-pill-btn ${trailerRegion === region ? 'active' : ''}`}
+                    onClick={() => setTrailerRegion(region)}
+                  >
+                    {region}
+                  </button>
+                ))}
+              </div>
+            </TrailerRow>
+          )}
+
           {/* For You (Personalized Recommendations) — Logged-in only */}
           {isLoggedIn && (
             <>
@@ -255,6 +313,25 @@ export default function Home() {
                 seeAllHref="/recommendations"
                 premiumScroll={true}
               />
+              <TrailerRow 
+                title="Trailers 🎬" 
+                items={trailers} 
+                loading={trailersLoad} 
+                onPlayTrailer={handlePlayTrailer}
+                premiumScroll={true}
+              >
+                <div className="movie-row__pills-container">
+                  {TRAILER_REGIONS.map(region => (
+                    <button
+                      key={region}
+                      className={`genre-pill-btn ${trailerRegion === region ? 'active' : ''}`}
+                      onClick={() => setTrailerRegion(region)}
+                    >
+                      {region}
+                    </button>
+                  ))}
+                </div>
+              </TrailerRow>
               <WatchlistSection />
             </>
           )}
@@ -402,6 +479,15 @@ export default function Home() {
 
       </div>
     </main>
+    {trailerModalOpen && trailerModalData && (
+      <TrailerModal
+        isOpen={trailerModalOpen}
+        onClose={() => setTrailerModalOpen(false)}
+        directVideoKey={trailerModalData.video_key}
+        contentId={trailerModalData.id}
+        mediaType={trailerModalData.media_type}
+      />
+    )}
     </>
   )
 }

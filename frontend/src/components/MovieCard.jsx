@@ -81,38 +81,6 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     return () => observer.disconnect()
   }, [])
 
-  useEffect(() => {
-    const parentEl = cardRef.current
-    if (!showFeedback || !parentEl || !tmdbId) return
-
-    const targetEl = parentEl.querySelector('.movie-card')
-    if (!targetEl) return
-
-    const timeout = { id: null }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          timeout.id = setTimeout(() => {
-            if (!impressionLogged.current) {
-              impressionLogged.current = true
-              recFeedback.ignore(tmdbId, mediaType)
-            }
-          }, 2000)
-        } else {
-          clearTimeout(timeout.id)
-        }
-      },
-      { threshold: 0.5 }
-    )
-
-    observer.observe(targetEl)
-    return () => {
-      observer.disconnect()
-      clearTimeout(timeout.id)
-    }
-  }, [tmdbId, mediaType, showFeedback])
-
   const sendExplicit = useCallback((signalType, e) => {
     e.stopPropagation()
     e.preventDefault()

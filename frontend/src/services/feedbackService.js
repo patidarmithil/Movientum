@@ -2,7 +2,7 @@
  * Movientum — Recommendation Feedback Service (Phase 6)
  *
  * Thin API wrapper for POST /api/v1/rec-feedback/
- * Used by MovieCard to send thumbs-up, thumbs-down, click, and ignore signals.
+ * Used by MovieCard to send thumbs-up, thumbs-down, and click signals.
  *
  * All calls are fire-and-forget — errors are silently swallowed so they never
  * break the user experience.
@@ -18,7 +18,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || ''
  * @param {object} params
  * @param {number}  params.tmdbId         - TMDB item ID
  * @param {string}  params.mediaType      - "movie" | "tv"
- * @param {string}  params.signalType     - "thumbs_up" | "thumbs_down" | "click" | "ignore"
+ * @param {string}  params.signalType     - "thumbs_up" | "thumbs_down" | "click"
  * @param {object?} params.featureSnapshot - Optional 16-dim feature dict (from Phase 4)
  * @returns {Promise<void>}               - Always resolves, never rejects
  */
@@ -52,7 +52,6 @@ export const recFeedback = {
   thumbsUp:   (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'thumbs_up' }),
   thumbsDown: (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'thumbs_down' }),
   click:      (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'click' }),
-  ignore:     (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'ignore' }),
 }
 
 export default recFeedback

@@ -340,3 +340,14 @@
   }
 }
 
+/* ── Trailer Card play overlay hover ── */
+.movie-card:hover .trailer-play-overlay,
+.movie-card:focus-visible .trailer-play-overlay {
+  background: rgba(0,0,0,0.35) !important;
+}
+.movie-card:hover .trailer-play-btn,
+.movie-card:focus-visible .trailer-play-btn {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+

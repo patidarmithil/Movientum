@@ -60,6 +60,9 @@
 .movie-row__pills-container {
   margin-bottom: var(--space-4);
   width: 100%;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Premium scrollbar container settings */

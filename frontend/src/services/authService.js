@@ -33,4 +33,13 @@ export const authService = {
 
   getMe: () =>
     api.get(`${BASE}/me`).then((r) => r.data.data),
+
+  deviceLogin: (device_id) =>
+    api.post(`${BASE}/device-login`, { device_id }).then((r) => r.data.data),
+
+  createDeviceSession: (device_id) =>
+    api.post(`${BASE}/device-session`, { device_id }).then((r) => r.data.data),
+
+  deleteDeviceSession: (device_id) =>
+    api.delete(`${BASE}/device-session`, { data: { device_id } }).then((r) => r.data.data),
 }

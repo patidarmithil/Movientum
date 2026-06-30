@@ -1,0 +1,113 @@
+/* TrailerCard.css */
+
+.trailer-card {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  overflow: visible;
+  outline: none;
+  flex-shrink: 0;
+  width: 160px;
+  background: var(--surface-card);
+  transition: transform var(--ease-hover);
+}
+
+.trailer-card:hover {
+  transform: translateY(-4px);
+}
+
+.trailer-type-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.trailer-type-badge.trailer {
+  background: rgba(220, 38, 38, 0.9); /* Red */
+}
+
+.trailer-type-badge.teaser {
+  background: rgba(234, 88, 12, 0.9); /* Orange */
+}
+
+.trailer-card-poster {
+  width: 160px;
+  height: 240px;
+  object-fit: cover;
+  border-top-left-radius: 11px;
+  border-top-right-radius: 11px;
+  display: block;
+}
+
+.trailer-card-poster-fallback {
+  width: 160px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top-left-radius: 11px;
+  border-top-right-radius: 11px;
+  background: linear-gradient(135deg, #1a0a2e 0%, #0f0f1a 100%);
+  font-size: 32px;
+}
+
+.trailer-card-play-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 160px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border-top-left-radius: 11px;
+  border-top-right-radius: 11px;
+}
+
+.trailer-card:hover .trailer-card-play-overlay {
+  opacity: 1;
+}
+
+.trailer-card-play-overlay svg {
+  width: 48px;
+  height: 48px;
+  color: white;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  transition: transform 0.2s ease;
+}
+
+.trailer-card:hover .trailer-card-play-overlay svg {
+  transform: scale(1.1);
+}
+
+.trailer-card-info {
+  padding: 10px 12px 12px;
+}
+
+.trailer-card-title {
+  display: block;
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.trailer-card-meta {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
