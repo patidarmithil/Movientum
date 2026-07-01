@@ -35,6 +35,7 @@ import TVDetail from './pages/TVDetail'
 import News from './pages/News'
 import CompanyPage from './pages/CompanyPage'
 import CountryPage from './pages/CountryPage'
+import MostInterested from './pages/MostInterested'
 import Help from './pages/Help'
 import Privacy from './pages/Privacy'
 import TermsOfService from './pages/TermsOfService'
@@ -208,6 +209,9 @@ function AppRoutes() {
 
           {/* Improvement 1.6 — Explore */}
           <Route path="/explore" element={<PageTransition><Explore /></PageTransition>} />
+
+          {/* Most Interested Full List */}
+          <Route path="/most-interested" element={<PageTransition><MostInterested /></PageTransition>} />
 
           {/* Improvement H — Help (Redirect to settings) */}
           <Route path="/help" element={<Navigate to="/settings/help" replace />} />

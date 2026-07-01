@@ -71,10 +71,10 @@ export const movieService = {
     api.get(`/api/v1/movies/genre/${genreId}`).then((r) => r.data),
 
   /**
-   * GET /api/v1/movies/upcoming?filter={week|month|year} → upcoming movies and tv
+   * GET /api/v1/movies/upcoming?filter={week|month|quarter|year|all_time}&limit={number}&country={country}
    */
-  getUpcoming: (filter = 'month') =>
-    api.get('/api/v1/movies/upcoming', { params: { filter } }).then((r) => r.data),
+  getUpcoming: (filter = 'month', limit = 8, country = 'all') =>
+    api.get('/api/v1/movies/upcoming', { params: { filter, limit, country } }).then((r) => r.data),
 
   /**
    * POST /api/v1/recommendations/content

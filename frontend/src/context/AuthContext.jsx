@@ -106,23 +106,18 @@ export function AuthProvider({ children }) {
         setUser(freshUser)
         storage.setItem(KEYS.user, JSON.stringify(freshUser))
       } catch {
-        // Token expired — try refresh
-        try {
-          const data = await authService.refreshToken(storedRefresh)
-          persist(data.access_token, data.refresh_token, data.user ?? JSON.parse(storedUser))
-        } catch {
-          // Refresh failed too → try device session
-          const deviceId = getDeviceId()
-          if (deviceId) {
-            try {
-              const data = await authService.deviceLogin(deviceId)
-              persist(data.access_token, data.refresh_token, data.user)
-            } catch {
-              clearSession()
-            }
-          } else {
+        // Access token expired AND interceptor failed to refresh it
+        // Or backend is down. Try device session fallback.
+        const deviceId = getDeviceId()
+        if (deviceId) {
+          try {
+            const data = await authService.deviceLogin(deviceId)
+            persist(data.access_token, data.refresh_token, data.user)
+          } catch {
             clearSession()
           }
+        } else {
+          clearSession()
         }
       } finally {
         setIsLoading(false)

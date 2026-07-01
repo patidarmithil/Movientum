@@ -82,13 +82,17 @@ api.interceptors.response.use(
       }
     }
 
-    // Skip retry for refresh endpoint itself — prevents infinite loop
+    // Skip retry for auth endpoints where 401 means invalid credentials, not an expired access token
     if (original?.url?.includes('/auth/refresh')) {
       // Refresh failed → force logout
       storage.removeItem(KEYS.access)
       storage.removeItem(KEYS.refresh)
       storage.removeItem('mv_user')
       window.dispatchEvent(new Event('mv:logout'))
+      return Promise.reject(error)
+    }
+
+    if (original?.url?.includes('/auth/login') || original?.url?.includes('/auth/device-login')) {
       return Promise.reject(error)
     }
 

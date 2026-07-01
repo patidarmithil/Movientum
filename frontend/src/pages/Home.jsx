@@ -475,6 +475,18 @@ export default function Home() {
               })
             )}
           </StaggerContainer>
+
+          {/* See All Button */}
+          {!upcomingLoad && upcoming.length > 0 && (
+            <div className="sidebar-see-all-wrap">
+              <Link to="/most-interested" className="sidebar-see-all-btn">
+                See All
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17l9.2-9.2M17 17V7H7" />
+                </svg>
+              </Link>
+            </div>
+          )}
         </ScrollReveal>
 
       </div>
