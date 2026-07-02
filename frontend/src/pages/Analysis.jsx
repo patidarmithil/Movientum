@@ -349,7 +349,7 @@ function DonutChart({ data }) {
         />
         <g transform="rotate(-90 90 90)">
           {data.map((item, idx) => {
-            const percentage = item.percentage;
+            const percentage = typeof item.percentage === 'number' && !isNaN(item.percentage) ? item.percentage : 0;
             const dashArray = `${percentage * circumference} ${circumference}`;
             const dashOffset = -accumulatedPercent * circumference;
             accumulatedPercent += percentage;
@@ -675,7 +675,8 @@ function DiscoveryGauge({ score, type }) {
   const radius = 45;
   const strokeWidth = 8;
   const fullCircumference = 2 * Math.PI * radius;
-  const strokeDashoffset = fullCircumference - (score / 100) * fullCircumference;
+  const validScore = typeof score === 'number' && !isNaN(score) ? score : 0;
+  const strokeDashoffset = fullCircumference - (validScore / 100) * fullCircumference;
 
   return (
     <div className="discovery-gauge-wrapper">

@@ -219,6 +219,9 @@
     scrollbar-width: none;
   }
   .dashboard__tabs::-webkit-scrollbar { display: none; }
+  .watchlist-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 480px) {

@@ -2,7 +2,8 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
-import { notificationService } from '../services/notificationService'
+import { watchlistService } from '../services/watchlistService'
+import { planToWatchService } from '../services/planToWatchService'
 import SearchOverlay from './SearchOverlay'
 import './Navbar.css'
 
@@ -23,6 +24,15 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef(null)
+
+  const [activeNotifTab, setActiveNotifTab] = useState('all')
+  const [clearedNotifs, setClearedNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('wl_notifs_cleared_list') || '[]')
+    } catch {
+      return []
+    }
+  })
 
   const [scrolled, setScrolled] = useState(false)
 
@@ -69,25 +79,149 @@ export default function Navbar() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      notificationService.getNotifications()
-        .then(setNotifications)
-        .catch(() => {})
+      const fetchWatchlistNotifications = async () => {
+        try {
+          const items = await planToWatchService.getItemsWithDetails()
+          
+          const now = new Date()
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          
+          const notifs = []
+          const seenIds = new Set()
+          
+          for (const item of items) {
+            const movie = item.movie
+            if (!movie) continue
+            if (seenIds.has(movie.id)) continue
+            seenIds.add(movie.id)
+            
+            const releaseDateStr = movie.release_date || movie.first_air_date
+            if (!releaseDateStr) continue
+            
+            const releaseDate = new Date(releaseDateStr)
+            const diffTime = Math.floor((releaseDate - today) / (1000 * 60 * 60 * 24))
+            
+            let prefix = 'Released'
+            if (diffTime === 0) prefix = 'Releasing Today'
+            else if (diffTime > 0) prefix = `Releasing in ${diffTime} days`
+            else prefix = 'Released'
+            
+            const dateOptions = { day: 'numeric', month: 'short', year: 'numeric' }
+            const dateStr = releaseDate.toLocaleDateString('en-US', dateOptions)
+            
+            notifs.push({
+              id: `notif-${movie.id}`,
+              message: `${prefix}: ${movie.title || movie.name}`,
+              poster_path: movie.poster_path,
+              created_at: releaseDate.toISOString(),
+              diff_days: diffTime,
+              seen: false
+            })
+          }
+          
+          notifs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          
+          const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
+          const finalNotifs = notifs.map(n => ({
+            ...n,
+            seen: savedSeen[n.id] || false
+          }))
+          
+          setNotifications(finalNotifs)
+        } catch (error) {
+          console.error("Failed to load watchlist notifications", error)
+        }
+      }
+      
+      fetchWatchlistNotifications()
     } else {
       setNotifications([])
     }
   }, [isLoggedIn])
 
   const safeNotifications = Array.isArray(notifications) ? notifications : []
-  const unreadCount = safeNotifications.filter(n => !n.seen).length
+  const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
+  const unreadCount = visibleNotifications.filter(n => !n.seen).length
 
   const handleNotifClick = () => {
     setNotifOpen(!notifOpen)
     if (!notifOpen && unreadCount > 0) {
-      notificationService.markAllSeen().then(() => {
-        setNotifications(safeNotifications.map(n => ({...n, seen: true})))
-      })
+      const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
+      visibleNotifications.forEach(n => savedSeen[n.id] = true)
+      localStorage.setItem('wl_notifs_seen', JSON.stringify(savedSeen))
+      setNotifications(safeNotifications.map(n => ({...n, seen: savedSeen[n.id] || false})))
     }
   }
+
+  const formatDayMonth = (dateStr) => {
+    const d = new Date(dateStr)
+    const day = d.getDate()
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    const monthName = months[d.getMonth()]
+    
+    let suffix = 'th'
+    if (day === 1 || day === 21 || day === 31) suffix = 'st'
+    else if (day === 2 || day === 22) suffix = 'nd'
+    else if (day === 3 || day === 23) suffix = 'rd'
+    
+    return `${day}${suffix} ${monthName}`
+  }
+
+  const handleClearNotifs = () => {
+    const idsToClear = safeNotifications.map(n => n.id)
+    const newCleared = [...clearedNotifs, ...idsToClear]
+    setClearedNotifs(newCleared)
+    localStorage.setItem('wl_notifs_cleared_list', JSON.stringify(newCleared))
+  }
+
+  const filteredNotifs = visibleNotifications.filter(n => {
+    if (activeNotifTab === 'updates') {
+      return n.diff_days >= 0
+    }
+    if (activeNotifTab === 'activity') {
+      return n.diff_days < 0
+    }
+    return true
+  })
+
+  const groupedNotifs = {
+    upcoming: [],
+    recent: [],
+    older: []
+  }
+
+  filteredNotifs.forEach(n => {
+    if (n.diff_days > 0) {
+      groupedNotifs.upcoming.push(n)
+    } else if (n.diff_days >= -7) {
+      groupedNotifs.recent.push(n)
+    } else {
+      groupedNotifs.older.push(n)
+    }
+  })
+
+  const renderNotifItem = (n) => (
+    <div
+      key={n.id}
+      className="navbar__notif-item"
+      style={{ opacity: n.seen ? 0.6 : 1 }}
+    >
+      {n.poster_path && (
+        <img 
+          src={`https://image.tmdb.org/t/p/w92${n.poster_path}`} 
+          alt=""
+        />
+      )}
+      <div className="navbar__notif-content">
+        <span className="navbar__notif-message">
+          {n.message}
+        </span>
+        <span className="navbar__notif-date">
+          {formatDayMonth(n.created_at)}
+        </span>
+      </div>
+    </div>
+  )
 
   const addTestNotification = () => {
     const newNotif = {
@@ -312,32 +446,54 @@ export default function Navbar() {
                 </button>
                 {notifOpen && (
                   <div className="navbar__notif-dropdown">
-                    <div className="navbar__notif-header">Notifications</div>
+                    <div className="navbar__notif-header">
+                      <span>Notifications</span>
+                      <button className="navbar__notif-clear-btn" onClick={handleClearNotifs} title="Clean History">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m15 4-2-2H9v3h10v-1Z"/>
+                          <path d="M20 9H4v2h16V9Z"/>
+                          <path d="M5 11v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>
+                          <path d="M9 11v5"/>
+                          <path d="M12 11v5"/>
+                          <path d="M15 11v5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="navbar__notif-tabs">
+                      <button className={`navbar__notif-tab ${activeNotifTab === 'all' ? 'active' : ''}`} onClick={() => setActiveNotifTab('all')}>All</button>
+                      <button className={`navbar__notif-tab ${activeNotifTab === 'updates' ? 'active' : ''}`} onClick={() => setActiveNotifTab('updates')}>Updates</button>
+                      <button className={`navbar__notif-tab ${activeNotifTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveNotifTab('activity')}>Activity</button>
+                    </div>
                     <div className="navbar__notif-list">
-                      {safeNotifications.length === 0 ? (
+                      {filteredNotifs.length === 0 ? (
                         <div className="navbar__notif-empty">
                           No notifications
-                          <br/><br/>
-                          <button onClick={addTestNotification} className="btn btn--secondary btn--sm">Test Notifications</button>
                         </div>
                       ) : (
-                        safeNotifications.map(n => (
-                          <div
-                            key={n.id}
-                            className="navbar__notif-item"
-                            style={{ opacity: n.seen ? 0.6 : 1 }}
-                          >
-                            <span className="navbar__notif-message">{n.message}</span>
-                            <span className="navbar__notif-date">
-                              {new Date(n.created_at).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </span>
-                          </div>
-                        ))
+                        <>
+                          {groupedNotifs.upcoming.length > 0 && (
+                            <>
+                              <div className="navbar__notif-group-title">Upcoming</div>
+                              {groupedNotifs.upcoming.map(renderNotifItem)}
+                            </>
+                          )}
+                          {groupedNotifs.recent.length > 0 && (
+                            <>
+                              <div className="navbar__notif-group-title">Last 7 Days</div>
+                              {groupedNotifs.recent.map(renderNotifItem)}
+                            </>
+                          )}
+                          {groupedNotifs.older.length > 0 && (
+                            <>
+                              <div className="navbar__notif-group-title">Older</div>
+                              {groupedNotifs.older.map(renderNotifItem)}
+                            </>
+                          )}
+                        </>
                       )}
+                    </div>
+                    <div className="navbar__notif-footer">
+                      Notifications are automatically removed after 30 days
                     </div>
                   </div>
                 )}
