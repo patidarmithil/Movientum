@@ -275,6 +275,7 @@ export default function Home() {
           {/* Trending Now */}
           <MovieRow 
             title="Trending Now" 
+            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline><polyline points="16 7 22 7 22 13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline></svg>}
             movies={trending} 
             loading={trendLoad} 
             seeAllHref="/explore?sort=popularity" 
@@ -307,7 +308,8 @@ export default function Home() {
           {isLoggedIn && (
             <>
               <MovieRow 
-                title="For You 🎯" 
+                title="For You" 
+                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle></svg>}
                 movies={forYou} 
                 loading={forYouLoad} 
                 seeAllHref="/recommendations"
@@ -339,6 +341,7 @@ export default function Home() {
           {/* Top Rated */}
           <MovieRow 
             title="Top Rated" 
+            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"></polygon></svg>}
             movies={topRated} 
             loading={topRatedLoad} 
             seeAllHref="/explore?sort=rating" 
@@ -351,6 +354,7 @@ export default function Home() {
           {/* Top Rated in Genre */}
           <MovieRow 
             title={`Top Rated in ${selectedGenreName}`}
+            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></path><path d="M2 12h10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path><path d="M2 17h10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path><path d="M2 7h4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path></svg>}
             movies={genreMovies} 
             loading={genreLoad} 
             seeAllHref={`/explore?genres=${selectedGenreName}`}

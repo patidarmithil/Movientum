@@ -9,15 +9,15 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-4);
-  flex-wrap: wrap;
   gap: var(--space-4);
+  width: 100%;
 }
 
 .section-header-left {
   display: flex;
   align-items: center;
   gap: var(--space-6);
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .see-all-link {
@@ -25,6 +25,7 @@
   font-weight: 500;
   color: var(--accent);
   transition: opacity 150ms ease;
+  flex-shrink: 0;
 }
 
 .see-all-link:hover {

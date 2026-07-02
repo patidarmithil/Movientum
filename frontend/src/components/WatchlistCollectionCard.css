@@ -6,6 +6,7 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   border-radius: 12px;
   padding: 0.5rem;
+  width: 100%;
 }
 
 .collection-card:hover {
@@ -16,11 +17,17 @@
 
 .collection-card__cover {
   width: 100%;
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 16 / 9;
   border-radius: 8px;
   overflow: hidden;
   background-color: #1a1a2e; /* dark bg */
   position: relative;
+}
+
+.collection-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .collage-grid {
@@ -31,68 +38,26 @@
   background-color: #0d0d1a;
 }
 
-.collage-grid.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 3rem;
-  opacity: 0.5;
-}
-
 .collage-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-/* Layouts based on count */
-
-.collage-layout-1 {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-
-.collage-layout-2 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr;
-}
-
-.collage-layout-3 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-}
-.collage-layout-3 .collage-img:nth-child(1) {
-  grid-row: span 2;
-}
-
-.collage-layout-4 {
+.collage-layout-4-strict {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
 }
 
-.collage-layout-5 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
-}
-.collage-layout-5 .collage-img:nth-child(1) {
-  grid-row: span 2;
-}
-.collage-layout-5 .collage-img:nth-child(2) {
-  grid-row: span 1;
-}
-.collage-layout-5 .collage-img:nth-child(3) {
-  grid-row: span 1;
-}
-.collage-layout-5 .collage-img:nth-child(4) {
-  grid-row: span 1;
-}
-.collage-layout-5 .collage-img:nth-child(5) {
-  grid-row: span 1;
-}
-
-.collage-layout-6 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
+.collection-card__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 3rem;
+  opacity: 0.5;
+  background-color: #0d0d1a;
 }
 
 .collection-card__info {
@@ -103,18 +68,17 @@
 }
 
 .collection-card__title {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0;
-  color: #ffffff;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .collection-card__count {
-  font-size: 0.85rem;
-  color: #a0a0b0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
   margin: 0;
 }
 

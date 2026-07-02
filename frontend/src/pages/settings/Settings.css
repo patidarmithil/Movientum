@@ -320,3 +320,63 @@ textarea.settings-input {
     font-size: 0.85rem !important;
   }
 }
+
+/* ── Settings Sidebar Profile Widget ── */
+.settings-user-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.5rem 0.5rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+}
+
+.settings-user-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 0 20px var(--accent-glow);
+  flex-shrink: 0;
+}
+
+.settings-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+}
+
+.settings-username {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.15rem;
+}
+
+.settings-email {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+

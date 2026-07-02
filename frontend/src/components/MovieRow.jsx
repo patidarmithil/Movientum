@@ -51,7 +51,8 @@ export default function MovieRow({
   showFeedback = false,
   emptyText = 'No titles found.',
   renderCard,
-  children
+  children,
+  icon
 }) {
   const scrollRowRef = useRef(null)
   const containerRef = useRef(null)
@@ -301,7 +302,8 @@ export default function MovieRow({
     <ScrollReveal className={`movie-row section-sm ${premiumScroll ? 'trending-premium-row' : ''}`}>
       <div className="section-header">
         <div className="section-header-left">
-          <h2>
+          <h2 style={{ display: 'flex', alignItems: 'center' }}>
+            {icon && <span style={{ display: 'flex', alignItems: 'center', marginRight: '8px' }}>{icon}</span>}
             <ShinyText text={title} />
           </h2>
         </div>

@@ -11,6 +11,7 @@
  * MovieCard expects same shape — direct pass, no rename.
  */
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
@@ -19,13 +20,14 @@ import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import WatchlistCollectionCard from '../components/WatchlistCollectionCard'
 import Aurora from '../components/Aurora'
+import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Dashboard.css'
 
 const TABS = [
-  { key: 'watchlist', label: '★ My Watchlists' },
-  { key: 'history',   label: '✓ Watched' },
-  { key: 'ratings',   label: '🎯 My Ratings' },
+  { key: 'watchlist', label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> My Watchlists</> },
+  { key: 'history',   label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><polyline points="20 6 9 17 4 12"></polyline></svg> Watched</> },
+  { key: 'ratings',   label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg> My Ratings</> },
 ]
 
 const RATING_LABELS = {
@@ -104,7 +106,7 @@ function TabContent({ tab, data, loading, error }) {
 
   if (tab === 'watchlist') {
     return (
-      <StaggerContainer className="movie-grid" instant={true}>
+      <StaggerContainer className="watchlist-grid" instant={true}>
         {data.map((collection, index) => (
           <StaggerItem key={collection.id} index={index}>
             <WatchlistCollectionCard collection={collection} />
@@ -192,6 +194,9 @@ export default function Dashboard() {
   const tabError   = { history: errH,  watchlist: errW,  ratings: errR  }
 
   const initials = (user?.username || user?.email || '?').charAt(0).toUpperCase()
+  const avatarUrl = user?.avatar_url
+    ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar_url}`)
+    : null
 
   return (
     <main className="dashboard page-content" id="dashboard-page">
@@ -210,9 +215,21 @@ export default function Dashboard() {
 
         {/* ── User Hero ── */}
         <div className="dashboard__hero">
-          <div className="dashboard__avatar">{initials}</div>
+          <div className="dashboard__avatar" style={{ overflow: 'hidden' }}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={user?.username || 'User'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              initials
+            )}
+          </div>
           <div className="dashboard__hero-info">
-            <h1 className="dashboard__title">Welcome back, {user?.username || 'friend'}!</h1>
+            <h1 className="dashboard__title">
+              <ShinyText text={`Welcome back, ${user?.username || 'friend'}!`} />
+            </h1>
             <p className="dashboard__subtitle">{user?.email}</p>
           </div>
           <div className="dashboard__stats">
@@ -232,19 +249,28 @@ export default function Dashboard() {
         </div>
 
         {/* ── Tabs ── */}
-        <div className="dashboard__tabs" role="tablist" aria-label="Dashboard sections">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              id={`tab-${t.key}`}
-              role="tab"
-              aria-selected={activeTab === t.key}
-              className={`dashboard__tab${activeTab === t.key ? ' dashboard__tab--active' : ''}`}
-              onClick={() => setActiveTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="dashboard__tabs-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', marginBottom: 'var(--space-6)' }}>
+          <div className="dashboard__tabs" role="tablist" aria-label="Dashboard sections" style={{ borderBottom: 'none', marginBottom: 0 }}>
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                id={`tab-${t.key}`}
+                role="tab"
+                aria-selected={activeTab === t.key}
+                className={`dashboard__tab${activeTab === t.key ? ' dashboard__tab--active' : ''}`}
+                onClick={() => setActiveTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <Link to="/settings/import" className="btn btn--secondary btn--sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg> Import List
+          </Link>
         </div>
 
         {/* ── Tab Panel ── */}

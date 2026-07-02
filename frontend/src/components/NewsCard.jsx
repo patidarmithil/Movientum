@@ -31,6 +31,8 @@ export default function NewsCard({ article, variant = 'standard' }) {
 
   const ago = timeAgo(article.published_at)
 
+  if (imgError || !article.image_url) return null
+
   return (
     <BorderGlow
       className={`news-card news-card--${variant}`}
@@ -48,7 +50,6 @@ export default function NewsCard({ article, variant = 'standard' }) {
       <div className="news-card__content">
         {/* Thumbnail */}
         <div className="news-card__thumb-wrap">
-        {article.image_url && !imgError ? (
           <img
             src={article.image_url}
             alt=""
@@ -56,16 +57,6 @@ export default function NewsCard({ article, variant = 'standard' }) {
             loading="lazy"
             onError={() => setImgError(true)}
           />
-        ) : (
-          <div className="news-card__thumb-fallback">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" />
-              <path d="M2 12h10" />
-              <path d="M2 17h10" />
-              <path d="M2 7h4" />
-            </svg>
-          </div>
-        )}
         {/* Hover overlay */}
         <div className="news-card__hover-overlay">
           <span className="news-card__read-label">Read Article ↗</span>

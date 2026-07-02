@@ -8,7 +8,13 @@ const SettingsProfile = () => {
   const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(null);
-  const [preview, setPreview] = useState(user?.avatar_url ? `http://localhost:8000${user.avatar_url}` : '/default-avatar.png');
+  const getAvatarUrl = (path) => {
+    if (!path) return '/default-avatar.png';
+    if (path.startsWith('http')) return path;
+    return `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${path}`;
+  };
+
+  const [preview, setPreview] = useState(getAvatarUrl(user?.avatar_url));
   const [imgError, setImgError] = useState(false);
   
   const [loading, setLoading] = useState(false);

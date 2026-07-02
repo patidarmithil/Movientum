@@ -6,6 +6,7 @@ import { useSessionState } from '../hooks/useSessionState'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
+import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Explore.css' // Reuse Explore styles
 
@@ -176,9 +177,16 @@ export default function Recommendations() {
       </div>
 
       <div className="explore-page__inner">
-        <header className="explore-header-section">
-          <span className="explore-category-tag">For You 🎯</span>
-          <h1 className="explore-hero-title">Recommendations</h1>
+        <header className="explore-header-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span className="explore-category-tag" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg> For You
+          </span>
+          <h1 className="explore-hero-title">
+            <ShinyText text="Recommendations" />
+          </h1>
         </header>
 
         {error && (

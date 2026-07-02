@@ -40,11 +40,24 @@
   gap: var(--space-5);
   margin-bottom: var(--space-8);
   padding: var(--space-6);
-  background: var(--surface-card);
-  border: 1px solid var(--border);
+  background: rgba(10, 10, 15, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 }
+
+/* ── Watchlist Grid ── */
+.watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-5);
+  width: 100%;
+}
+
 
 .dashboard__avatar {
   width: 64px;

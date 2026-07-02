@@ -333,6 +333,8 @@
 /* ── Mobile Layout & Genre Pills Optimizations ── */
 @media (max-width: 768px) {
   .home-layout-container {
+    display: flex;
+    flex-direction: column;
     padding-top: var(--space-4);
     padding-bottom: var(--space-8);
   }
@@ -348,6 +350,54 @@
   .genre-pill-btn {
     padding: 4px 10px;
     font-size: 11px;
+  }
+
+  /* Make sidebar lists layout horizontally as a flexbox row on mobile only */
+  .sidebar-list {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    gap: var(--space-3) !important;
+    padding-bottom: var(--space-2) !important;
+    scrollbar-width: none !important;
+  }
+
+  .sidebar-list::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Decrease size of boxes of most-interested section on mobile view */
+  .home-sidebar .stagger-item-wrap {
+    flex-shrink: 0 !important;
+    width: 200px !important;
+  }
+
+  .sidebar-card {
+    width: 100% !important;
+  }
+
+  .sidebar-card > .border-glow-inner {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+
+  .sidebar-card-rank {
+    font-size: 2.8rem !important;
+    width: 25px !important;
+    margin-right: -12px !important;
+  }
+
+  .sidebar-card-poster-wrap {
+    width: 42px !important;
+    height: 60px !important;
+  }
+
+  .sidebar-card-title {
+    font-size: var(--text-sm) !important;
+  }
+
+  .sidebar-card-release {
+    font-size: 10px !important;
   }
 }
 

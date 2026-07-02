@@ -213,8 +213,8 @@ function AppRoutes() {
           {/* Most Interested Full List */}
           <Route path="/most-interested" element={<PageTransition><MostInterested /></PageTransition>} />
 
-          {/* Improvement H — Help (Redirect to settings) */}
-          <Route path="/help" element={<Navigate to="/settings/help" replace />} />
+          {/* Improvement H — Help (Public standalone route) */}
+          <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
           
           {/* Legal Pages (Dual Routed) */}
           <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />

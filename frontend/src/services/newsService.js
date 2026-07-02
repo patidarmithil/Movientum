@@ -26,6 +26,18 @@ export const newsService = {
     return data
   },
 
+  async getByCategory(category, page = 1, pageSize = 12) {
+    const { data } = await api.get(`${BASE}/feed/category`, {
+      params: { category, page, page_size: pageSize },
+    })
+    return data
+  },
+
+  async getStatus() {
+    const { data } = await api.get(`${BASE}/status`)
+    return data
+  },
+
   recordView(articleId) {
   },
 }

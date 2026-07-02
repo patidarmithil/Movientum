@@ -44,6 +44,7 @@ function PosterStack({ posters, itemCount }) {
         alt="Collection poster primary"
         className="wld-poster wld-poster--front"
         loading="lazy"
+        onError={(e) => { e.target.style.display = 'none' }}
       />
       {/* Stacked poster 1 behind */}
       {safePosters[1] && (
@@ -52,6 +53,7 @@ function PosterStack({ posters, itemCount }) {
           alt="Collection poster back 1"
           className="wld-poster wld-poster--back-1"
           loading="lazy"
+          onError={(e) => { e.target.style.display = 'none' }}
         />
       )}
       {safePosters[2] && (
@@ -60,6 +62,7 @@ function PosterStack({ posters, itemCount }) {
           alt="Collection poster back 2"
           className="wld-poster wld-poster--back-2"
           loading="lazy"
+          onError={(e) => { e.target.style.display = 'none' }}
         />
       )}
     </div>
@@ -433,6 +436,7 @@ export default function WatchlistDetail() {
               src={`${TMDB_IMAGE_BASE}${backdropPoster}`}
               alt=""
               className="wld-banner__backdrop"
+              onError={(e) => { e.target.style.display = 'none' }}
             />
           ) : (
             <div className="wld-banner__backdrop empty-backdrop" />

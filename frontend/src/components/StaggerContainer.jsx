@@ -47,6 +47,7 @@ export function StaggerItem({ children, index = 0, className = '', style = {}, .
       className={`stagger-item-wrap ${className}`}
       style={{
         animationDelay: delay,
+        width: '100%',
         ...style
       }}
       {...rest}

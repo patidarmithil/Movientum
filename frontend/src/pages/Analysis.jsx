@@ -1,7 +1,328 @@
 import { useEffect, useState } from 'react'
 import { userService } from '../services/userService'
+import api from '../utils/api';
+import ShinyText from '../components/ShinyText';
 import Aurora from '../components/Aurora'
 import './Analysis.css'
+
+// ── -1. Profile Editor ──
+function ProfileEditor({ dateRangeData, onSave }) {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [prefs, setPrefs] = useState({
+    content_type_pref: 'balanced',
+    popularity_pref: 'mixed',
+    discovery_mode: 'explore'
+  });
+  const [expanded, setExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [tasteData, setTasteData] = useState([]);
+  const [editedTaste, setEditedTaste] = useState({});
+
+  useEffect(() => {
+    if (dateRangeData) {
+      if (dateRangeData.saved_from) setDateFrom(dateRangeData.saved_from.split('T')[0]);
+      if (dateRangeData.saved_to) setDateTo(dateRangeData.saved_to.split('T')[0]);
+      setPrefs({
+        content_type_pref: dateRangeData.content_type_pref || 'balanced',
+        popularity_pref: dateRangeData.popularity_pref || 'mixed',
+        discovery_mode: dateRangeData.discovery_mode || 'explore'
+      });
+    }
+  }, [dateRangeData]);
+
+  useEffect(() => {
+    if (expanded && tasteData.length === 0) {
+      userService.getTasteProfile().then(res => {
+        if (res.data) {
+          setTasteData(res.data);
+          const initialEdits = {};
+          res.data.forEach(g => {
+             initialEdits[g.id] = g.weight;
+          });
+          setEditedTaste(initialEdits);
+        }
+      }).catch(err => console.error(err));
+    }
+  }, [expanded]);
+
+  if (!dateRangeData) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await userService.saveDateRange(
+        dateFrom ? new Date(dateFrom).toISOString() : null,
+        dateTo ? new Date(dateTo).toISOString() : null
+      );
+      await userService.saveRecPreferences(prefs);
+      
+      if (Object.keys(editedTaste).length > 0) {
+        await userService.saveTasteProfile(editedTaste);
+      }
+      
+      if (onSave) onSave();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setDateFrom('');
+    setDateTo('');
+    setPrefs({
+      content_type_pref: 'balanced',
+      popularity_pref: 'mixed',
+      discovery_mode: 'explore'
+    });
+    setSaving(true);
+    try {
+      await userService.saveDateRange(null, null);
+      await userService.saveRecPreferences({
+        content_type_pref: 'balanced',
+        popularity_pref: 'mixed',
+        discovery_mode: 'explore'
+      });
+      if (onSave) onSave();
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setPreset = (months) => {
+    if (!months) {
+      setDateFrom('');
+      setDateTo('');
+      return;
+    }
+    const d = new Date();
+    d.setMonth(d.getMonth() - months);
+    setDateFrom(d.toISOString().split('T')[0]);
+    setDateTo('');
+  };
+
+  const handleSliderChange = (id, val) => {
+    setEditedTaste(prev => ({
+      ...prev,
+      [id]: parseFloat(val)
+    }));
+  };
+
+  return (
+    <section className="profile-editor-card glass-panel fade-in">
+      <div className="pe-header">
+        <h2><ShinyText text="Your Recommendation Profile" /></h2>
+        <p className="card-subtitle">Adjust the signals we use to generate your recommendations.</p>
+      </div>
+
+      <div className="pe-date-range">
+        <div className="pe-range-inputs">
+          <div className="pe-input-group">
+            <label>From</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} min={dateRangeData.watch_history_min?.split('T')[0]} max={dateRangeData.watch_history_max?.split('T')[0]} />
+          </div>
+          <div className="pe-input-group">
+            <label>To</label>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateRangeData.watch_history_min?.split('T')[0]} max={dateRangeData.watch_history_max?.split('T')[0]} />
+          </div>
+        </div>
+        <div className="pe-presets">
+          <button className="preset-pill" onClick={() => setPreset(3)}>Last 3m</button>
+          <button className="preset-pill" onClick={() => setPreset(6)}>Last 6m</button>
+          <button className="preset-pill" onClick={() => setPreset(12)}>Last 1y</button>
+          <button className="preset-pill" onClick={() => setPreset(24)}>Last 2y</button>
+          <button className="preset-pill" onClick={() => setPreset(null)}>All time</button>
+        </div>
+      </div>
+
+      <button className="pe-expand-btn" onClick={() => setExpanded(!expanded)}>
+        {expanded ? 'Hide Advanced Preferences' : 'Show Advanced Preferences'}
+      </button>
+
+      {expanded && (
+        <div className="pe-advanced-prefs">
+          <div className="pref-group">
+            <label>Content Type</label>
+            <select value={prefs.content_type_pref} onChange={e => setPrefs({...prefs, content_type_pref: e.target.value})}>
+              <option value="balanced">Balanced</option>
+              <option value="movie">Movies Preferred</option>
+              <option value="tv">TV Shows Preferred</option>
+            </select>
+          </div>
+          <div className="pref-group">
+            <label>Popularity</label>
+            <select value={prefs.popularity_pref} onChange={e => setPrefs({...prefs, popularity_pref: e.target.value})}>
+              <option value="mainstream">Mainstream</option>
+              <option value="mixed">Mixed</option>
+              <option value="niche">Niche</option>
+            </select>
+          </div>
+          <div className="pref-group">
+            <label>Discovery Mode</label>
+            <select value={prefs.discovery_mode} onChange={e => setPrefs({...prefs, discovery_mode: e.target.value})}>
+              <option value="safe">Safe Picks</option>
+              <option value="explore">Explore / Adventurous</option>
+            </select>
+          </div>
+          
+          <div className="taste-sliders-container">
+             <h3 className="taste-sliders-title">Adjust Genre Weights</h3>
+             <p className="taste-sliders-desc">Manually override how much weight the recommendation engine assigns to each genre.</p>
+             {tasteData.map(g => {
+                const minWeight = Math.min(0, Math.floor(Math.min(...tasteData.map(d => d.weight)) * 1.5));
+                const maxWeight = Math.max(100, Math.ceil(Math.max(...tasteData.map(d => d.weight)) * 1.5));
+                return (
+                <div key={g.id} className="taste-slider-row">
+                   <span className="ts-name">{g.name}</span>
+                   <input 
+                      type="range" 
+                      min={minWeight} 
+                      max={maxWeight} 
+                      step="0.1" 
+                      value={editedTaste[g.id] ?? g.weight}
+                      onChange={(e) => handleSliderChange(g.id, e.target.value)}
+                      className="ts-slider"
+                   />
+                   <input
+                      type="number"
+                      className="ts-number"
+                      value={editedTaste[g.id] !== undefined ? editedTaste[g.id] : g.weight}
+                      onChange={(e) => handleSliderChange(g.id, e.target.value)}
+                      step="0.1"
+                   />
+                </div>
+                );
+             })}
+          </div>
+        </div>
+      )}
+
+      <div className="pe-actions">
+        <button className="btn-save" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
+        <button className="btn-reset" onClick={handleReset} disabled={saving}>Reset to Defaults</button>
+      </div>
+    </section>
+  );
+}
+
+// ── 0. Rec Explanation Panel ──
+function RecExplanationPanel({ expData }) {
+  if (!expData) return null;
+
+  const {
+    genre_profile,
+    language_profile,
+    exclusions,
+    current_seed,
+    blend_info,
+    quality_gate,
+    data_range
+  } = expData;
+
+  // Transform top 5 combined genres
+  const topGenres = Object.entries(genre_profile.combined)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const topLangs = Object.entries(language_profile)
+    .filter(([lang, freq]) => freq > 0.1)
+    .map(([lang]) => lang);
+
+  return (
+    <section className="chart-card glass-panel fade-in full-width-card rec-explanation-panel">
+      <h2>Why You See What You See</h2>
+      <p className="card-subtitle">Transparency into your recommendation engine profile and settings.</p>
+
+      <div className="rec-explanation-grid">
+        {/* A. Profile Build */}
+        <div className="rec-exp-section">
+          <h3>How Your Profile Was Built</h3>
+          <div className="signal-split-bar">
+            <div className="signal-fill watch" style={{ width: '70%' }}>Watch History (70%)</div>
+            <div className="signal-fill click" style={{ width: '30%' }}>Click Data (30%)</div>
+          </div>
+          <p className="formula-text"><code>{genre_profile.formula}</code></p>
+          <div className="top-genres-bars">
+            {topGenres.map(([genre, weight]) => {
+              const watchW = (genre_profile.watch_genres[genre] || 0) * 0.7 * 100;
+              const clickW = (genre_profile.click_genres[genre] || 0) * 0.3 * 100;
+              return (
+                <div key={genre} className="genre-bar-row">
+                  <span className="genre-label">{genre}</span>
+                  <div className="genre-bar-container">
+                    <div className="genre-bar watch" style={{ width: `${watchW}%` }}></div>
+                    <div className="genre-bar click" style={{ width: `${clickW}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* B. Exclusions */}
+        <div className="rec-exp-section">
+          <h3>What's Filtered Out</h3>
+          <p className="section-desc">These are hidden from your feed to keep recommendations fresh.</p>
+          <div className="exclusion-pills">
+            <span className="exclusion-pill">🎬 {exclusions.recent_watched_7d} recently watched</span>
+            <span className="exclusion-pill">👎 {exclusions.low_rated} low-rated excluded</span>
+            <span className="exclusion-pill">📋 {exclusions.in_watchlist} in watchlist</span>
+          </div>
+        </div>
+
+        {/* C. Current Seed */}
+        <div className="rec-exp-section">
+          <h3>Today's Recommendation Seed</h3>
+          {current_seed ? (
+            <div className="seed-card">
+              {current_seed.poster_path ? (
+                <img src={`https://image.tmdb.org/t/p/w200${current_seed.poster_path}`} alt="seed" className="seed-poster" />
+              ) : (
+                <div className="seed-poster placeholder">🎬</div>
+              )}
+              <div className="seed-info">
+                <p>We started today's ML pipeline from:</p>
+                <strong>{current_seed.title}</strong>
+              </div>
+            </div>
+          ) : (
+            <p className="no-data-text">No watch history to seed from.</p>
+          )}
+        </div>
+
+        {/* D. Blend Formula */}
+        <div className="rec-exp-section">
+          <h3>Blend Formula</h3>
+          <div className="signal-split-bar">
+            <div className="signal-fill ml" style={{ width: `${blend_info.ml_ratio * 100}%` }}>ML Model ({blend_info.ml_ratio * 100}%)</div>
+            <div className="signal-fill baseline" style={{ width: `${blend_info.baseline_ratio * 100}%` }}>Baseline ({blend_info.baseline_ratio * 100}%)</div>
+          </div>
+          <div className="blend-labels">
+            <span>{blend_info.ml_model}</span>
+            <span>{blend_info.baseline_model}</span>
+          </div>
+          {topLangs.length > 0 && (
+            <p className="lang-note">Language priority: {topLangs.join(', ').toUpperCase()} (up to 90% of feed)</p>
+          )}
+        </div>
+
+        {/* E. Quality Gate */}
+        <div className="rec-exp-section">
+          <h3>Quality Gate</h3>
+          <div className="quality-badges">
+            <span className="badge">★ ≥ {quality_gate.min_vote_average}</span>
+            <span className="badge">Votes ≥ {quality_gate.min_vote_count}</span>
+            {quality_gate.requires_poster && <span className="badge">Poster required</span>}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // ── 1. Genre Distribution Donut Chart ──
 function DonutChart({ data }) {
@@ -396,22 +717,156 @@ function DiscoveryGauge({ score, type }) {
   );
 }
 
+// ── 6. Phase 3 Components ──
+function DirectorAffinity({ data }) {
+  if (!data || !data.top_directors || data.top_directors.length === 0) return <p className="no-data-msg">No director data available.</p>;
+  const maxCount = Math.max(...data.top_directors.map(d => d.count));
+  
+  return (
+    <div className="director-affinity">
+      {data.top_directors.map(d => (
+        <div key={d.name} className="director-row">
+          <span className="dir-name">{d.name}</span>
+          <div className="dir-bar-container">
+            <div className="dir-bar" style={{ width: `${(d.count / maxCount) * 100}%` }}></div>
+          </div>
+          <span className="dir-count">{d.count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BingePattern({ data }) {
+  if (!data) return null;
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const maxDow = Math.max(1, ...days.map(d => data.binge_dow[d] || 0));
+
+  return (
+    <div className="binge-pattern">
+      <div className="binge-stats">
+        <div className="stat-box"><h4>{data.binge_sessions}</h4><p>Binge Sessions</p></div>
+        <div className="stat-box"><h4>{data.longest_binge}</h4><p>Max Items</p></div>
+        <div className="stat-box"><h4>{data.max_streak}</h4><p>Day Streak</p></div>
+      </div>
+      <div className="binge-dow-chart">
+        {days.map(day => (
+          <div key={day} className="dow-col">
+            <div className="dow-bar-container">
+              <div className="dow-bar" style={{ height: `${((data.binge_dow[day] || 0) / maxDow) * 100}%` }}></div>
+            </div>
+            <span>{day}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TasteDrift({ data }) {
+  if (!data || !data.quarters || data.quarters.length < 2) return <p className="no-data-msg">Not enough historical quarters for drift analysis.</p>;
+  
+  return (
+    <div className="taste-drift">
+      <div className="drift-header">
+        <div className="drift-score-box">
+          <span className="score">{(data.drift_score * 100).toFixed(0)}%</span>
+          <span className="label">Drift</span>
+        </div>
+        <div className="drift-label-box">
+          <h4>{data.label}</h4>
+        </div>
+      </div>
+      <div className="drift-timeline">
+        {data.quarters.map((q, idx) => (
+          <div key={q.quarter} className="timeline-node">
+            <div className="node-dot"></div>
+            <div className="node-info">
+              <span className="node-q">{q.quarter}</span>
+              <span className="node-genre">{q.top_genre}</span>
+            </div>
+            {idx < data.quarters.length - 1 && <div className="node-line"></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HiddenGems({ data }) {
+  if (!data || data.count === 0) return <p className="no-data-msg">No hidden gems found yet.</p>;
+
+  return (
+    <div className="hidden-gems">
+      <div className="gems-header">
+        <span className="gems-ratio">{(data.ratio * 100).toFixed(1)}% of favorites are obscure</span>
+        {data.seed_genres && data.seed_genres.length > 0 && (
+          <span className="gems-seeds">Explore more: {data.seed_genres.map(g => g[0]).join(', ')}</span>
+        )}
+      </div>
+      <div className="rewatch-scroll-row">
+        {data.gems.map(item => (
+          <a href={`/movies/${item.id}`} key={item.id} className="rewatch-card">
+            {item.poster_path ? (
+              <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} />
+            ) : (
+              <div className="no-poster">🎬</div>
+            )}
+            <div className="overlay">
+              <span className="rewatch-title">{item.title}</span>
+              <span className="rewatch-why">Pop: {item.tmdb_popularity.toFixed(1)}</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FeedbackLoop({ data }) {
+  if (!data || (data.thumbs_up === 0 && data.thumbs_down === 0 && data.not_interested === 0)) return <p className="no-data-msg">No feedback interactions yet.</p>;
+
+  return (
+    <div className="feedback-loop">
+      <div className="feedback-stats">
+        <div className="f-stat"><span className="icon">👍</span> {data.thumbs_up}</div>
+        <div className="f-stat"><span className="icon">👎</span> {data.thumbs_down}</div>
+        <div className="f-stat"><span className="icon">🚫</span> {data.not_interested}</div>
+      </div>
+      <div className="conversion-box">
+        <h4>{(data.conversion_rate * 100).toFixed(1)}%</h4>
+        <p>of liked recommendations were actually watched</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Analysis() {
   const [data, setData] = useState(null)
+  const [expData, setExpData] = useState(null)
+  const [dateRangeData, setDateRangeData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await userService.getAnalysis()
-        setData(response.data)
-      } catch (err) {
-        setError('Failed to load analysis data.')
-      } finally {
-        setLoading(false)
-      }
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [analysisRes, expRes, dateRes] = await Promise.all([
+        userService.getAnalysis(),
+        userService.getRecExplanation().catch(err => ({ data: null })),
+        userService.getDateRange().catch(err => null)
+      ]);
+      setData(analysisRes.data)
+      if (expRes && expRes.data) setExpData(expRes.data)
+      if (dateRes) setDateRangeData(dateRes)
+    } catch (err) {
+      setError('Failed to load analysis data.')
+    } finally {
+      setLoading(false)
     }
+  };
+
+  useEffect(() => {
     fetchData()
   }, [])
 
@@ -444,7 +899,12 @@ export default function Analysis() {
     early_favorites,
     discovery_depth_score,
     personal_tags,
-    summary
+    summary,
+    director_affinity,
+    binge_pattern,
+    taste_drift,
+    hidden_gems,
+    feedback_loop
   } = data
 
   return (
@@ -496,6 +956,9 @@ export default function Analysis() {
         </div>
       </section>
 
+      {/* Recommendation Explanation Panel */}
+      <RecExplanationPanel expData={expData} />
+
       {/* Row 1: Genre Pie & Rating Histogram */}
       <div className="analysis-row">
         <section className="chart-card glass-panel fade-in">
@@ -510,6 +973,9 @@ export default function Analysis() {
           <RatingHistogram profile={rating_profile} />
         </section>
       </div>
+
+      {/* Profile Editor Panel */}
+      <ProfileEditor dateRangeData={dateRangeData} onSave={fetchData} />
 
       {/* Row 2: Taste Evolution & Click vs Watch Gap */}
       <div className="analysis-row">
@@ -612,6 +1078,43 @@ export default function Analysis() {
           </div>
         </section>
       )}
+
+      {/* Row 5: Director Affinity & Binge Pattern */}
+      <div className="analysis-row">
+        <section className="chart-card glass-panel fade-in">
+          <h2>Director Affinity</h2>
+          <p className="card-subtitle">Which directors dominate your watch history.</p>
+          <DirectorAffinity data={director_affinity} />
+        </section>
+
+        <section className="chart-card glass-panel fade-in">
+          <h2>Binge Pattern Detector</h2>
+          <p className="card-subtitle">Days with 3+ watches, streaks, and day-of-week frequency.</p>
+          <BingePattern data={binge_pattern} />
+        </section>
+      </div>
+
+      {/* Row 6: Taste Drift Timeline */}
+      <section className="chart-card glass-panel fade-in full-width-card" style={{ marginTop: '24px' }}>
+        <h2>Taste Drift Timeline</h2>
+        <p className="card-subtitle">How your core genre preference shifted quarter by quarter.</p>
+        <TasteDrift data={taste_drift} />
+      </section>
+
+      {/* Row 7: Hidden Gems & Feedback Loop */}
+      <div className="analysis-row" style={{ marginTop: '24px' }}>
+        <section className="chart-card glass-panel fade-in">
+          <h2>Hidden Gems</h2>
+          <p className="card-subtitle">Low popularity items you rated highly.</p>
+          <HiddenGems data={hidden_gems} />
+        </section>
+
+        <section className="chart-card glass-panel fade-in">
+          <h2>Feedback Loop</h2>
+          <p className="card-subtitle">How well recommendations convert into actual watches.</p>
+          <FeedbackLoop data={feedback_loop} />
+        </section>
+      </div>
     </div>
   )
 }
