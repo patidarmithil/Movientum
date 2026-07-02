@@ -279,19 +279,18 @@
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
-  border: 2px solid rgba(176, 72, 255, 0.4);
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: box-shadow var(--ease-hover), border-color var(--ease-hover);
+  transition: box-shadow var(--ease-hover);
   padding: 0;
   overflow: hidden;
 }
 
 .navbar__avatar:hover {
   box-shadow: 0 0 0 3px var(--accent-glow);
-  border-color: var(--accent);
 }
 
 .navbar__avatar-skeleton {
