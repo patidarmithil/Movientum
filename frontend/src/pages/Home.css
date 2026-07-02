@@ -352,24 +352,18 @@
     font-size: 11px;
   }
 
-  /* Make sidebar lists layout horizontally as a flexbox row on mobile only */
+  /* Make sidebar lists layout vertically in rows on mobile instead of horizontal scroll */
   .sidebar-list {
     display: flex !important;
-    flex-direction: row !important;
-    overflow-x: auto !important;
+    flex-direction: column !important;
+    overflow-x: visible !important;
     gap: var(--space-3) !important;
     padding-bottom: var(--space-2) !important;
-    scrollbar-width: none !important;
-  }
-
-  .sidebar-list::-webkit-scrollbar {
-    display: none !important;
   }
 
   /* Decrease size of boxes of most-interested section on mobile view */
   .home-sidebar .stagger-item-wrap {
-    flex-shrink: 0 !important;
-    width: 200px !important;
+    width: 100% !important;
   }
 
   .sidebar-card {

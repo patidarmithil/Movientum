@@ -100,8 +100,9 @@ export function AuthProvider({ children }) {
         setAccessToken(storedAccess)
         setUser(parsedUser)
         setIsLoggedIn(true)
+        setIsLoading(false) // Set loading to false optimistically to mount UI immediately
 
-        // Validate token with backend
+        // Validate token with backend in background
         const freshUser = await authService.getMe()
         setUser(freshUser)
         storage.setItem(KEYS.user, JSON.stringify(freshUser))
