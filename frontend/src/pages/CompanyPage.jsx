@@ -31,7 +31,13 @@ export default function CompanyPage() {
   const [total, setTotal] = useState(cachedData?.total || 0)
   const [hasMore, setHasMore] = useState(cachedData ? cachedData.hasMore : true)
 
-  const observerRef = useRef(null)
+  useEffect(() => {
+    if (companyInfo?.name) {
+      document.title = `${companyInfo.name} - Movientum`
+    } else {
+      document.title = 'Company - Movientum'
+    }
+  }, [companyInfo])
 
   // Reset page & data when company id changes
   useEffect(() => {

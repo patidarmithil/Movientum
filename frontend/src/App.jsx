@@ -143,6 +143,63 @@ function AppRoutes() {
   const location = useLocation()
   const { isLoggedIn } = useAuth()
 
+  useEffect(() => {
+    const path = location.pathname;
+    let title = "Movientum — Your Movies, Your Way"; // default fallback
+
+    if (path === "/" || path === "/intro" || path === "/about") {
+      title = "About - Movientum";
+    } else if (path === "/home") {
+      title = "Home - Movientum";
+    } else if (path === "/movies") {
+      title = "Explore Movies - Movientum";
+    } else if (path.startsWith("/movies/")) {
+      title = "Movie Details - Movientum";
+    } else if (path === "/login") {
+      title = "Login - Movientum";
+    } else if (path === "/register" || path === "/signup") {
+      title = "Sign Up - Movientum";
+    } else if (path === "/dashboard") {
+      title = "Dashboard - Movientum";
+    } else if (path === "/recommendations") {
+      title = "Recommendations - Movientum";
+    } else if (path === "/analysis") {
+      title = "Analysis - Movientum";
+    } else if (path === "/search") {
+      title = "Search - Movientum";
+    } else if (path === "/rec-content") {
+      title = "Recommendation Content - Movientum";
+    } else if (path.startsWith("/person/")) {
+      title = "Person - Movientum";
+    } else if (path === "/explore") {
+      title = "Explore - Movientum";
+    } else if (path === "/most-interested") {
+      title = "Most Interested - Movientum";
+    } else if (path === "/help") {
+      title = "Help - Movientum";
+    } else if (path === "/privacy") {
+      title = "Privacy Policy - Movientum";
+    } else if (path === "/terms" || path === "/terms-of-service") {
+      title = "Terms of Service - Movientum";
+    } else if (path.startsWith("/tv/")) {
+      title = "TV Show Details - Movientum";
+    } else if (path === "/news") {
+      title = "News - Movientum";
+    } else if (path.startsWith("/company/")) {
+      title = "Company - Movientum";
+    } else if (path.startsWith("/country/")) {
+      title = "Country - Movientum";
+    } else if (path === "/admin") {
+      title = "Admin Dashboard - Movientum";
+    } else if (path.startsWith("/settings")) {
+      title = "Settings - Movientum";
+    } else if (path.startsWith("/watchlists/")) {
+      title = "Watchlist - Movientum";
+    }
+
+    document.title = title;
+  }, [location.pathname]);
+
   return (
     <>
       <LogoutListener />

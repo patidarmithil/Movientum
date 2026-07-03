@@ -43,6 +43,14 @@ export default function PersonPage() {
   const wheelTimeout = useRef(null)
 
   useEffect(() => {
+    if (person) {
+      document.title = `${person.name} - Movientum`
+    } else {
+      document.title = 'Person Details - Movientum'
+    }
+  }, [person])
+
+  useEffect(() => {
     let cancelled = false
     if (!person) {
       setLoading(true)

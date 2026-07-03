@@ -221,6 +221,14 @@ export default function WatchlistDetail() {
     return result
   }, [items, typeFilter, minRating, sortOption])
 
+  useEffect(() => {
+    if (collection) {
+      document.title = `${collection.name} - Movientum`
+    } else {
+      document.title = 'Watchlist - Movientum'
+    }
+  }, [collection])
+
   const backdropRef = useRef(null)
 
   const fetchCollection = useCallback(() => {

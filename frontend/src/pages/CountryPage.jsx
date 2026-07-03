@@ -39,7 +39,9 @@ export default function CountryPage() {
   const [total, setTotal] = useState(cachedData?.total || 0)
   const [hasMore, setHasMore] = useState(cachedData ? cachedData.hasMore : true)
 
-  const observerRef = useRef(null)
+  useEffect(() => {
+    document.title = `${countryName} Titles - Movientum`
+  }, [countryName])
 
   // Reset page & data when country (iso) changes
   useEffect(() => {

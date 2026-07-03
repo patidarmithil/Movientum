@@ -85,6 +85,14 @@ export default function TVDetail() {
   const trailerKey = videosData?.trailer_key || null
 
   useEffect(() => {
+    if (show) {
+      document.title = `${show.name || show.title} - Movientum`
+    } else {
+      document.title = 'TV Show Details - Movientum'
+    }
+  }, [show])
+
+  useEffect(() => {
     setPosterLoaded(false)
     setShowRatingMeter(false)
     setVideoReady(false)

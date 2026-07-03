@@ -164,6 +164,14 @@ export default function MovieDetail() {
   const [collection, setCollection] = useState(null)
 
   useEffect(() => {
+    if (movie) {
+      document.title = `${movie.title} - Movientum`
+    } else {
+      document.title = 'Movie Details - Movientum'
+    }
+  }, [movie])
+
+  useEffect(() => {
     setPosterLoaded(false)
     setShowRatingMeter(false)
     setVideoReady(false)
