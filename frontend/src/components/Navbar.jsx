@@ -204,7 +204,7 @@ export default function Navbar() {
     <div
       key={n.id}
       className="navbar__notif-item"
-      style={{ opacity: n.seen ? 0.6 : 1 }}
+      style={{ opacity: 1 }}
     >
       {n.poster_path && (
         <img 

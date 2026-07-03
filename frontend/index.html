@@ -14,6 +14,22 @@
     <meta name="robots" content="index, follow" />
     <meta name="author" content="Movientum" />
     <link rel="canonical" href="https://movientum.vercel.app/" />
+    <script>
+      (function() {
+        var path = window.location.pathname;
+        if (path !== '/' && path !== '/intro' && path !== '/about') {
+          var meta = document.querySelector('meta[name="robots"]');
+          if (meta) {
+            meta.setAttribute('content', 'noindex, nofollow');
+          } else {
+            meta = document.createElement('meta');
+            meta.name = 'robots';
+            meta.content = 'noindex, nofollow';
+            document.head.appendChild(meta);
+          }
+        }
+      })();
+    </script>
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />

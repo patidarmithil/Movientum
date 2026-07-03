@@ -727,11 +727,11 @@
   border-radius: 20px !important;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7) !important;
   z-index: 1100;
-  width: 280px;
-  padding: 12px;
+  width: 350px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   animation: filterDropdownIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -741,17 +741,17 @@
   align-items: center;
   padding: 6px 8px 8px 8px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-primary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .navbar__notif-list {
-  max-height: 280px;
+  max-height: 360px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding-right: 4px;
 }
 
@@ -771,12 +771,12 @@
 }
 
 .navbar__notif-item {
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   transition: all 0.15s ease;
   cursor: pointer;
   user-select: none;
@@ -803,22 +803,22 @@
 }
 
 .navbar__notif-message {
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.95);
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .navbar__notif-date {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted, rgba(255, 255, 255, 0.45));
 }
 
 .navbar__notif-empty {
-  padding: 20px;
+  padding: 24px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 @keyframes filterDropdownIn {
@@ -862,7 +862,7 @@
   background: none;
   border: none;
   color: var(--text-muted, #9ca3af);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   padding: 6px 0;
   cursor: pointer;
@@ -893,21 +893,21 @@
 
 /* Group Title */
 .navbar__notif-group-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-primary, #fff);
-  padding: 8px 12px 4px 12px;
+  padding: 10px 12px 6px 12px;
   text-transform: none;
 }
 
 /* Notification footer */
 .navbar__notif-footer {
-  padding: 12px;
+  padding: 14px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.35);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .navbar__notif-clear-btn {

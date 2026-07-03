@@ -30,9 +30,25 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Helper to check if user agent is a search crawler bot
+const isBotUserAgent = () => {
+  if (typeof window === 'undefined' || !window.navigator || !window.navigator.userAgent) {
+    return false;
+  }
+  const ua = window.navigator.userAgent.toLowerCase();
+  return /googlebot|bingbot|yandexbot|baiduspider|duckduckbot|yahoo! slurp|sogou|exabot|ia_archiver|facebot|facebookexternalhit|twitterbot|pinterest|slackbot|telegrambot|whatsapp/i.test(ua);
+};
+
 // ── Request interceptor — attach Bearer token ──────────────────
 api.interceptors.request.use(
   (config) => {
+    // Intercept and prevent crawling bots from hitting the server on any non-landing subpaths
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    if (isBotUserAgent() && pathname !== '/' && pathname !== '/intro' && pathname !== '/about') {
+      console.warn(`[Bot Block] Prevented crawler request to ${config.url} on path ${pathname}`);
+      return Promise.reject({ __isBotBlock: true, config });
+    }
+
     const token = storage.getItem(KEYS.access)
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
@@ -57,6 +73,26 @@ const processQueue = (error, token = null) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
+    // Resolve immediately with empty data format to prevent client-side JS crashes if bot blocked
+    if (error && error.__isBotBlock) {
+      return Promise.resolve({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: error.config,
+        data: {
+          movies: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          results: [],
+          articles: [],
+          success: true,
+          data: []
+        }
+      });
+    }
+
     const original = error.config
 
     // ── Basic error logging ──────────────────────────────────
