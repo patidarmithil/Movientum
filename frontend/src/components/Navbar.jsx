@@ -915,6 +915,51 @@ export default function Navbar() {
                         </svg> DNA
                       </Link>
                       <Link
+                        to="/recommendations"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-recommendations"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/>
+                          <path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5Z"/>
+                          <path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/>
+                        </svg> Recommendations
+                      </Link>
+                      <a
+                        href="https://drive.google.com/file/d/1PcqTQEhuijVDgiO9vu-e9unlm5KCt1qx/view?usp=sharing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                          <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg> Documentation
+                      </a>
+                      <Link
+                        to="/analysis"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-analysis"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <line x1="3" y1="22" x2="21" y2="22"></line>
+                          <line x1="4" y1="22" x2="4" y2="16"></line>
+                          <line x1="8" y1="22" x2="8" y2="12"></line>
+                          <line x1="12" y1="22" x2="12" y2="9"></line>
+                          <line x1="16" y1="22" x2="16" y2="11"></line>
+                          <line x1="20" y1="22" x2="20" y2="5"></line>
+                        </svg> Analysis
+                      </Link>
+                      <Link
                         to="/help"
                         className="navbar__dropdown-item"
                         role="menuitem"
