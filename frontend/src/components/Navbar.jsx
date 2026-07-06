@@ -826,14 +826,124 @@ export default function Navbar() {
                 )}
               </div>
             ) : (
-              <div className="navbar__auth-desktop-buttons">
-                <Link to="/login" className="btn btn--ghost btn--sm" id="nav-login">
-                  Login
-                </Link>
-                <Link to="/signup" className="btn btn--primary btn--sm" id="nav-register">
-                  Sign Up
-                </Link>
-              </div>
+              <>
+                <div className="navbar__auth-desktop-buttons">
+                  <Link to="/login" className="btn btn--ghost btn--sm" id="nav-login">
+                    Login
+                  </Link>
+                  <Link to="/signup" className="btn btn--primary btn--sm" id="nav-register">
+                    Sign Up
+                  </Link>
+                </div>
+
+                {/* Mobile avatar dropdown trigger for guest users */}
+                <div className="navbar__user navbar__user--mobile-only" ref={dropRef}>
+                  <button
+                    className="navbar__avatar"
+                    id="navbar-avatar-btn-guest"
+                    aria-label="User menu"
+                    aria-expanded={dropOpen}
+                    aria-haspopup="true"
+                    onClick={() => setDropOpen((v) => !v)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  </button>
+
+                  {dropOpen && (
+                    <div className="navbar__dropdown" role="menu" id="navbar-dropdown">
+                      <div className="navbar__dropdown-user">
+                        <span className="navbar__dropdown-name">Guest User</span>
+                        <span className="navbar__dropdown-email">Please log in to sync progress</span>
+                      </div>
+                      <div className="navbar__dropdown-divider" />
+                      <Link
+                        to="/login"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-login"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                          <polyline points="10 17 15 12 10 7" />
+                          <line x1="15" y1="12" x2="3" y2="12" />
+                        </svg> Login
+                      </Link>
+                      <Link
+                        to="/signup"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-register"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="8.5" cy="7" r="4" />
+                          <line x1="20" y1="8" x2="20" y2="14" />
+                          <line x1="23" y1="11" x2="17" y2="11" />
+                        </svg> Sign Up
+                      </Link>
+                      <div className="navbar__dropdown-divider" />
+                      <Link
+                        to="/news"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-news"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" />
+                          <path d="M2 12h10" />
+                          <path d="M2 17h10" />
+                          <path d="M2 7h4" />
+                        </svg> News
+                      </Link>
+                      <Link
+                        to="/rec-content"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-dna"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg> DNA
+                      </Link>
+                      <Link
+                        to="/help"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-help"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg> Help
+                      </Link>
+                      <Link
+                        to="/about"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-about"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="12" y1="16" x2="12" y2="12"></line>
+                          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg> About
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
           {/* Search Trigger */}
