@@ -928,3 +928,17 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Guest mobile dropdown styles */
+.navbar__user--mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .navbar__user--mobile-only {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+
