@@ -76,7 +76,8 @@ const COUNTRIES = [
 const PROVIDERS = [
   { id: '8', label: 'Netflix' },
   { id: '119', label: 'Prime Video' },
-  { id: '122', label: 'Disney+ Hotstar' },
+  { id: '122,337', label: 'Disney' },
+  { id: '1899', label: 'HBO' },
   { id: '220', label: 'JioCinema' },
   { id: '232', label: 'ZEE5' },
   { id: '237', label: 'SonyLIV' },

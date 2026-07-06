@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import SearchOverlay from './SearchOverlay'
+import TrailerModal from './TrailerModal'
+import api from '../utils/api'
 import './Navbar.css'
 
 /**
@@ -24,8 +26,15 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef(null)
+  
+  const [trailerModalOpen, setTrailerModalOpen] = useState(false)
+  const [trailerModalData, setTrailerModalData] = useState(null)
+  const [trailerModalSeasons, setTrailerModalSeasons] = useState([])
+  const [trailerModalMediaType, setTrailerModalMediaType] = useState('')
+  const [trailerModalContentId, setTrailerModalContentId] = useState(null)
+  const [trailerModalInitialSeason, setTrailerModalInitialSeason] = useState("all")
 
-  const [activeNotifTab, setActiveNotifTab] = useState('all')
+  const [activeNotifTab, setActiveNotifTab] = useState('released')
   const [clearedNotifs, setClearedNotifs] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('wl_notifs_cleared_list') || '[]')
@@ -77,10 +86,28 @@ export default function Navbar() {
     navigate('/')
   }
 
+  const formatDayMonth = (dateStr) => {
+    const d = new Date(dateStr)
+    const day = d.getDate()
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    const monthName = months[d.getMonth()]
+    
+    let suffix = 'th'
+    if (day === 1 || day === 21 || day === 31) suffix = 'st'
+    else if (day === 2 || day === 22) suffix = 'nd'
+    else if (day === 3 || day === 23) suffix = 'rd'
+    
+    return `${day}${suffix} ${monthName}`
+  }
+
   useEffect(() => {
     if (isLoggedIn) {
       const fetchWatchlistNotifications = async () => {
         try {
+          // Reset notifications for testing as requested
+          localStorage.removeItem('wl_notifs_seen')
+          localStorage.removeItem('wl_notifs_cleared_list')
+
           const items = await planToWatchService.getItemsWithDetails()
           
           const now = new Date()
@@ -95,31 +122,118 @@ export default function Navbar() {
             if (seenIds.has(movie.id)) continue
             seenIds.add(movie.id)
             
-            const releaseDateStr = movie.release_date || movie.first_air_date
-            if (!releaseDateStr) continue
+            const isTv = movie.type === 'tv' || !!movie.first_air_date || (item.media_type === 'tv')
             
-            const releaseDate = new Date(releaseDateStr)
-            const diffTime = Math.floor((releaseDate - today) / (1000 * 60 * 60 * 24))
-            
-            let prefix = 'Released'
-            if (diffTime === 0) prefix = 'Releasing Today'
-            else if (diffTime > 0) prefix = `Releasing in ${diffTime} days`
-            else prefix = 'Released'
-            
-            const dateOptions = { day: 'numeric', month: 'short', year: 'numeric' }
-            const dateStr = releaseDate.toLocaleDateString('en-US', dateOptions)
-            
-            notifs.push({
-              id: `notif-${movie.id}`,
-              message: `${prefix}: ${movie.title || movie.name}`,
-              poster_path: movie.poster_path,
-              created_at: releaseDate.toISOString(),
-              diff_days: diffTime,
-              seen: false
-            })
+            if (!isTv) {
+              const releaseDateStr = movie.release_date
+              if (!releaseDateStr) continue
+              const releaseDate = new Date(releaseDateStr)
+              const diffTime = Math.floor((releaseDate - today) / (1000 * 60 * 60 * 24))
+              
+              if (diffTime <= 0) {
+                notifs.push({
+                  id: `notif-${movie.id}`,
+                  message: `Released Movie: ${movie.title || movie.name}`,
+                  poster_path: movie.poster_path,
+                  created_at: releaseDate.toISOString(),
+                  diff_days: diffTime,
+                  category: 'released',
+                  seen: false,
+                  media_type: 'movie',
+                  media_id: movie.id,
+                  movie: movie
+                })
+              } else {
+                notifs.push({
+                  id: `notif-${movie.id}`,
+                  message: `Releasing on ${formatDayMonth(releaseDate)}: ${movie.title || movie.name}`,
+                  poster_path: movie.poster_path,
+                  created_at: releaseDate.toISOString(),
+                  diff_days: diffTime,
+                  category: 'upcoming',
+                  seen: false,
+                  media_type: 'movie',
+                  media_id: movie.id,
+                  movie: movie
+                })
+              }
+            } else {
+              const firstAirDateStr = movie.first_air_date
+              if (!firstAirDateStr) continue
+              const firstAirDate = new Date(firstAirDateStr)
+              const diffTime = Math.floor((firstAirDate - today) / (1000 * 60 * 60 * 24))
+              
+              if (diffTime > 0) {
+                // Not yet aired -> Upcoming
+                notifs.push({
+                  id: `notif-${movie.id}`,
+                  message: `${movie.name || movie.title}`,
+                  poster_path: movie.poster_path,
+                  created_at: firstAirDate.toISOString(),
+                  diff_days: diffTime,
+                  category: 'upcoming',
+                  seen: false,
+                  media_type: 'tv',
+                  media_id: movie.id,
+                  movie: movie
+                })
+              } else {
+                // Released with few episodes (first_air_date <= today)
+                const nextEp = movie.next_episode_to_air
+                if (nextEp && nextEp.air_date) {
+                  const epAirDate = new Date(nextEp.air_date)
+                  const epDiffTime = Math.floor((epAirDate - today) / (1000 * 60 * 60 * 24))
+                  
+                  if (epDiffTime === 0) {
+                    const seasonNum = nextEp.season_number || 1
+                    const episodeNum = nextEp.episode_number || 1
+                    const message = `Season ${seasonNum} Episode ${episodeNum} of ${movie.name || movie.title} was released`
+                    
+                    notifs.push({
+                      id: `notif-${movie.id}-ep-${nextEp.id || episodeNum}`,
+                      message: message,
+                      poster_path: movie.poster_path,
+                      created_at: epAirDate.toISOString(),
+                      diff_days: epDiffTime,
+                      category: 'released',
+                      seen: false,
+                      media_type: 'tv',
+                      media_id: movie.id,
+                      movie: movie,
+                      season_number: seasonNum
+                    })
+                  } else if (epDiffTime > 0) {
+                    const seasonNum = nextEp.season_number || 1
+                    const episodeNum = nextEp.episode_number || 1
+                    const message = `Season ${seasonNum} Episode ${episodeNum} of ${movie.name || movie.title}`
+                    
+                    notifs.push({
+                      id: `notif-${movie.id}-ep-${nextEp.id || episodeNum}`,
+                      message: message,
+                      poster_path: movie.poster_path,
+                      created_at: epAirDate.toISOString(),
+                      diff_days: epDiffTime,
+                      category: 'upcoming',
+                      seen: false,
+                      media_type: 'tv',
+                      media_id: movie.id,
+                      movie: movie,
+                      season_number: seasonNum
+                    })
+                  }
+                }
+              }
+            }
           }
           
-          notifs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          notifs.sort((a, b) => {
+            const dateA = new Date(a.created_at)
+            const dateB = new Date(b.created_at)
+            if (a.category === 'upcoming' && b.category === 'upcoming') {
+              return dateA - dateB // Closest upcoming first
+            }
+            return dateB - dateA // Latest released first
+          })
           
           const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
           const finalNotifs = notifs.map(n => ({
@@ -141,7 +255,7 @@ export default function Navbar() {
 
   const safeNotifications = Array.isArray(notifications) ? notifications : []
   const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
-  const unreadCount = visibleNotifications.filter(n => !n.seen).length
+  const unreadCount = visibleNotifications.filter(n => !n.seen && n.category === 'released').length
 
   const handleNotifClick = () => {
     setNotifOpen(!notifOpen)
@@ -153,20 +267,6 @@ export default function Navbar() {
     }
   }
 
-  const formatDayMonth = (dateStr) => {
-    const d = new Date(dateStr)
-    const day = d.getDate()
-    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-    const monthName = months[d.getMonth()]
-    
-    let suffix = 'th'
-    if (day === 1 || day === 21 || day === 31) suffix = 'st'
-    else if (day === 2 || day === 22) suffix = 'nd'
-    else if (day === 3 || day === 23) suffix = 'rd'
-    
-    return `${day}${suffix} ${monthName}`
-  }
-
   const handleClearNotifs = () => {
     const idsToClear = safeNotifications.map(n => n.id)
     const newCleared = [...clearedNotifs, ...idsToClear]
@@ -174,38 +274,39 @@ export default function Navbar() {
     localStorage.setItem('wl_notifs_cleared_list', JSON.stringify(newCleared))
   }
 
-  const filteredNotifs = visibleNotifications.filter(n => {
-    if (activeNotifTab === 'updates') {
-      return n.diff_days >= 0
-    }
-    if (activeNotifTab === 'activity') {
-      return n.diff_days < 0
-    }
-    return true
-  })
+  const filteredNotifs = visibleNotifications.filter(n => n.category === activeNotifTab)
 
-  const groupedNotifs = {
-    upcoming: [],
-    recent: [],
-    older: []
+  const handlePlayTrailer = async (e, n) => {
+    e.stopPropagation();
+    try {
+      const endpoint = n.media_type === 'tv' ? `/api/v1/tv/${n.media_id}/videos` : `/api/v1/movies/${n.media_id}/videos`;
+      const r = await api.get(endpoint);
+      setTrailerModalData(r.data);
+      setTrailerModalContentId(n.media_id);
+      setTrailerModalMediaType(n.media_type);
+      setTrailerModalSeasons(n.movie?.seasons || []);
+      setTrailerModalInitialSeason(n.season_number || "all");
+      setTrailerModalOpen(true);
+    } catch (err) {
+      console.error("Failed to load trailer", err);
+    }
   }
 
-  filteredNotifs.forEach(n => {
-    if (n.diff_days > 0) {
-      groupedNotifs.upcoming.push(n)
-    } else if (n.diff_days >= -7) {
-      groupedNotifs.recent.push(n)
-    } else {
-      groupedNotifs.older.push(n)
+  const renderNotifItem = (n) => {
+    const handleItemClick = () => {
+      if (n.media_id && n.media_type) {
+        setNotifOpen(false)
+        navigate(`/${n.media_type === 'tv' ? 'tv' : 'movies'}/${n.media_id}`)
+      }
     }
-  })
-
-  const renderNotifItem = (n) => (
-    <div
-      key={n.id}
-      className="navbar__notif-item"
-      style={{ opacity: 1 }}
-    >
+    
+    return (
+      <div
+        key={n.id}
+        className="navbar__notif-item"
+        style={{ opacity: 1, cursor: 'pointer' }}
+        onClick={handleItemClick}
+      >
       {n.poster_path && (
         <img 
           src={`https://image.tmdb.org/t/p/w92${n.poster_path}`} 
@@ -216,19 +317,45 @@ export default function Navbar() {
         <span className="navbar__notif-message">
           {n.message}
         </span>
-        <span className="navbar__notif-date">
-          {formatDayMonth(n.created_at)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+          <span className="navbar__notif-date">
+            {formatDayMonth(n.created_at)}
+          </span>
+          <button 
+            onClick={(e) => handlePlayTrailer(e, n)}
+            style={{ 
+              background: 'rgba(229, 9, 20, 0.1)', 
+              border: 'none', 
+              borderRadius: '4px',
+              padding: '2px 6px',
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              color: '#E50914',
+              gap: '4px',
+              fontSize: '11px',
+              fontWeight: '600'
+            }}
+            title="Play Trailer"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            TRAILER
+          </button>
+        </div>
       </div>
     </div>
   )
+  }
 
   const addTestNotification = () => {
     const newNotif = {
       id: Date.now(),
       message: "This is a test notification. Notifications are working!",
       seen: false,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      category: 'released'
     }
     setNotifications([newNotif, ...notifications])
   }
@@ -417,28 +544,6 @@ export default function Navbar() {
 
           {/* Auth Actions (Avatar dropdown or Login / SignUp buttons) */}
           <div className="navbar__actions">
-            {/* Search Trigger Button */}
-            {!(location.pathname === '/intro' || location.pathname === '/about' || (location.pathname === '/' && !isLoggedIn)) && (
-              <button
-                className="navbar__notif-btn"
-                onClick={() => setSearchOpen(!searchOpen)}
-                aria-label="Search"
-                style={{ marginRight: '8px' }}
-              >
-                {searchOpen ? (
-                  <svg key="cross" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg search-icon-animate">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                ) : (
-                  <svg key="search" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg search-icon-animate">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
-                )}
-              </button>
-            )}
-
             {isLoggedIn && (
               <div className="navbar__user" ref={notifRef} style={{ marginRight: '8px' }}>
                 <button
@@ -470,9 +575,8 @@ export default function Navbar() {
                       </button>
                     </div>
                     <div className="navbar__notif-tabs">
-                      <button className={`navbar__notif-tab ${activeNotifTab === 'all' ? 'active' : ''}`} onClick={() => setActiveNotifTab('all')}>All</button>
-                      <button className={`navbar__notif-tab ${activeNotifTab === 'updates' ? 'active' : ''}`} onClick={() => setActiveNotifTab('updates')}>Updates</button>
-                      <button className={`navbar__notif-tab ${activeNotifTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveNotifTab('activity')}>Activity</button>
+                      <button className={`navbar__notif-tab ${activeNotifTab === 'released' ? 'active' : ''}`} onClick={() => setActiveNotifTab('released')}>Released</button>
+                      <button className={`navbar__notif-tab ${activeNotifTab === 'upcoming' ? 'active' : ''}`} onClick={() => setActiveNotifTab('upcoming')}>Upcoming</button>
                     </div>
                     <div className="navbar__notif-list">
                       {filteredNotifs.length === 0 ? (
@@ -480,26 +584,7 @@ export default function Navbar() {
                           No notifications
                         </div>
                       ) : (
-                        <>
-                          {groupedNotifs.upcoming.length > 0 && (
-                            <>
-                              <div className="navbar__notif-group-title">Upcoming</div>
-                              {groupedNotifs.upcoming.map(renderNotifItem)}
-                            </>
-                          )}
-                          {groupedNotifs.recent.length > 0 && (
-                            <>
-                              <div className="navbar__notif-group-title">Last 7 Days</div>
-                              {groupedNotifs.recent.map(renderNotifItem)}
-                            </>
-                          )}
-                          {groupedNotifs.older.length > 0 && (
-                            <>
-                              <div className="navbar__notif-group-title">Older</div>
-                              {groupedNotifs.older.map(renderNotifItem)}
-                            </>
-                          )}
-                        </>
+                        filteredNotifs.map(renderNotifItem)
                       )}
                     </div>
                     <div className="navbar__notif-footer">
@@ -508,6 +593,28 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Search Trigger Button */}
+            {!(location.pathname === '/intro' || location.pathname === '/about' || (location.pathname === '/' && !isLoggedIn)) && (
+              <button
+                className="navbar__notif-btn"
+                onClick={() => setSearchOpen(!searchOpen)}
+                aria-label="Search"
+                style={{ marginRight: '8px' }}
+              >
+                {searchOpen ? (
+                  <svg key="cross" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg search-icon-animate">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                ) : (
+                  <svg key="search" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg search-icon-animate">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                )}
+              </button>
             )}
 
             {isLoading ? (
@@ -693,19 +800,7 @@ export default function Navbar() {
             <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
           )}
 
-            {/* Mobile Hamburger menu toggle button */}
-            <button 
-              className="navbar__hamburger"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Open menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-            </button>
+
           </div>
         </div>
 
@@ -920,6 +1015,19 @@ export default function Navbar() {
           </div>
         </>,
         document.body
+      )}
+      {/* Trailer Modal Overlay */}
+      {trailerModalData && (
+        <TrailerModal
+          isOpen={trailerModalOpen}
+          onClose={() => setTrailerModalOpen(false)}
+          data={trailerModalData}
+          seasons={trailerModalSeasons}
+          tvId={trailerModalMediaType === 'tv' ? trailerModalContentId : null}
+          contentId={trailerModalContentId}
+          mediaType={trailerModalMediaType}
+          initialSeason={trailerModalInitialSeason}
+        />
       )}
     </nav>
   )

@@ -316,7 +316,7 @@ export default function Home() {
                 premiumScroll={true}
               />
               <TrailerRow 
-                title="Trailers 🎬" 
+                title="🎬 Trailers" 
                 items={trailers} 
                 loading={trailersLoad} 
                 onPlayTrailer={handlePlayTrailer}

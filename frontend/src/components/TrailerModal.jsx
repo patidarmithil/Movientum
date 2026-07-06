@@ -5,10 +5,10 @@ import './TrailerModal.css'
 
 import api from '../utils/api'
 
-export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, directVideoKey, contentId, mediaType }) {
+export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, directVideoKey, contentId, mediaType, initialSeason }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("trailer") // "trailer" | "teaser"
-  const [selectedSeason, setSelectedSeason] = useState("all")
+  const [selectedSeason, setSelectedSeason] = useState(initialSeason || "all")
   const [seasonVideos, setSeasonVideos] = useState(null)
   const [loadingSeason, setLoadingSeason] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -16,11 +16,14 @@ export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, dir
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
+      if (initialSeason) {
+        setSelectedSeason(initialSeason)
+      }
     }
     return () => {
       document.body.style.overflow = ''
     }
-  }, [isOpen])
+  }, [isOpen, initialSeason])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -52,17 +55,30 @@ export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, dir
 
   if (!isOpen) return null;
 
-  const currentData = selectedSeason === "all" ? data : seasonVideos
-  
-  // If directVideoKey is passed, we override the normal flow and just play that
-  const currentKey = directVideoKey 
-    ? directVideoKey 
-    : (activeTab === "trailer" ? currentData?.trailer_key : currentData?.teaser_key)
-    
-  const currentQuery = activeTab === "trailer" ? currentData?.fallback_queries?.trailer : currentData?.fallback_queries?.teaser
+  // When a specific season is selected, use its videos; fall back to show-level data if no season trailer
+  const seasonData = selectedSeason === "all" ? null : seasonVideos
+  const trailerKey = activeTab === "trailer"
+    ? (seasonData?.trailer_key || data?.trailer_key)
+    : (seasonData?.teaser_key || data?.teaser_key)
+
+  // If directVideoKey is passed, override everything
+  const currentKey = directVideoKey ? directVideoKey : trailerKey
+
+  // For fallback query: prefer season-specific, then show-level
+  const seasonQuery = activeTab === "trailer"
+    ? (seasonData?.fallback_queries?.trailer || data?.fallback_queries?.trailer)
+    : (seasonData?.fallback_queries?.teaser || data?.fallback_queries?.teaser)
+  const currentQuery = directVideoKey ? null : seasonQuery
 
   // Determine iframe src URL
   const embedUrl = currentKey ? `https://www.youtube-nocookie.com/embed/${currentKey}?autoplay=0&rel=0&origin=${window.location.origin}` : "";
+
+  // Figure out which season label to show in the dropdown button
+  const getSeasonLabel = () => {
+    if (!seasons || seasons.length === 0) return null
+    if (selectedSeason === "all") return `Season 1`
+    return `Season ${selectedSeason}`
+  }
 
   const handleViewClick = (e) => {
     e.stopPropagation();
@@ -125,26 +141,17 @@ export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, dir
                   setIsDropdownOpen(!isDropdownOpen);
                 }}
               >
-                {selectedSeason === "all" ? "Show Trailer" : `Season ${selectedSeason}`}
+                {getSeasonLabel()}
                 <svg className="dropdown-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </button>
               {isDropdownOpen && (
                 <div className="custom-dropdown-menu">
-                  <div 
-                    className={`custom-dropdown-item ${selectedSeason === "all" ? "active" : ""}`}
-                    onClick={() => {
-                      setSelectedSeason("all")
-                      setIsDropdownOpen(false)
-                    }}
-                  >
-                    Show Trailer
-                  </div>
                   {seasons.map((s) => (
                     <div 
                       key={s.season_number} 
-                      className={`custom-dropdown-item ${String(selectedSeason) === String(s.season_number) ? "active" : ""}`}
+                      className={`custom-dropdown-item ${String(selectedSeason) === String(s.season_number) || (selectedSeason === "all" && s.season_number === 1) ? "active" : ""}`}
                       onClick={() => {
                         setSelectedSeason(s.season_number)
                         setIsDropdownOpen(false)
@@ -184,4 +191,3 @@ export default function TrailerModal({ isOpen, onClose, data, seasons, tvId, dir
     document.body
   )
 }
-
