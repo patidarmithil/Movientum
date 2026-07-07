@@ -93,6 +93,9 @@ export default function Home() {
   const [forYou, setForYou] = useSessionState('home_forYou', [])
   const [forYouLoad, setForYouLoad] = useState(isLoggedIn && forYou.length === 0)
 
+  const [guestRecs, setGuestRecs] = useSessionState('home_guestRecs', [])
+  const [guestRecsLoad, setGuestRecsLoad] = useState(!isLoggedIn && guestRecs.length === 0)
+
   // Trailers state (not cached in session — region changes need fresh data)
   const [trailers, setTrailers] = useState([])
   const [trailersLoad, setTrailersLoad] = useState(true)
@@ -192,6 +195,36 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 
+  async function detectCountryCode() {
+    const stored = sessionStorage.getItem('guest_country_code_v2')
+    if (stored) return stored
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 3000)
+      const res = await fetch('https://get.geojs.io/v1/ip/country.json', { signal: controller.signal })
+      clearTimeout(timer)
+      const data = await res.json()
+      const code = data.country || 'US'
+      sessionStorage.setItem('guest_country_code_v2', code)
+      return code
+    } catch {
+      return 'US'
+    }
+  }
+
+  useEffect(() => {
+    if (isLoggedIn) return
+    if (guestRecs.length > 0) { setGuestRecsLoad(false); return }
+    setGuestRecsLoad(true)
+    detectCountryCode().then(code =>
+      api.get('/api/v1/recommendations/guest?country_code=' + code)
+        .then(r => setGuestRecs(r.data?.movies || []))
+        .catch(() => setGuestRecs([]))
+        .finally(() => setGuestRecsLoad(false))
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn])
+
   // Fetch Trailers — re-fetch whenever region pill changes
   useEffect(() => {
     setTrailersLoad(true)
@@ -283,25 +316,35 @@ export default function Home() {
           />
 
           {!isLoggedIn && (
-            <TrailerRow 
-              title="Trailers 🎬" 
-              items={trailers} 
-              loading={trailersLoad} 
-              onPlayTrailer={handlePlayTrailer}
-              premiumScroll={true}
-            >
-              <div className="movie-row__pills-container">
-                {TRAILER_REGIONS.map(region => (
-                  <button
-                    key={region}
-                    className={`genre-pill-btn ${trailerRegion === region ? 'active' : ''}`}
-                    onClick={() => setTrailerRegion(region)}
-                  >
-                    {region}
-                  </button>
-                ))}
-              </div>
-            </TrailerRow>
+            <>
+              <MovieRow
+                title="Recommendations"
+                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle></svg>}
+                movies={guestRecs}
+                loading={guestRecsLoad}
+                seeAllHref="/explore?sort=rating"
+                premiumScroll={true}
+              />
+              <TrailerRow 
+                title="Trailers 🎬" 
+                items={trailers} 
+                loading={trailersLoad} 
+                onPlayTrailer={handlePlayTrailer}
+                premiumScroll={true}
+              >
+                <div className="movie-row__pills-container">
+                  {TRAILER_REGIONS.map(region => (
+                    <button
+                      key={region}
+                      className={`genre-pill-btn ${trailerRegion === region ? 'active' : ''}`}
+                      onClick={() => setTrailerRegion(region)}
+                    >
+                      {region}
+                    </button>
+                  ))}
+                </div>
+              </TrailerRow>
+            </>
           )}
 
           {/* For You (Personalized Recommendations) — Logged-in only */}

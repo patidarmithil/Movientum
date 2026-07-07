@@ -721,6 +721,8 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
+  width: fit-content;
+  max-width: 100%;
 }
 
 .collection-box__title {
@@ -774,12 +776,14 @@
 .collection-box__arrow:hover { background: rgba(255,255,255,0.25); }
 
 .collection-card {
-  flex-shrink: 0;
+  flex: 0 0 120px;
   width: 120px;
+  max-width: 120px;
   text-decoration: none;
   color: inherit;
   scroll-snap-align: start;
   transition: transform 0.2s ease;
+  display: block; /* Ensure the anchor behaves like a block */
 }
 .collection-card:hover { transform: translateY(-3px); }
 

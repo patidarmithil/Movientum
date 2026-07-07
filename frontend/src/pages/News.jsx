@@ -117,8 +117,6 @@ export default function News() {
   }, [])
 
   const fetchNews = useCallback(async (pg, cat = 'for-you', append = false) => {
-    if (!isLoggedIn && cat === 'for-you') return
-    
     const id = Symbol()
     fetchRef.current = id
 
@@ -128,7 +126,11 @@ export default function News() {
     try {
       let data;
       if (cat === 'for-you') {
-        data = await newsService.getForYou(pg, PAGE_SIZE)
+        if (!isLoggedIn) {
+          data = await newsService.getEditorialPicks(pg, PAGE_SIZE)
+        } else {
+          data = await newsService.getForYou(pg, PAGE_SIZE)
+        }
       } else if (cat === 'all') {
         data = await newsService.getLatest(pg, PAGE_SIZE)
       } else {
@@ -167,10 +169,8 @@ export default function News() {
   useEffect(() => {
     setPage(1)
     setArticles([])
-    if (isLoggedIn) {
-      fetchNews(1, activeCategory, false)
-    }
-  }, [isLoggedIn, fetchNews])
+    fetchNews(1, activeCategory, false)
+  }, [isLoggedIn, activeCategory, fetchNews])
 
   const observerRef = useRef(null)      // sentinel div ref
   const isFetchingRef = useRef(false)   // prevent double-fetch
@@ -269,57 +269,51 @@ export default function News() {
           })}
         </div>
 
-        {/* ── Locked State ── */}
-        {!isLoggedIn && activeCategory === 'for-you' ? (
-          <div className="news-locked-state">
-            <div className="news-locked-state__icon">🔒</div>
-            <h2>Sign in to see your news</h2>
-            <p>Get news articles based on the movies and TV shows you've watched.</p>
-            <Link to="/login" className="btn btn--primary btn--md" id="news-login-cta">
-              Sign In to Unlock
-            </Link>
+        {/* ── Guest Banner (Soft Lock) ── */}
+        {!isLoggedIn && activeCategory === 'for-you' && (
+          <div className="news-guest-banner" style={{ textAlign: 'center', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ marginRight: '1rem', color: 'var(--text-secondary)' }}>Sign in to get personalized news based on your watch history</span>
+            <Link to="/login" className="btn btn--primary btn--sm" style={{ padding: '0.4rem 1rem' }}>Sign In</Link>
+          </div>
+        )}
+
+        {/* ── Content ── */}
+        {loading ? (
+          <NewsSkeleton />
+        ) : isEmpty ? (
+          <div className="news-empty">
+            <span className="news-empty__icon">📭</span>
+            <h3>No articles found</h3>
+            <p>
+              {activeCategory === 'for-you'
+                ? "Watch more titles to start getting personalized news, or explore other categories!"
+                : `No news articles found under the ${CATEGORIES.find(c => c.id === activeCategory)?.label || activeCategory} category.`}
+            </p>
           </div>
         ) : (
-          <>
-            {/* ── Content ── */}
-            {loading ? (
-              <NewsSkeleton />
-            ) : isEmpty ? (
-              <div className="news-empty">
-                <span className="news-empty__icon">📭</span>
-                <h3>No articles found</h3>
-                <p>
-                  {activeCategory === 'for-you'
-                    ? "Rate and watch more titles to start getting personalized news!"
-                    : `No news articles found under the ${CATEGORIES.find(c => c.id === activeCategory)?.label || activeCategory} category.`}
-                </p>
-              </div>
-            ) : (
-              <StaggerContainer className="news-grid" instant={true}>
-                {articles.filter(a => a.image_url).map((article, index) => (
-                  <StaggerItem key={article.id} index={index}>
-                    <NewsCard article={article} variant="standard" />
-                  </StaggerItem>
-                ))}
-              </StaggerContainer>
-            )}
+          <StaggerContainer className="news-grid" instant={true}>
+            {articles.filter(a => a.image_url).map((article, index) => (
+              <StaggerItem key={article.id} index={index}>
+                <NewsCard article={article} variant="standard" />
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
+        )}
 
-            {/* Sentinel — triggers next page load when visible */}
-            {!loading && hasMore && (
-              <div
-                ref={observerRef}
-                className="news-scroll-sentinel"
-                aria-hidden="true"
-              />
-            )}
+        {/* Sentinel — triggers next page load when visible */}
+        {!loading && hasMore && (
+          <div
+            ref={observerRef}
+            className="news-scroll-sentinel"
+            aria-hidden="true"
+          />
+        )}
 
-            {/* Loading spinner for infinite scroll (not first load) */}
-            {loadMore && (
-              <div className="news-scroll-loader">
-                <div className="news-scroll-spinner" />
-              </div>
-            )}
-          </>
+        {/* Loading spinner for infinite scroll (not first load) */}
+        {loadMore && (
+          <div className="news-scroll-loader">
+            <div className="news-scroll-spinner" />
+          </div>
         )}
       </div>
     </main>

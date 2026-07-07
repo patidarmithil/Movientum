@@ -26,6 +26,13 @@ export const newsService = {
     return data
   },
 
+  async getEditorialPicks(page = 1, pageSize = 12) {
+    const { data } = await api.get(`${BASE}/editorial`, {
+      params: { page, page_size: pageSize },
+    })
+    return data
+  },
+
   async getByCategory(category, page = 1, pageSize = 12) {
     const { data } = await api.get(`${BASE}/feed/category`, {
       params: { category, page, page_size: pageSize },

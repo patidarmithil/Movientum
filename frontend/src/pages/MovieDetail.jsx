@@ -50,28 +50,60 @@ const formatINR = (val) => {
 // ── Collection Box (Sequel/Prequel) ──────────────────────────────
 function CollectionBox({ name, parts }) {
   const scrollRef = useRef(null)
-  const CARD_W = 160
-  const VISIBLE = 3
+  
+  // Dragging state refs
+  const isDragging = useRef(false)
+  const startX = useRef(0)
+  const scrollLeftStart = useRef(0)
 
-  const scroll = (dir) => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: dir * CARD_W * VISIBLE, behavior: 'smooth' })
+  const handleMouseDown = (e) => {
+    isDragging.current = true
+    const el = scrollRef.current
+    if (!el) return
+    startX.current = e.pageX - el.offsetLeft
+    scrollLeftStart.current = el.scrollLeft
+    el.style.scrollBehavior = 'auto'
+    el.style.cursor = 'grabbing'
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isDragging.current) return
+    e.preventDefault()
+    const el = scrollRef.current
+    if (!el) return
+    const x = e.pageX - el.offsetLeft
+    const walk = (x - startX.current) * 2 // Scroll fast multiplier
+    el.scrollLeft = scrollLeftStart.current - walk
+  }
+
+  const handleMouseUpOrLeave = () => {
+    isDragging.current = false
+    const el = scrollRef.current
+    if (el) {
+      el.style.scrollBehavior = 'smooth'
+      el.style.cursor = 'grab'
     }
   }
 
   return (
     <div className="movie-detail__collection-box">
       <h4 className="collection-box__title">{name}</h4>
-      <div className="collection-box__scroll-wrap">
-        {parts.length > VISIBLE && (
-          <button className="collection-box__arrow left" onClick={() => scroll(-1)} aria-label="Scroll left">‹</button>
-        )}
-        <div className="collection-box__row" ref={scrollRef}>
+      <div className="scroll-row-container collection-box__scroll-wrap">
+        <div 
+          className="scroll-row collection-box__row" 
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+          style={{ cursor: 'grab', userSelect: 'none' }}
+        >
           {parts.map(part => (
             <Link
               key={part.id}
               to={`/movies/${part.id}`}
               className="collection-card"
+              onDragStart={(e) => e.preventDefault()} // Prevent image dragging from interfering
             >
               <div className="collection-card__poster-wrap">
                 <img
@@ -79,6 +111,7 @@ function CollectionBox({ name, parts }) {
                   alt={part.title}
                   className="collection-card__poster"
                   loading="lazy"
+                  onDragStart={(e) => e.preventDefault()}
                 />
                 <span className={`collection-card__badge badge--${part.badge.toLowerCase().replace(' ', '-')}`}>
                   {part.badge}
@@ -91,9 +124,6 @@ function CollectionBox({ name, parts }) {
             </Link>
           ))}
         </div>
-        {parts.length > VISIBLE && (
-          <button className="collection-box__arrow right" onClick={() => scroll(1)} aria-label="Scroll right">›</button>
-        )}
       </div>
     </div>
   )

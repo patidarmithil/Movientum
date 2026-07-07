@@ -518,12 +518,23 @@ export default function RecommendationsContent() {
             </button>
           )}
 
-          {commonTraits.genres && commonTraits.genres.length > 0 && movies.length > 0 && (
-            <div className="reccontent-traits-bar">
-              <span className="reccontent-traits-label">Shared DNA:</span>
-              {commonTraits.genres.map(g => (
+          {commonTraits && movies.length > 0 && (
+            <div className="reccontent-traits-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '16px' }}>
+              <span className="reccontent-traits-label" style={{ fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginRight: '8px' }}>Shared DNA:</span>
+              {(commonTraits.genres || []).map(g => (
                 <span key={g} className="reccontent-trait-tag">{g}</span>
               ))}
+              {(commonTraits.languages || []).map(lang => (
+                <span key={lang} className="reccontent-trait-tag" style={{ background: 'rgba(123, 47, 190, 0.2)', border: '1px solid rgba(123, 47, 190, 0.5)', color: '#c084fc' }}>{lang}</span>
+              ))}
+              {commonTraits.era && (
+                <span className="reccontent-trait-tag" style={{ background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.4)', color: '#ffb74d' }}>{commonTraits.era}</span>
+              )}
+              {commonTraits.basket_type && commonTraits.basket_type !== 'mixed' && (
+                <span className="reccontent-trait-tag" style={{ background: 'rgba(255, 0, 128, 0.15)', border: '1px solid rgba(255, 0, 128, 0.4)', color: '#FF0080', fontWeight: 'bold' }}>
+                  [{commonTraits.basket_type.toUpperCase()}]
+                </span>
+              )}
             </div>
           )}
         </section>
