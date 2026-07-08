@@ -127,7 +127,9 @@ export default function News() {
       let data;
       if (cat === 'for-you') {
         if (!isLoggedIn) {
-          data = await newsService.getEditorialPicks(pg, PAGE_SIZE)
+          // Limited simple trending recommendation for non-logged in users
+          data = await newsService.getLatest(1, 6)
+          data.total = data.articles?.length || 0 // Prevents infinite scroll
         } else {
           data = await newsService.getForYou(pg, PAGE_SIZE)
         }
@@ -272,8 +274,8 @@ export default function News() {
         {/* ── Guest Banner (Soft Lock) ── */}
         {!isLoggedIn && activeCategory === 'for-you' && (
           <div className="news-guest-banner" style={{ textAlign: 'center', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <span style={{ marginRight: '1rem', color: 'var(--text-secondary)' }}>Sign in to get personalized news based on your watch history</span>
-            <Link to="/login" className="btn btn--primary btn--sm" style={{ padding: '0.4rem 1rem' }}>Sign In</Link>
+            <span style={{ marginRight: '1rem', color: 'var(--text-secondary)' }}>Showing limited trending news. Log in to see more and get personalized recommendations!</span>
+            <Link to="/login" className="btn btn--primary btn--sm" style={{ padding: '0.4rem 1rem' }}>Log In</Link>
           </div>
         )}
 

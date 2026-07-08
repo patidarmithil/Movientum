@@ -182,17 +182,22 @@ export default function RatingMeter({
     return () => cancelAnimationFrame(animationFrameId)
   }, [activePct, safeTotal])
 
-  const fetchDist = useCallback(async () => {
-    if (hasPropsData) return
+  const fetchDist = useCallback(async (force = false) => {
+    if (hasPropsData && !force) return
     try {
       const data = await ratingService.getDistribution(movieId, mediaType)
       setDist(data)
+      // If we forced it, it means the user rated, so we dynamically disable hasPropsData check locally
+      if (force) {
+        // We set dist so the UI updates, and we override loading state
+        setLoading(false)
+      }
     } catch {
       setError('Failed to load ratings')
     } finally {
       setLoading(false)
     }
-  }, [movieId, hasPropsData])
+  }, [movieId, hasPropsData, mediaType])
 
   useEffect(() => {
     if (!hasPropsData) {
@@ -237,7 +242,7 @@ export default function RatingMeter({
           await ratingService.deleteRating(userRatingId)
         }
         setMyRating(null)
-        await fetchDist()
+        await fetchDist(true)
         onRatingRemoved?.()
       } else if (myRating !== null) {
         if (userRatingId) {
@@ -246,12 +251,12 @@ export default function RatingMeter({
           await ratingService.submitRating(movieId, mediaType, category)
         }
         setMyRating(category)
-        await fetchDist()
+        await fetchDist(true)
         onRated?.()
       } else {
         await ratingService.submitRating(movieId, mediaType, category)
         setMyRating(category)
-        await fetchDist()
+        await fetchDist(true)
         onRated?.()
       }
     } catch {

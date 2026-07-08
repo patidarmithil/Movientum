@@ -13,6 +13,11 @@ export const adminService = {
     return data
   },
 
+  async stopTask(jobId) {
+    const { data } = await api.post(`${BASE}/tasks/stop/${jobId}`)
+    return data
+  },
+
   async getTaskStatus(jobId, taskName = '') {
     const { data } = await api.get(`${BASE}/tasks/status/${jobId}`, {
       params: { task_name: taskName }

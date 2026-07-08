@@ -10,6 +10,7 @@ const TASKS = [
   { key: "fetch_cat_news",  label: "Fetch News (Category)",   icon: "📑" },
   { key: "check_episodes",  label: "Check Episodes",          icon: "📺" },
   { key: "expire_articles", label: "Expire Old Articles",     icon: "🗑️" },
+  { key: "nightly_job",     label: "Overall Nightly Job",     icon: "🌙" },
 ]
 
 export default function AdminPage() {
@@ -72,6 +73,19 @@ export default function AdminPage() {
     }
   }
 
+  async function handleStop(task_key, job_id) {
+    if (!job_id) return
+    try {
+      await adminService.stopTask(job_id)
+      setTaskStates(prev => ({
+        ...prev,
+        [task_key]: { ...prev[task_key], status: "REVOKED", progress: 0 }
+      }))
+    } catch (err) {
+      console.error("Failed to stop task:", err)
+    }
+  }
+
   return (
     <main className="admin-page page-content">
       <div className="admin-aurora-bg" aria-hidden="true">
@@ -130,7 +144,7 @@ export default function AdminPage() {
               <tbody>
                 {TASKS.map(task => {
                   const state = taskStates[task.key]
-                  const isRunning = ['queued', 'PENDING', 'STARTED'].includes(state.status)
+                  const isRunning = ['queued', 'PENDING', 'STARTED', 'PROGRESS'].includes(state.status)
                   
                   return (
                     <tr key={task.key}>
@@ -148,7 +162,7 @@ export default function AdminPage() {
                               />
                             </div>
                             <span className="admin-task-progress-label">
-                              {state.status === 'STARTED' ? 'Running...' :
+                              {state.status === 'STARTED' || state.status === 'PROGRESS' ? 'Running...' :
                                state.status === 'PENDING' ? 'Queued...' :
                                state.status === 'FAILURE' ? `Failed: ${state.error}` : state.status}
                             </span>
@@ -166,13 +180,24 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td>
-                        <button 
-                          className="btn btn--primary btn--sm" 
-                          onClick={() => triggerTask(task.key)}
-                          disabled={isRunning}
-                        >
-                          {isRunning ? 'Running...' : 'Run'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            className="btn btn--primary btn--sm" 
+                            onClick={() => triggerTask(task.key)}
+                            disabled={isRunning}
+                          >
+                            {isRunning ? 'Running...' : 'Run'}
+                          </button>
+                          {isRunning && (
+                            <button
+                              className="btn btn--danger btn--sm"
+                              onClick={() => handleStop(task.key, state.job_id)}
+                              style={{ backgroundColor: '#dc3545', color: 'white' }}
+                            >
+                              Stop
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

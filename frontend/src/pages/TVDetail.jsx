@@ -896,7 +896,7 @@ export default function TVDetail() {
                   }}
                   userRating={watchStatus.user_rating}
                   userRatingId={watchStatus.rating_id}
-                  {...(show.moctale_rating || {})}
+                  {...(show.moctale_rating || { total_votes: 0, perfection: 0, go_for_it: 0, timepass: 0, skip: 0 })}
                 />
               </div>
             ) : (

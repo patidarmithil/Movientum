@@ -6,14 +6,6 @@ import AdminAnalytics from '../components/AdminAnalytics';
 import './AdminDashboard.css';
 import './AdminPage.css'; // Import the new styles we created
 
-const TASKS = [
-  { key: "retrain_ranker",  label: "Retrain Ranker",          icon: "🧠" },
-  { key: "sync_movies",     label: "Sync Movies",             icon: "🎞️" },
-  { key: "fetch_news",      label: "Fetch News (Global)",     icon: "📰" },
-  { key: "fetch_cat_news",  label: "Fetch News (Category)",   icon: "📑" },
-  { key: "check_episodes",  label: "Check Episodes",          icon: "📺" },
-  { key: "expire_articles", label: "Expire Old Articles",     icon: "🗑️" },
-]
 
 export default function AdminDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -30,15 +22,39 @@ export default function AdminDashboard() {
   const [subTabInfra, setSubTabInfra] = useState('api'); // 'api', 'infra'
   const [subTabML, setSubTabML] = useState('recs'); // 'recs', 'graph', 'retrain'
 
-  const [taskStates, setTaskStates] = useState(
-    Object.fromEntries(TASKS.map(t => [t.key, {
-      status:   "idle",
-      progress: 0,
-      job_id:   null,
-      result:   null,
-      error:    null,
-    }]))
-  )
+  const [taskStatuses, setTaskStatuses] = useState({});
+  const [activeInterval, setActiveInterval] = useState(null);
+
+  const TASKS = [
+    { 
+      key: "nightly_job", name: "Overall Nightly Job", desc: "Runs the full suite of nightly updates.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    },
+    { 
+      key: "sync_movies", name: "Sync Movies", desc: "Synchronize popular and upcoming movies from TMDB.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+    },
+    { 
+      key: "retrain_ranker", name: "Retrain ML Ranker", desc: "Retrains the XGBRanker model using recent logs.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+    },
+    { 
+      key: "fetch_news", name: "Fetch Global News", desc: "Fetches global movie and TV news from API partners.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8l-4 4v14a2 2 0 0 0 2 2z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+    },
+    { 
+      key: "fetch_cat_news", name: "Fetch Category News", desc: "Fetches news specific to movie genres and TV.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+    },
+    { 
+      key: "check_episodes", name: "Check New Episodes", desc: "Checks for new episodes of tracked TV shows.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+    },
+    { 
+      key: "expire_articles", name: "Expire Old Articles", desc: "Archives news articles older than 7 days.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+    }
+  ];
 
   useEffect(() => {
     // Load Feedbacks
@@ -62,42 +78,47 @@ export default function AdminDashboard() {
       .finally(() => setLoadingStats(false));
   }, []);
 
-  function startPolling(task_key, job_id) {
-    const interval = setInterval(async () => {
-      try {
-        const res = await adminService.getTaskStatus(job_id, task_key)
-        const { status, progress, result, error } = res
-        
-        setTaskStates(prev => ({
-          ...prev,
-          [task_key]: { ...prev[task_key], status, progress, result, error, job_id }
-        }))
+  useEffect(() => {
+    // Poll active tasks
+    const pollInterval = setInterval(() => {
+      setTaskStatuses(currentStatuses => {
+        const activeKeys = Object.keys(currentStatuses).filter(k => {
+          const st = currentStatuses[k];
+          return st && (st.progress > 0 && st.progress < 100 && st.status !== 'FAILURE');
+        });
 
-        if (['SUCCESS', 'FAILURE', 'REVOKED'].includes(status)) {
-          clearInterval(interval)
+        if (activeKeys.length > 0) {
+          activeKeys.forEach(async (key) => {
+            try {
+              const res = await api.get(`/internal/progress/${key}`);
+              setTaskStatuses(prev => ({...prev, [key]: res.data}));
+            } catch (e) {
+              console.error(e);
+            }
+          });
         }
-      } catch (err) {
-        clearInterval(interval)
-      }
-    }, 2000)
+        return currentStatuses;
+      });
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, []);
+
+  async function handleTriggerTask(taskKey) {
+    setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 5, status: "Starting..." }}));
+    try {
+      await api.post(`/internal/trigger/${taskKey}?token=super-secret-cron-token-change-me`);
+    } catch (err) {
+      setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 0, status: "FAILURE", error: err.message }}));
+    }
   }
 
-  async function triggerTask(task_key) {
-    setTaskStates(prev => ({...prev, [task_key]: {...prev[task_key], status: "queued", progress: 0}}))
+  async function handleCancelTask(taskKey) {
     try {
-      const res = await adminService.triggerTask(task_key)
-      const job_id = res.job_id
-      setTaskStates(prev => ({...prev, [task_key]: {...prev[task_key], job_id, status: "PENDING"}}))
-      startPolling(task_key, job_id)
+      await api.post(`/internal/cancel/${taskKey}?token=super-secret-cron-token-change-me`);
+      setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 0, status: "CANCELLED" }}));
     } catch (err) {
-      setTaskStates(prev => ({
-        ...prev, 
-        [task_key]: {
-          ...prev[task_key], 
-          status: "FAILURE", 
-          error: err.response?.data?.detail || "Failed to trigger task"
-        }
-      }))
+      console.error("Failed to cancel task:", err);
     }
   }
 
@@ -226,68 +247,81 @@ export default function AdminDashboard() {
             </section>
 
             <section className="admin-tasks-section">
-              <h2>Celery Task Control</h2>
-              <div className="admin-tasks-table-wrapper">
-                <table className="admin-tasks-table">
-                  <thead>
-                    <tr>
-                      <th>Task</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {TASKS.map(task => {
-                      const state = taskStates[task.key]
-                      const isRunning = ['queued', 'PENDING', 'STARTED'].includes(state.status)
+              <h2>Manual Triggers & Tasks</h2>
+              <div className="admin-tasks-list">
+                {TASKS.map(task => {
+                  const state = taskStatuses[task.key] || { progress: 0, status: "idle" };
+                  const isRunning = state.progress > 0 && state.progress < 100 && state.status !== 'FAILURE' && state.status !== 'CANCELLED';
+                  const isSuccess = state.progress === 100 && state.status === 'SUCCESS';
+                  const isFailed = state.status === 'FAILURE';
+                  const isCancelled = state.status === 'CANCELLED';
+                  
+                  return (
+                    <div key={task.key} className="admin-task-row">
+                      <div className="admin-task-row-left">
+                        <div className="admin-task-row-icon">
+                          {task.icon}
+                        </div>
+                        <div className="admin-task-row-details">
+                          <h4>{task.name}</h4>
+                          <p>{task.desc}</p>
+                        </div>
+                      </div>
                       
-                      return (
-                        <tr key={task.key}>
-                          <td>
-                            <div className="admin-task-name">
-                              <span className="admin-task-icon">{task.icon}</span>
-                              <span>{task.label}</span>
+                      <div className="admin-task-row-right">
+                        {/* Progress Bar Area */}
+                        {(isRunning || isSuccess || isFailed || isCancelled || state.progress > 0) && (
+                          <div className="admin-task-row-progress-container">
+                            <div className="admin-task-row-progress-text">
+                              <span style={{ 
+                                color: isFailed ? '#ef4444' : isSuccess ? '#10b981' : isCancelled ? '#6b7280' : '#56CFE1',
+                                fontWeight: 500
+                              }}>
+                                {state.status}
+                              </span>
+                              <span style={{ color: 'var(--text-secondary)' }}>{state.progress}%</span>
                             </div>
-                            {state.status !== 'idle' && state.status !== 'SUCCESS' && (
-                              <div className="admin-task-progress">
-                                <div className="admin-task-progress-track">
-                                  <div 
-                                    className={`admin-task-progress-bar ${state.status === 'FAILURE' ? 'error' : ''}`}
-                                    style={{ width: `${state.progress}%` }} 
-                                  />
-                                </div>
-                                <span className="admin-task-progress-label">
-                                  {state.status === 'STARTED' ? 'Running...' :
-                                   state.status === 'PENDING' ? 'Queued...' :
-                                   state.status === 'FAILURE' ? `Failed: ${state.error}` : state.status}
-                                </span>
-                              </div>
+                            <div className="admin-task-row-progress-track">
+                              <div className="admin-task-row-progress-bar" style={{ 
+                                width: `${state.progress}%`,
+                                background: isFailed ? '#ef4444' : isSuccess ? '#10b981' : isCancelled ? '#4b5563' : '#56CFE1',
+                              }} />
+                            </div>
+                            {isFailed && state.error && (
+                              <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '4px' }}>{state.error}</div>
                             )}
-                            {state.status === 'SUCCESS' && (
-                              <div className="admin-task-result">
-                                <pre>{JSON.stringify(state.result, null, 2)}</pre>
-                              </div>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`admin-badge admin-badge--${state.status.toLowerCase()}`}>
-                              {state.status}
-                            </span>
-                          </td>
-                          <td>
+                          </div>
+                        )}
+                        
+                        {/* Actions */}
+                        <div className="admin-task-row-actions">
+                          {isRunning ? (
+                            <button 
+                              className="btn btn--danger btn--sm" 
+                              onClick={() => handleCancelTask(task.key)}
+                              style={{ 
+                                background: 'rgba(239, 68, 68, 0.1)', 
+                                border: '1px solid #ef4444', 
+                                color: '#ef4444',
+                                minWidth: '80px' 
+                              }}
+                            >
+                              Stop
+                            </button>
+                          ) : (
                             <button 
                               className="btn btn--primary btn--sm" 
-                              onClick={() => triggerTask(task.key)}
-                              disabled={isRunning}
+                              onClick={() => handleTriggerTask(task.key)}
+                              style={{ minWidth: '80px' }}
                             >
-                              {isRunning ? 'Running...' : 'Run'}
+                              {isSuccess ? 'Run Again' : 'Run'}
                             </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </div>

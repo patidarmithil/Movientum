@@ -919,7 +919,7 @@ export default function MovieDetail() {
                   }}
                   userRating={watchStatus.user_rating}
                   userRatingId={watchStatus.rating_id}
-                  {...(movie.moctale_rating || {})}
+                  {...(movie.moctale_rating || { total_votes: 0, perfection: 0, go_for_it: 0, timepass: 0, skip: 0 })}
                 />
               </div>
             ) : (
