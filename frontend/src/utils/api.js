@@ -23,6 +23,7 @@ const fallbackAPIUrl = isLocalhost
   : 'https://movientum.azurewebsites.net';
 
 const BASE_URL = import.meta.env.VITE_API_URL || fallbackAPIUrl;
+const SECONDARY_URL = import.meta.env.VITE_API_URL_SECONDARY || 'https://movientum-backend-secondary.onrender.com';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -118,6 +119,25 @@ api.interceptors.response.use(
       }
     }
 
+    // ── Secondary Backend Fallback ───────────────────────────
+    if (!original._secondaryRetry && SECONDARY_URL && original.baseURL !== SECONDARY_URL) {
+      const isNetworkOrServerError = 
+        !error.response || 
+        error.code === 'ECONNABORTED' ||
+        (error.response.status >= 500 && error.response.status <= 599);
+
+      if (isNetworkOrServerError) {
+        console.warn(`[API Fallback] Primary failed, retrying with secondary backend: ${SECONDARY_URL}`);
+        original._secondaryRetry = true;
+        
+        // Update global instance so future requests also use the working backend
+        api.defaults.baseURL = SECONDARY_URL;
+        original.baseURL = SECONDARY_URL;
+        
+        return api(original);
+      }
+    }
+
     // Skip retry for auth endpoints where 401 means invalid credentials, not an expired access token
     if (original?.url?.includes('/auth/refresh')) {
       // Refresh failed → force logout
@@ -159,7 +179,7 @@ api.interceptors.response.use(
       try {
         // Call refresh directly (avoid circular import with AuthContext)
         const response = await axios.post(
-          `${BASE_URL}/api/v1/auth/refresh`,
+          `${api.defaults.baseURL}/api/v1/auth/refresh`,
           { refresh_token: storedRefresh }
         )
         const { access_token, refresh_token } = response.data.data
