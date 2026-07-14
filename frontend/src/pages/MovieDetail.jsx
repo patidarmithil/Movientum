@@ -27,6 +27,7 @@ import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
+import AIRecommendations from '../components/AIRecommendations'
 import './MovieDetail.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -957,6 +958,13 @@ export default function MovieDetail() {
           productionCompanies={movie.production_companies || []}
           productionCountries={movie.production_countries || []}
         />
+        {/* ── AI Recommendations (Phase 6) ── */}
+        <AIRecommendations
+          seedTmdbId={movieId}
+          seedMediaType="movie"
+          seedTitle={movie?.title || ''}
+        />
+
         {/* ── Similar Movies ── */}
         <div className="movie-detail__similar">
           <MovieRow

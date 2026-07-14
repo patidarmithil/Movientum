@@ -80,12 +80,23 @@ export default function RatingMeter({
     }
   }, [userRating])
 
-  const safeTotal = hasPropsData ? (total_votes ?? 0) : (dist?.total ?? 0)
+  const isUserRated = myRating !== null
+  const safeTotal = isUserRated ? 1 : (hasPropsData ? (total_votes ?? 0) : (dist?.total ?? 0))
 
   let pctPerfection, pctGoForIt, pctTimepass, pctSkip
   let votesPerfection, votesGoForIt, votesTimepass, votesSkip
 
-  if (hasPropsData) {
+  if (isUserRated) {
+    pctPerfection = myRating === 'perfection' ? 100 : 0
+    pctGoForIt = myRating === 'go_for_it' ? 100 : 0
+    pctTimepass = myRating === 'timepass' ? 100 : 0
+    pctSkip = myRating === 'skip' ? 100 : 0
+
+    votesPerfection = myRating === 'perfection' ? 1 : 0
+    votesGoForIt = myRating === 'go_for_it' ? 1 : 0
+    votesTimepass = myRating === 'timepass' ? 1 : 0
+    votesSkip = myRating === 'skip' ? 1 : 0
+  } else if (hasPropsData) {
     // Props are percentages
     pctPerfection = perfection ?? 0
     pctGoForIt = go_for_it ?? 0
@@ -126,15 +137,17 @@ export default function RatingMeter({
   }
 
   // Find category with the maximum votes (dominant category) as default
-  let maxCategoryKey = 'go_for_it'
-  let maxCount = -1
-  CATEGORIES.forEach((cat) => {
-    const count = votes[cat.key] || 0
-    if (count > maxCount) {
-      maxCount = count
-      maxCategoryKey = cat.key
-    }
-  })
+  let maxCategoryKey = isUserRated ? myRating : 'go_for_it'
+  if (!isUserRated) {
+    let maxCount = -1
+    CATEGORIES.forEach((cat) => {
+      const count = votes[cat.key] || 0
+      if (count > maxCount) {
+        maxCount = count
+        maxCategoryKey = cat.key
+      }
+    })
+  }
 
   // Center display resolution: default is the category with the maximum votes
   const activeCategory = hoveredCategory || maxCategoryKey

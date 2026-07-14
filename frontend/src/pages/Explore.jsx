@@ -38,6 +38,17 @@ const TYPE_OPTIONS = [
   { value: 'anime', label: 'Anime' },
 ]
 
+const CINEMA_OPTIONS = [
+  { value: '', label: 'All Cinema' },
+  { value: 'hollywood', label: 'Hollywood' },
+  { value: 'bollywood', label: 'Bollywood' },
+  { value: 'tollywood', label: 'Tollywood' },
+  { value: 'kollywood', label: 'Kollywood' },
+  { value: 'mollywood', label: 'Mollywood' },
+  { value: 'sandalwood', label: 'Sandalwood' },
+  { value: 'kdrama', label: 'K-Drama' },
+]
+
 const COMPANIES = [
   { id: '420', label: 'Marvel Studios' },
   { id: '2', label: 'Walt Disney' },
@@ -135,6 +146,7 @@ export default function Explore() {
   const [yearTo,     setYearTo]     = useState(() => Number(searchParams.get('year_to')   ?? CURRENT_YEAR))
   const [sort,       setSort]       = useState(() => searchParams.get('sort') ?? 'popularity')
   const [ageRating,  setAgeRating]  = useState(() => searchParams.get('age_rating') ?? '')
+  const [selectedCinema, setSelectedCinema] = useState(() => searchParams.get('cinema') ?? '')
   const [page,       setPage]       = useSessionState('explore_page', () => Number(searchParams.get('page') ?? 1))
 
   // ── Debounced state for sliders/inputs ────────────────────
@@ -179,7 +191,8 @@ export default function Explore() {
     debouncedYearTo,
     sort,
     selectedType,
-    ageRating
+    ageRating,
+    selectedCinema
   ].join('|')
 
   const isMounted = useRef(false)
@@ -224,6 +237,7 @@ export default function Explore() {
       if (debouncedYearTo < CURRENT_YEAR) params.year_to    = debouncedYearTo
       if (selectedType)                  params.type       = selectedType
       if (ageRating)                     params.age_rating = ageRating
+      if (selectedCinema)                params.cinema     = selectedCinema
 
       const r = await api.get('/api/v1/movies/explore', { 
         params,
@@ -260,7 +274,7 @@ export default function Explore() {
         setLoadingMore(false)
       }
     }
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating, selectedCinema])
 
   // Reset page and movies list when filters change
   useEffect(() => {
@@ -299,9 +313,10 @@ export default function Explore() {
     if (sort !== 'popularity')     p.sort       = sort
     if (selectedType)              p.type       = selectedType
     if (ageRating)                 p.age_rating = ageRating
+    if (selectedCinema)            p.cinema     = selectedCinema
     setSearchParams(p, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating])
+  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating, selectedCinema])
 
   // Fetch subsequent pages when page increments
   useEffect(() => {
@@ -382,6 +397,7 @@ export default function Explore() {
     setSort('popularity')
     setSelectedType('')
     setAgeRating('')
+    setSelectedCinema('')
     setPage(1)
   }
 
@@ -395,7 +411,8 @@ export default function Explore() {
     yearTo < CURRENT_YEAR ||
     sort !== 'popularity' ||
     selectedType !== '' ||
-    ageRating !== ''
+    ageRating !== '' ||
+    selectedCinema !== ''
 
   const getHeroTitle = () => {
     if (selectedGenres.length === 1) {
@@ -443,6 +460,27 @@ export default function Explore() {
                 </button>
               ))}
             </div>
+
+            {/* Cinema Dropdown */}
+            <FilterDropdown
+              label={`Cinema: ${CINEMA_OPTIONS.find(o => o.value === selectedCinema)?.label || 'All Cinema'}`}
+              active={selectedCinema !== ''}
+            >
+              <div className="filter-dropdown__menu-list">
+                {CINEMA_OPTIONS.map((o) => (
+                  <label key={o.value} className={`filter-dropdown__menu-item ${selectedCinema === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="cinema-option"
+                      className="filter-dropdown__radio"
+                      checked={selectedCinema === o.value}
+                      onChange={() => setSelectedCinema(o.value)}
+                    />
+                    <span>{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
 
             {/* Genre Dropdown */}
             <FilterDropdown 
@@ -680,6 +718,11 @@ export default function Explore() {
               {selectedType && (
                 <button key="active-chip-type" className="explore-active-chip" onClick={() => setSelectedType('')}>
                   {selectedType === 'movie' ? 'Movies' : selectedType === 'tv' ? 'TV Shows' : 'Anime'} ×
+                </button>
+              )}
+              {selectedCinema && (
+                <button key="active-chip-cinema" className="explore-active-chip" onClick={() => setSelectedCinema('')}>
+                  {CINEMA_OPTIONS.find(o => o.value === selectedCinema)?.label} ×
                 </button>
               )}
               {selectedGenres.map((g) => (

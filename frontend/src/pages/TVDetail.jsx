@@ -31,6 +31,7 @@ import { planToWatchService } from '../services/planToWatchService'
 import { tempTrackerService } from '../services/tempTrackerService'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
+import AIRecommendations from '../components/AIRecommendations'
 import './MovieDetail.css'   // reuse same layout CSS
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -925,6 +926,13 @@ export default function TVDetail() {
           productionCompanies={productionCompanies}
           productionCountries={productionCountries}
         />
+        {/* ── AI Recommendations (Phase 6) ── */}
+        <AIRecommendations
+          seedTmdbId={tvId}
+          seedMediaType="tv"
+          seedTitle={show?.name || show?.title || ''}
+        />
+
         {/* ── Similar Items ── */}
         <div className="movie-detail__similar">
           <MovieRow

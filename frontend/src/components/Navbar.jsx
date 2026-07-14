@@ -679,6 +679,18 @@ export default function Navbar() {
                       </svg> News
                     </Link>
                     <Link
+                      to="/explore"
+                      className="navbar__dropdown-item"
+                      role="menuitem"
+                      id="nav-explore"
+                      onClick={() => setDropOpen(false)}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                      </svg> Explore
+                    </Link>
+                    <Link
                       to="/dashboard"
                       className="navbar__dropdown-item"
                       role="menuitem"
@@ -900,6 +912,18 @@ export default function Navbar() {
                           <path d="M2 17h10" />
                           <path d="M2 7h4" />
                         </svg> News
+                      </Link>
+                      <Link
+                        to="/explore"
+                        className="navbar__dropdown-item"
+                        role="menuitem"
+                        id="nav-dropdown-explore"
+                        onClick={() => setDropOpen(false)}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '8px' }}>
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                        </svg> Explore
                       </Link>
                       <Link
                         to="/rec-content"
