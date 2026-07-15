@@ -70,10 +70,11 @@ export default function TrailerCard({ item, onPlayTrailer }) {
           {/* Trailer/Teaser badge top-left (replaces rating) */}
           <div style={{
             position: 'absolute', top: '8px', left: '8px',
-            background: item.video_type === 'Trailer' ? 'rgba(176,72,255,0.85)' : 'rgba(255,77,109,0.85)',
-            color: '#fff', padding: '3px 8px', borderRadius: '6px',
-            fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.5px',
-            backdropFilter: 'blur(4px)', zIndex: 2
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            color: '#fff', padding: '4px 8px', borderRadius: '8px',
+            fontSize: '0.75rem', fontWeight: 'bold',
+            backdropFilter: 'blur(4px)', zIndex: 2,
+            border: '1px solid rgba(255,255,255,0.1)'
           }}>
             {item.video_type?.toUpperCase()}
           </div>
@@ -87,8 +88,9 @@ export default function TrailerCard({ item, onPlayTrailer }) {
           }} className="trailer-play-overlay">
             <div style={{
               width: '44px', height: '44px', borderRadius: '50%',
-              background: 'rgba(176,72,255,0.9)', display: 'flex',
+              backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.1)',
               opacity: 0, transition: 'opacity 0.2s', transform: 'scale(0.8)',
             }} className="trailer-play-btn">
               <svg viewBox="0 0 24 24" fill="white" width="18" height="18">

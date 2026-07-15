@@ -13,7 +13,12 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { aiRecsService } from '../services/aiRecsService'
 import ShinyText from './ShinyText'
+import BorderGlow from './BorderGlow'
+import { BsStars } from 'react-icons/bs'
+import { FiThumbsUp, FiThumbsDown, FiRefreshCw, FiAlertTriangle, FiFilm } from 'react-icons/fi'
 import './AIRecommendations.css'
+import './MovieCard.css'
+import './MovieRow.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
@@ -31,6 +36,27 @@ const STATE = { IDLE: 'IDLE', LOADING: 'LOADING', LOADED: 'LOADED', ERROR: 'ERRO
 
 // ── AI Card ──────────────────────────────────────────────────────
 function AIRecCard({ item, isLoggedIn, memoryMap, onThumb }) {
+  const [hasError, setHasError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
+  const cardRef = useRef(null)
+  
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.1, rootMargin: '0px 0px 100px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   const signal = memoryMap[`${item.tmdb_id}:${item.media_type}`]
 
   const posterUrl = item.poster_path
@@ -39,71 +65,87 @@ function AIRecCard({ item, isLoggedIn, memoryMap, onThumb }) {
 
   const detailHref = item.media_type === 'tv'
     ? `/tv/${item.tmdb_id}`
-    : `/movie/${item.tmdb_id}`
+    : `/movies/${item.tmdb_id}`
 
-  const cardClass = [
-    'ai-rec-card',
-    signal === 'up'   ? 'ai-rec-card--liked'    : '',
-    signal === 'down' ? 'ai-rec-card--disliked'  : '',
-  ].filter(Boolean).join(' ')
+  const ratingColor = item.vote_average >= 8 ? '#22C55E' : item.vote_average >= 6 ? '#FFC300' : '#EF4444'
 
   return (
-    <div className={cardClass}>
-      <div className="ai-rec-card__poster-wrap">
-        {/* AI pick badge */}
-        <span className="ai-rec-card__badge">✨ AI Pick</span>
+    <div ref={cardRef} className="ai-rec-card">
+      <Link
+        to={detailHref}
+        style={{ textDecoration: 'none', display: 'contents', color: 'inherit' }}
+      >
+        <BorderGlow
+          className={`movie-card movie-card--standard ${isVisible ? 'visible' : ''}`}
+          tabIndex={0}
+          borderRadius={12}
+          glowRadius={30}
+          glowIntensity={0.85}
+          colors={['#B048FF', '#00E5A0', '#FF4D6D']}
+          backgroundColor="#1B1B1B"
+        >
+          <div className="movie-card__poster-wrap">
+            {posterUrl && !hasError ? (
+              <img
+                src={posterUrl}
+                alt={item.title}
+                className={`movie-card__poster poster-progressive ${imageLoaded ? 'poster-progressive--loaded' : ''}`}
+                loading="lazy"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setHasError(true)}
+              />
+            ) : (
+              <div className="movie-card__poster-fallback">
+                <span>{item.title}</span>
+              </div>
+            )}
+            
+            <span className="ai-rec-card__badge"><BsStars /></span>
 
-        {/* Rating */}
-        {item.vote_average > 0 && (
-          <span className="ai-rec-card__rating">★ {item.vote_average?.toFixed(1)}</span>
-        )}
+            {item.vote_average > 0 && (
+              <div className="movie-card__rating" style={{ color: ratingColor }}>
+                {item.vote_average.toFixed(1)}
+              </div>
+            )}
 
-        {/* Poster or placeholder */}
-        <Link to={detailHref} tabIndex={-1}>
-          {posterUrl ? (
-            <img
-              src={posterUrl}
-              alt={item.title}
-              className="ai-rec-card__poster"
-              loading="lazy"
-            />
-          ) : (
-            <div className="ai-rec-card__poster-placeholder">🎬</div>
-          )}
-        </Link>
+            {item.media_type === 'tv' && (
+              <div className="movie-card__tv-badge">TV</div>
+            )}
 
-        {/* Reason chip */}
-        {item.reason && (
-          <div className="ai-rec-card__reason" title={item.reason}>
-            {item.reason}
+            {isLoggedIn && (
+              <div className="movie-card__feedback-overlay" onClick={e => e.preventDefault()}>
+                <button
+                  className={`movie-card__feedback-btn movie-card__feedback-btn--up ${signal === 'up' ? 'is-active' : ''}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onThumb(item, 'up') }}
+                  title="Like"
+                  aria-label="Thumbs up"
+                >
+                  <FiThumbsUp />
+                </button>
+                <button
+                  className={`movie-card__feedback-btn movie-card__feedback-btn--down ${signal === 'down' ? 'is-active' : ''}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onThumb(item, 'down') }}
+                  title="Dislike"
+                  aria-label="Thumbs down"
+                >
+                  <FiThumbsDown />
+                </button>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Thumbs overlay — logged-in only */}
-        {isLoggedIn && (
-          <div className="ai-rec-card__thumbs">
-            <button
-              className={`ai-rec-card__thumb-btn ai-rec-card__thumb-btn--up ${signal === 'up' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); onThumb(item, 'up') }}
-              title="Like"
-              aria-label="Thumbs up"
-            >
-              👍
-            </button>
-            <button
-              className={`ai-rec-card__thumb-btn ai-rec-card__thumb-btn--down ${signal === 'down' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); onThumb(item, 'down') }}
-              title="Dislike"
-              aria-label="Thumbs down"
-            >
-              👎
-            </button>
+          <div className="movie-card__info">
+            <h3 className="movie-card__title">{item.title}</h3>
+            <p className="movie-card__meta">
+              <span className="movie-card__year">{item.release_date ? item.release_date.slice(0, 4) : ''}</span>
+            </p>
+            {item.reason && (
+              <p className="movie-card__meta" style={{ marginTop: '4px', fontStyle: 'italic', color: '#94a3b8', fontSize: '0.65rem', whiteSpace: 'normal', lineHeight: 1.2 }}>
+                {item.reason}
+              </p>
+            )}
           </div>
-        )}
-      </div>
-
-      <Link to={detailHref} className="ai-rec-card__title" title={item.title}>
-        {item.title}
+        </BorderGlow>
       </Link>
     </div>
   )
@@ -121,6 +163,7 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
   const [moreLike,     setMoreLike]     = useState([])     // [{ title, year, media_type }]
   const [previousIds,  setPreviousIds]  = useState([])
   const [rerunCount,   setRerunCount]   = useState(0)
+  const [errorMessage, setErrorMessage] = useState('AI could not generate results. Please try again.')
   const scrollRef = useRef(null)
 
   // Build memory map from existing signals on items
@@ -174,6 +217,11 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
       setUiState(STATE.LOADED)
     } catch (err) {
       console.error('[AIRecs] fetch failed:', err)
+      if (err.response?.status === 429) {
+        setErrorMessage(err.response?.data?.detail || 'Daily AI quota exceeded. Please try again tomorrow.')
+      } else {
+        setErrorMessage('AI could not generate results. Please try again.')
+      }
       setUiState(STATE.ERROR)
     }
   }, [seedTmdbId, seedMediaType, buildMemoryMap])
@@ -254,28 +302,37 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
   return (
     <section className="ai-recs" aria-label="AI Recommendations">
       {/* ── Header ── */}
-      <div className="ai-recs__header">
-        <h2 className="ai-recs__title">✨ AI Recommendations</h2>
-        <span className="ai-recs__gemini-badge">
-          <ShinyText
-            text="Powered by Gemini"
-            speed={3}
-            color="#c4b5fd"
-            shineColor="#ede9fe"
-            spread={100}
-          />
-        </span>
-        {isLoaded && metadata?.personalized && (
-          <span className="ai-recs__personalized-pill">
-            ✦ Personalized
+      <div className="section-header" style={{ flexWrap: 'wrap', marginBottom: '1rem', border: 'none', padding: 0 }}>
+        <div className="section-header-left">
+          <h2 style={{ display: 'flex', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', marginRight: '8px' }}>
+              <BsStars />
+            </span>
+            <ShinyText text="AI Recommendations" />
+          </h2>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }}>
+          <span className="ai-recs__gemini-badge">
+            <ShinyText
+              text="Powered by Gemini"
+              speed={3}
+              color="#c4b5fd"
+              shineColor="#ede9fe"
+              spread={100}
+            />
           </span>
-        )}
+          {isLoaded && metadata?.personalized && (
+            <span className="ai-recs__personalized-pill">
+              <BsStars style={{ marginRight: '4px' }} /> Personalized
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── IDLE ── */}
       {isIdle && (
         <div className="ai-recs__idle">
-          <div className="ai-recs__idle-icon">✨</div>
+          <div className="ai-recs__idle-icon"><BsStars /></div>
           <p className="ai-recs__idle-text">
             Discover hidden gems and unexpected picks similar to <strong>{seedTitle}</strong> — curated by Gemini AI.
           </p>
@@ -284,7 +341,7 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
             className="ai-recs__cta-btn"
             onClick={handleGetRecs}
           >
-            ✨ Get AI Recommendations
+            <BsStars style={{ marginRight: '6px' }} /> Get AI Recommendations
           </button>
         </div>
       )}
@@ -293,16 +350,19 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
       {isLoading && (
         <div className="ai-recs__loading">
           <div className="ai-recs__spinner-ring" />
-          <p className="ai-recs__loading-text">✨ AI finding similar content...</p>
+          <p className="ai-recs__loading-text"><BsStars style={{ marginRight: '6px', verticalAlign: 'middle', marginTop: '-2px' }} /> AI finding similar content...</p>
         </div>
       )}
 
       {/* ── ERROR ── */}
       {isError && (
         <div className="ai-recs__error">
-          <p className="ai-recs__error-msg">⚠ AI could not generate results. Please try again.</p>
+          <p className="ai-recs__error-msg">
+            <FiAlertTriangle style={{ marginRight: '6px', verticalAlign: 'middle', marginTop: '-2px' }} /> 
+            {errorMessage}
+          </p>
           <button className="ai-recs__retry-btn" onClick={handleGetRecs}>
-            🔄 Retry
+            <FiRefreshCw style={{ marginRight: '6px' }} /> Retry
           </button>
         </div>
       )}
@@ -330,7 +390,7 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
           )}
 
           {/* Scroll row */}
-          <div className="ai-recs__scroll-wrap">
+          <div className="scroll-row-container" style={{ position: 'relative' }}>
             {isRerunning && (
               <div className="ai-recs__rerun-overlay">
                 <div className="ai-recs__spinner-ring" />
@@ -339,7 +399,7 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
             )}
             <div
               ref={scrollRef}
-              className={`ai-recs__scroll-row${isRerunning ? ' ai-recs__scroll-row--rerunning' : ''}`}
+              className={`scroll-row${isRerunning ? ' ai-recs__scroll-row--rerunning' : ''}`}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -404,7 +464,7 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
               onClick={handleRerun}
               disabled={isRerunning}
             >
-              🔄 Re-run AI
+              <FiRefreshCw style={{ marginRight: '6px' }} /> Re-run AI
             </button>
           </div>
         </>
