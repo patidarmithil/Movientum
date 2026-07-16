@@ -38,6 +38,7 @@ export default function CountryPage() {
   const [page, setPage] = useState(cachedData?.page || 1)
   const [total, setTotal] = useState(cachedData?.total || 0)
   const [hasMore, setHasMore] = useState(cachedData ? cachedData.hasMore : true)
+  const observerRef = useRef(null)
 
   useEffect(() => {
     document.title = `${countryName} Titles - Movientum`
