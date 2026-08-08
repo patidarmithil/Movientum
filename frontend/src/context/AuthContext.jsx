@@ -142,6 +142,19 @@ export function AuthProvider({ children }) {
     return data
   }, [persist])
 
+  const googleLogin = useCallback(async (credential) => {
+    storage.setRememberMe(true)   // Google sign-in implies a persistent session
+    const data = await authService.googleAuth(credential)
+    persist(data.access_token, data.refresh_token, data.user)
+
+    const deviceId = getOrCreateDeviceId()
+    if (deviceId) {
+      authService.createDeviceSession(deviceId).catch(() => {})
+    }
+
+    return data
+  }, [persist])
+
   const register = useCallback(async (username, email, password) => {
     storage.setRememberMe(false)
     const data = await authService.register(username, email, password)
@@ -203,6 +216,7 @@ export function AuthProvider({ children }) {
     isLoggedIn,
     isLoading,
     login,
+    googleLogin,
     register,
     logout,
     refreshToken,

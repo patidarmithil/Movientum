@@ -104,36 +104,38 @@ export default function Navbar() {
     if (isLoggedIn) {
       const fetchWatchlistNotifications = async () => {
         try {
-          // Reset notifications for testing as requested
-          localStorage.removeItem('wl_notifs_seen')
-          localStorage.removeItem('wl_notifs_cleared_list')
-
           const items = await planToWatchService.getItemsWithDetails()
-          
+
           const now = new Date()
           const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-          
+          const thirtyDaysAgo = new Date(today)
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
           const notifs = []
           const seenIds = new Set()
-          
+
           for (const item of items) {
             const movie = item.movie
             if (!movie) continue
             if (seenIds.has(movie.id)) continue
             seenIds.add(movie.id)
-            
+
             const isTv = movie.type === 'tv' || !!movie.first_air_date || (item.media_type === 'tv')
-            
+
             if (!isTv) {
               const releaseDateStr = movie.release_date
               if (!releaseDateStr) continue
               const releaseDate = new Date(releaseDateStr)
+
+              // Filter out notifications older than 30 days
+              if (releaseDate < thirtyDaysAgo) continue
+
               const diffTime = Math.floor((releaseDate - today) / (1000 * 60 * 60 * 24))
-              
+
               if (diffTime <= 0) {
                 notifs.push({
                   id: `notif-${movie.id}`,
-                  message: `Released Movie: ${movie.title || movie.name}`,
+                  message: `Released: ${movie.title || movie.name}`,
                   poster_path: movie.poster_path,
                   created_at: releaseDate.toISOString(),
                   diff_days: diffTime,
@@ -141,7 +143,8 @@ export default function Navbar() {
                   seen: false,
                   media_type: 'movie',
                   media_id: movie.id,
-                  movie: movie
+                  movie: movie,
+                  timestamp: now.getTime()
                 })
               } else {
                 notifs.push({
@@ -154,7 +157,8 @@ export default function Navbar() {
                   seen: false,
                   media_type: 'movie',
                   media_id: movie.id,
-                  movie: movie
+                  movie: movie,
+                  timestamp: now.getTime()
                 })
               }
             } else {
@@ -162,8 +166,11 @@ export default function Navbar() {
               if (!firstAirDateStr) continue
               const firstAirDate = new Date(firstAirDateStr)
               const diffTime = Math.floor((firstAirDate - today) / (1000 * 60 * 60 * 24))
-              
+
               if (diffTime > 0) {
+                // Filter out notifications older than 30 days
+                if (firstAirDate < thirtyDaysAgo) continue
+
                 // Not yet aired -> Upcoming
                 notifs.push({
                   id: `notif-${movie.id}`,
@@ -175,20 +182,25 @@ export default function Navbar() {
                   seen: false,
                   media_type: 'tv',
                   media_id: movie.id,
-                  movie: movie
+                  movie: movie,
+                  timestamp: now.getTime()
                 })
               } else {
                 // Released with few episodes (first_air_date <= today)
                 const nextEp = movie.next_episode_to_air
                 if (nextEp && nextEp.air_date) {
                   const epAirDate = new Date(nextEp.air_date)
+
+                  // Filter out notifications older than 30 days
+                  if (epAirDate < thirtyDaysAgo) continue
+
                   const epDiffTime = Math.floor((epAirDate - today) / (1000 * 60 * 60 * 24))
-                  
+
                   if (epDiffTime === 0) {
                     const seasonNum = nextEp.season_number || 1
                     const episodeNum = nextEp.episode_number || 1
                     const message = `Season ${seasonNum} Episode ${episodeNum} of ${movie.name || movie.title} was released`
-                    
+
                     notifs.push({
                       id: `notif-${movie.id}-ep-${nextEp.id || episodeNum}`,
                       message: message,
@@ -200,13 +212,14 @@ export default function Navbar() {
                       media_type: 'tv',
                       media_id: movie.id,
                       movie: movie,
-                      season_number: seasonNum
+                      season_number: seasonNum,
+                      timestamp: now.getTime()
                     })
                   } else if (epDiffTime > 0) {
                     const seasonNum = nextEp.season_number || 1
                     const episodeNum = nextEp.episode_number || 1
                     const message = `Season ${seasonNum} Episode ${episodeNum} of ${movie.name || movie.title}`
-                    
+
                     notifs.push({
                       id: `notif-${movie.id}-ep-${nextEp.id || episodeNum}`,
                       message: message,
@@ -218,14 +231,15 @@ export default function Navbar() {
                       media_type: 'tv',
                       media_id: movie.id,
                       movie: movie,
-                      season_number: seasonNum
+                      season_number: seasonNum,
+                      timestamp: now.getTime()
                     })
                   }
                 }
               }
             }
           }
-          
+
           notifs.sort((a, b) => {
             const dateA = new Date(a.created_at)
             const dateB = new Date(b.created_at)
@@ -234,19 +248,19 @@ export default function Navbar() {
             }
             return dateB - dateA // Latest released first
           })
-          
+
           const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
           const finalNotifs = notifs.map(n => ({
             ...n,
             seen: savedSeen[n.id] || false
           }))
-          
+
           setNotifications(finalNotifs)
         } catch (error) {
           console.error("Failed to load watchlist notifications", error)
         }
       }
-      
+
       fetchWatchlistNotifications()
     } else {
       setNotifications([])
@@ -255,13 +269,27 @@ export default function Navbar() {
 
   const safeNotifications = Array.isArray(notifications) ? notifications : []
   const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
-  const unreadCount = visibleNotifications.filter(n => !n.seen && n.category === 'released').length
+
+  // Count only unread released notifications from the last 30 days
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const unreadCount = visibleNotifications.filter(n => {
+    const nDate = new Date(n.created_at)
+    return !n.seen && n.category === 'released' && nDate >= thirtyDaysAgo
+  }).length
 
   const handleNotifClick = () => {
     setNotifOpen(!notifOpen)
     if (!notifOpen && unreadCount > 0) {
       const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
-      visibleNotifications.forEach(n => savedSeen[n.id] = true)
+      visibleNotifications.forEach(n => {
+        if (n.category === 'released') {
+          const nDate = new Date(n.created_at)
+          if (nDate >= thirtyDaysAgo && !n.seen) {
+            savedSeen[n.id] = true
+          }
+        }
+      })
       localStorage.setItem('wl_notifs_seen', JSON.stringify(savedSeen))
       setNotifications(safeNotifications.map(n => ({...n, seen: savedSeen[n.id] || false})))
     }

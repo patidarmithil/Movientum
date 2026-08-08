@@ -18,6 +18,7 @@ import MovieCard from '../components/MovieCard'
 import RatingMeter from '../components/RatingMeter'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import CastCrew from '../components/CastCrew'
+import NewsArticlesSection from '../components/NewsArticlesSection'
 import TrailerModal from '../components/TrailerModal'
 import ProductionTags from '../components/ProductionTags'
 import ShinyText from '../components/ShinyText'
@@ -952,6 +953,9 @@ export default function MovieDetail() {
 
         {/* ── Cast & Crew ── */}
         <CastCrew movieId={movieId} />
+
+        {/* ── In The News ── */}
+        <NewsArticlesSection itemId={movieId} mediaType="movie" />
 
         {/* ── Production Companies & Countries ── */}
         <ProductionTags

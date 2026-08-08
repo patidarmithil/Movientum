@@ -1,0 +1,9 @@
+/* GoogleSignInButton.css — positions/centres Google's own iframe button.
+   Do not attempt to restyle the iframe's interior; it is cross-origin. */
+
+.google-signin {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+}

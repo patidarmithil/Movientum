@@ -8,9 +8,10 @@
  * - Redirect if already logged in
  * - Shared Login.css + Register.css styling
  */
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import './Login.css'
 import './Register.css'
 
@@ -48,7 +49,7 @@ function PasswordStrength({ password }) {
 }
 
 export default function Register() {
-  const { register, isLoggedIn, isLoading } = useAuth()
+  const { register, googleLogin, isLoggedIn, isLoading } = useAuth()
   const navigate = useNavigate()
 
   const [username, setUsername]   = useState('')
@@ -112,6 +113,20 @@ export default function Register() {
     }
   }
 
+  const handleGoogleSuccess = useCallback(async (credential) => {
+    setApiError('')
+    setSubmitting(true)
+    try {
+      await googleLogin(credential)
+      navigate('/', { replace: true })
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Google sign-in failed. Please try again.'
+      setApiError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }, [googleLogin, navigate])
+
   const clearErr = (field) => setErrors((prev) => ({ ...prev, [field]: '' }))
 
   return (
@@ -146,6 +161,9 @@ export default function Register() {
             {apiError}
           </div>
         )}
+
+        <GoogleSignInButton text="signup_with" onSuccess={handleGoogleSuccess} />
+        <div className="auth-divider"><span>or</span></div>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate id="register-form">
           {/* Username */}

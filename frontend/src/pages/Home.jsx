@@ -72,16 +72,22 @@ export default function Home() {
   const [trending, setTrending] = useSessionState('home_trending', [])
   const [trendLoad, setTrendLoad] = useState(trending.length === 0)
   const [showLoader, setShowLoader] = useState(trending.length === 0)
+  const [mountedAt] = useState(() => performance.now())
 
-  // Control full screen cold start loader visibility
+  // Control full screen cold start loader visibility.
+  // Enforces a minimum display time (1.1s) so a fast/warm response doesn't flash the
+  // loader on and off before the poster wall has a chance to fade in.
+  const MIN_LOADER_MS = 1100
   useEffect(() => {
     if (!trendLoad) {
+      const elapsed = performance.now() - mountedAt
+      const remaining = Math.max(0, MIN_LOADER_MS - elapsed)
       const timer = setTimeout(() => {
         setShowLoader(false)
-      }, 500)
+      }, remaining)
       return () => clearTimeout(timer)
     }
-  }, [trendLoad])
+  }, [trendLoad, mountedAt])
 
   const [topRated, setTopRated] = useSessionState('home_topRated', [])
   const [topRatedLoad, setTopRatedLoad] = useState(topRated.length === 0)
@@ -126,7 +132,22 @@ export default function Home() {
     setTrendLoad(true)
     movieService.getTrending()
       .then((data) => {
-        setTrending(data?.movies || data || [])
+        const movies = data?.movies || data || []
+        setTrending(movies)
+
+        // Cache poster paths for the cold-start loader on the NEXT visit.
+        // Deliberately localStorage (not the storage.js wrapper — that is auth-only and
+        // switches between local/session based on "Remember me"; this must survive
+        // across sessions unconditionally).
+        try {
+          const paths = movies
+            .map((m) => m.poster_path)
+            .filter(Boolean)
+            .slice(0, 40)
+          if (paths.length >= 12) {
+            localStorage.setItem('mv_loader_posters', JSON.stringify({ v: 1, t: Date.now(), paths }))
+          }
+        } catch { /* quota exceeded / private mode — non-fatal */ }
       })
       .catch(() => {
         setTrending([])

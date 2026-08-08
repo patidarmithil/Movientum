@@ -8,7 +8,7 @@
  *   article: { id, title, description, url, image_url, source_name, published_at, genre_tags }
  *   variant?: 'standard' | 'compact'   (default: 'standard')
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { newsService } from '../services/newsService'
 import BorderGlow from './BorderGlow'
 import './NewsCard.css'
@@ -21,11 +21,44 @@ function timeAgo(iso) {
   return `${Math.round(diff / 86400)}d ago`
 }
 
+// Per-article debounce so the same card mounted twice (e.g. a Home strip + the
+// News page) doesn't double-count a view within one session.
+const recordedViews = new Set()
+
+function recordViewOnce(articleId) {
+  if (recordedViews.has(articleId)) return
+  recordedViews.add(articleId)
+  newsService.recordView(articleId)
+}
+
 export default function NewsCard({ article, variant = 'standard' }) {
   const [imgError, setImgError] = useState(false)
+  const cardRef = useRef(null)
+
+  // Fire a view once the card has been >=50% visible for >=2s.
+  useEffect(() => {
+    if (!cardRef.current) return
+    let timer = null
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timer = setTimeout(() => recordViewOnce(article.id), 2000)
+        } else if (timer) {
+          clearTimeout(timer)
+          timer = null
+        }
+      },
+      { threshold: 0.5 }
+    )
+    observer.observe(cardRef.current)
+    return () => {
+      if (timer) clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [article.id])
 
   const handleClick = () => {
-    newsService.recordView(article.id) // fire and forget
+    recordViewOnce(article.id)
     window.open(article.url, '_blank', 'noopener,noreferrer')
   }
 
@@ -35,6 +68,7 @@ export default function NewsCard({ article, variant = 'standard' }) {
 
   return (
     <BorderGlow
+      ref={cardRef}
       className={`news-card news-card--${variant}`}
       onClick={handleClick}
       role="button"

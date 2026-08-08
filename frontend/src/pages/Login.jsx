@@ -8,14 +8,15 @@
  * - Redirects to home if already logged in
  * - Redirects to ?redirect= param after login (e.g. /dashboard)
  */
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import './Login.css'
 
 export default function Login() {
-  const { login, isLoggedIn, isLoading } = useAuth()
+  const { login, googleLogin, isLoggedIn, isLoading } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
@@ -76,6 +77,21 @@ export default function Login() {
     }
   }
 
+  const handleGoogleSuccess = useCallback(async (credential) => {
+    setApiError('')
+    setApiSuccess('')
+    setSubmitting(true)
+    try {
+      await googleLogin(credential)
+      navigate(redirect, { replace: true })
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || 'Google sign-in failed. Please try again.'
+      setApiError(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }, [googleLogin, navigate, redirect])
+
   return (
     <main className="auth-page" id="login-page" aria-label="Login page">
       {/* Decorative blobs */}
@@ -112,6 +128,13 @@ export default function Login() {
           <div className="auth-banner" role="alert" style={{ background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)', borderColor: 'rgba(34, 197, 94, 0.2)' }}>
             {apiSuccess}
           </div>
+        )}
+
+        {!isForgotPassword && (
+          <>
+            <GoogleSignInButton text="signin_with" onSuccess={handleGoogleSuccess} />
+            <div className="auth-divider"><span>or</span></div>
+          </>
         )}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate id="login-form">

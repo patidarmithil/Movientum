@@ -18,6 +18,7 @@ import { ratingService } from '../services/ratingService'
 import { watchingTrackerService } from '../services/watchingTrackerService'
 import { useAuth } from '../context/AuthContext'
 import CastCrew from '../components/CastCrew'
+import NewsArticlesSection from '../components/NewsArticlesSection'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RatingMeter from '../components/RatingMeter'
@@ -920,6 +921,9 @@ export default function TVDetail() {
 
         {/* ── Cast & Crew (reuse CastCrew with tvId flag) ── */}
         <CastCrew movieId={tvId} isTV />
+
+        {/* ── In The News ── */}
+        <NewsArticlesSection itemId={tvId} mediaType="tv" />
 
         {/* ── Production Companies & Countries ── */}
         <ProductionTags

@@ -2,11 +2,11 @@
  * NewsArticlesSection — reusable news strip for Movie and TV detail pages.
  *
  * Props:
- *   itemId:    number — TMDB id (movie or TV show)
- *   itemTitle: string — title for empty-state message
+ *   itemId:    number — TMDB id
+ *   mediaType: 'movie' | 'tv'
  *
- * Works for both movie and TV since backend uses same
- * /api/v1/news/movie/{id} endpoint (TV stored in movies table).
+ * Backed by GET /api/v1/news/for-title/{media_type}/{tmdb_id}, which reads
+ * articles the entity linker matched to this title at ingest time.
  */
 import { useState, useEffect } from 'react'
 import { newsService } from '../services/newsService'
@@ -34,10 +34,11 @@ export default function NewsArticlesSection({ itemId, itemTitle, mediaType = 'mo
       })
 
     return () => { cancelled = true }
-  }, [itemId])
+  }, [itemId, mediaType])
 
-  // Don't render section if no data and done loading
-  if (!loading && articles.length === 0) return null
+  // A rail with a single item looks broken, and most titles have no news at all —
+  // render nothing rather than a half-empty section.
+  if (!loading && articles.length < 2) return null
 
   return (
     <section className="news-articles-section" aria-label="Related news articles">

@@ -1,9 +1,11 @@
 /**
  * News Page — /news
  *
- * Shows personalized news based on user's watch history.
- * Infinite scroll via "Load More" button.
- * Matches Movientum design system.
+ * v2: taxonomy fetched from GET /news/categories (server-driven, fixes the old
+ * three-disagreeing-copies problem) instead of a hardcoded array. The four
+ * viewing-mode pills (All / For You / Trending / Editorial) map to `tab`; every
+ * other pill is a real taxonomy category and maps to `category` (which the
+ * backend honours regardless of `tab`).
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
@@ -16,6 +18,7 @@ import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './News.css'
 
 const PAGE_SIZE = 12
+const WARMING_RETRY_CAP = 1
 
 function NewsSkeleton() {
   return (
@@ -52,6 +55,10 @@ const CategoryIcon = ({ id, color, size = 15 }) => {
       return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
     case 'for-you':
       return <svg {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    case 'trending':
+      return <svg {...props}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    case 'editorial':
+      return <svg {...props}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
     case 'bollywood':
       return <svg {...props}><path d="M7 2h13a2 2 0 0 1 2 2v13"/><path d="M3 6H2v16a2 2 0 0 0 2 2h16v-1"/><path d="M5 2h2l1 4H5z"/><path d="M11 2h2l1 4h-2z"/><path d="M17 2h2l1 4h-2z"/><rect x="2" y="6" width="20" height="16" rx="2"/></svg>
     case 'hollywood':
@@ -77,46 +84,49 @@ const CategoryIcon = ({ id, color, size = 15 }) => {
     case 'web-series':
       return <svg {...props}><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
     default:
-      return null
+      // Unknown/new icon name from the server — fall back to the 'all' glyph
+      // rather than rendering a blank chip.
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
   }
 }
 
-const CATEGORIES = [
-  { id: 'all',        label: 'All',         color: '#A0AEC0' },
-  { id: 'for-you',    label: 'For You',     color: '#B048FF' },
-  { id: 'bollywood',  label: 'Bollywood',   color: '#FF6B6B' },
-  { id: 'hollywood',  label: 'Hollywood',   color: '#F5A623' },
-  { id: 'anime',      label: 'Anime',       color: '#00E5A0' },
-  { id: 'k-drama',    label: 'K-Drama',     color: '#FF85C2' },
-  { id: 'sci-fi',     label: 'Sci-Fi',      color: '#56CFE1' },
-  { id: 'horror',     label: 'Horror',      color: '#FF4D6D' },
-  { id: 'action',     label: 'Action',      color: '#FFD166' },
-  { id: 'comedy',     label: 'Comedy',      color: '#06D6A0' },
-  { id: 'drama',      label: 'Drama',       color: '#C77DFF' },
-  { id: 'awards',     label: 'Awards',      color: '#F9C74F' },
-  { id: 'trailers',   label: 'Trailers',    color: '#4CC9F0' },
-  { id: 'web-series', label: 'Web Series',  color: '#80B918' },
+// Fixed viewing-mode pills — these map to `tab`, not `category`, and are not
+// part of the server-driven taxonomy (they aren't content categories).
+const TAB_PILLS = [
+  { id: 'all',       label: 'All',       color: '#A0AEC0' },
+  { id: 'for-you',   label: 'For You',   color: '#B048FF' },
+  { id: 'trending',  label: 'Trending',  color: '#FF9F1C' },
+  { id: 'editorial', label: 'Editorial', color: '#4CC9F0' },
 ]
+const TAB_IDS = new Set(TAB_PILLS.map((t) => t.id))
 
 export default function News() {
   const { isLoggedIn } = useAuth()
 
+  const [categories, setCategories] = useState([])
   const [articles, setArticles] = useState([])
   const [loading, setLoading]   = useState(true)
   const [page, setPage]         = useState(1)
   const [total, setTotal]       = useState(0)
   const [loadMore, setLoadMore] = useState(false)
   const [newsStatus, setNewsStatus] = useState(null)
+  const [personalized, setPersonalized] = useState(true)
+  const [warming, setWarming] = useState(null)   // { label, retryAfter } | null
 
   const fetchRef = useRef(null)
+  const retryCountRef = useRef(0)
 
-  const [activeCategory, setActiveCategory] = useState('for-you')
+  const [activePill, setActivePill] = useState('for-you')
 
   useEffect(() => {
+    document.title = 'News - Movientum'
     newsService.getStatus().then(setNewsStatus).catch(() => {})
+    newsService.getCategories().then(setCategories).catch(() => setCategories([]))
   }, [])
 
-  const fetchNews = useCallback(async (pg, cat = 'for-you', append = false) => {
+  const pills = [...TAB_PILLS, ...categories]
+
+  const fetchNews = useCallback(async (pg, pillId, append = false) => {
     const id = Symbol()
     fetchRef.current = id
 
@@ -124,31 +134,32 @@ export default function News() {
     else setLoadMore(true)
 
     try {
-      let data;
-      if (cat === 'for-you') {
-        if (!isLoggedIn) {
-          // Limited simple trending recommendation for non-logged in users
-          data = await newsService.getLatest(1, 6)
-          data.total = data.articles?.length || 0 // Prevents infinite scroll
-        } else {
-          data = await newsService.getForYou(pg, PAGE_SIZE)
-        }
-      } else if (cat === 'all') {
-        data = await newsService.getLatest(pg, PAGE_SIZE)
-      } else {
-        data = await newsService.getByCategory(cat, pg, PAGE_SIZE)
-      }
+      // Map 'all' tab to 'latest' for backend compatibility
+      const tabValue = pillId === 'all' ? 'latest' : pillId
+      const params = TAB_IDS.has(pillId)
+        ? { tab: tabValue, page: pg, pageSize: PAGE_SIZE }
+        : { tab: 'latest', category: pillId, page: pg, pageSize: PAGE_SIZE }
 
+      const data = await newsService.getFeed(params)
       if (fetchRef.current !== id) return
+
+      if (data.warming) {
+        setWarming({ label: pillId, retryAfter: data.retry_after || 20 })
+        setArticles([])
+        setTotal(0)
+        return
+      }
+      setWarming(null)
 
       const incoming = data.articles || []
       setArticles((prev) => {
         if (!append) return incoming
-        const existingIds = new Set(prev.map(a => a.id))
-        const uniqueIncoming = incoming.filter(a => !existingIds.has(a.id))
+        const existingIds = new Set(prev.map((a) => a.id))
+        const uniqueIncoming = incoming.filter((a) => !existingIds.has(a.id))
         return [...prev, ...uniqueIncoming]
       })
       setTotal(data.total || 0)
+      setPersonalized(data.personalized !== false)
     } catch {
       if (fetchRef.current !== id) return
       if (!append) setArticles([])
@@ -158,21 +169,33 @@ export default function News() {
         setLoadMore(false)
       }
     }
-  }, [isLoggedIn])
+  }, [])
 
-  async function handleCategoryChange(cat) {
-    if (activeCategory === cat) return
-    setActiveCategory(cat)
+  async function handlePillChange(pillId) {
+    if (activePill === pillId) return
+    setActivePill(pillId)
     setPage(1)
     setArticles([])
-    fetchNews(1, cat, false)
+    retryCountRef.current = 0
+    fetchNews(1, pillId, false)
   }
 
   useEffect(() => {
     setPage(1)
     setArticles([])
-    fetchNews(1, activeCategory, false)
-  }, [isLoggedIn, activeCategory, fetchNews])
+    retryCountRef.current = 0
+    fetchNews(1, activePill, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, activePill])
+
+  // Auto-retry once while a category is warming up.
+  useEffect(() => {
+    if (!warming) return
+    if (retryCountRef.current >= WARMING_RETRY_CAP) return
+    retryCountRef.current += 1
+    const timer = setTimeout(() => fetchNews(1, activePill, false), warming.retryAfter * 1000)
+    return () => clearTimeout(timer)
+  }, [warming, activePill, fetchNews])
 
   const observerRef = useRef(null)      // sentinel div ref
   const isFetchingRef = useRef(false)   // prevent double-fetch
@@ -190,19 +213,20 @@ export default function News() {
           isFetchingRef.current = true
           const next = page + 1
           setPage(next)
-          fetchNews(next, activeCategory, true).finally(() => {
+          fetchNews(next, activePill, true).finally(() => {
             isFetchingRef.current = false
           })
         }
       },
-      { threshold: 0.1 }    // trigger when 10% of sentinel visible
+      { threshold: 0.1 }
     )
 
     observer.observe(observerRef.current)
     return () => observer.disconnect()
-  }, [hasMore, page, fetchNews, activeCategory])
+  }, [hasMore, page, fetchNews, activePill])
 
-  const isEmpty = !loading && articles.length === 0
+  const activeLabel = pills.find((p) => p.id === activePill)?.label || activePill
+  const isEmpty = !loading && !warming && articles.length === 0
 
   return (
     <main className="news-page page-content">
@@ -248,53 +272,64 @@ export default function News() {
 
         {/* ── Filter Bar ── */}
         <div className="news-filter-bar" role="tablist">
-          {CATEGORIES.map(cat => {
-            const isActive = activeCategory === cat.id
+          {pills.map((pill) => {
+            const isActive = activePill === pill.id
             return (
               <button
-                key={cat.id}
+                key={pill.id}
                 role="tab"
                 aria-selected={isActive}
                 className={`news-filter-pill ${isActive ? 'news-filter-pill--active' : ''}`}
-                onClick={() => handleCategoryChange(cat.id)}
-                style={isActive ? { '--pill-glow': cat.color + '55', borderColor: cat.color + '88' } : {}}
+                onClick={() => handlePillChange(pill.id)}
+                style={isActive ? { '--pill-glow': pill.color + '55', borderColor: pill.color + '88' } : {}}
               >
                 <span
                   className="news-filter-pill__icon"
                   style={{ opacity: isActive ? 1 : 0.55 }}
                 >
-                  <CategoryIcon id={cat.id} color={isActive ? cat.color : 'currentColor'} size={15} />
+                  <CategoryIcon id={pill.icon || pill.id} color={isActive ? pill.color : 'currentColor'} size={15} />
                 </span>
-                <span>{cat.label}</span>
+                <span>{pill.label}</span>
               </button>
             )
           })}
         </div>
 
         {/* ── Guest Banner (Soft Lock) ── */}
-        {!isLoggedIn && activeCategory === 'for-you' && (
+        {!isLoggedIn && activePill === 'for-you' && (
           <div className="news-guest-banner" style={{ textAlign: 'center', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <span style={{ marginRight: '1rem', color: 'var(--text-secondary)' }}>Showing limited trending news. Log in to see more and get personalized recommendations!</span>
+            <span style={{ marginRight: '1rem', color: 'var(--text-secondary)' }}>Showing latest news. Log in to get personalized recommendations!</span>
             <Link to="/login" className="btn btn--primary btn--sm" style={{ padding: '0.4rem 1rem' }}>Log In</Link>
+          </div>
+        )}
+        {isLoggedIn && activePill === 'for-you' && !personalized && (
+          <div className="news-guest-banner" style={{ textAlign: 'center', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Watch and rate a few titles to unlock a personalized feed.</span>
           </div>
         )}
 
         {/* ── Content ── */}
-        {loading ? (
+        {warming ? (
+          <div className="news-empty">
+            <span className="news-empty__icon news-scroll-spinner" style={{ display: 'inline-block', margin: '0 auto 1rem' }} />
+            <h3>Fetching fresh {activeLabel} news…</h3>
+            <p>This category hasn't been crawled recently — give it a moment.</p>
+          </div>
+        ) : loading ? (
           <NewsSkeleton />
         ) : isEmpty ? (
           <div className="news-empty">
             <span className="news-empty__icon">📭</span>
             <h3>No articles found</h3>
             <p>
-              {activeCategory === 'for-you'
-                ? "Watch more titles to start getting personalized news, or explore other categories!"
-                : `No news articles found under the ${CATEGORIES.find(c => c.id === activeCategory)?.label || activeCategory} category.`}
+              {activePill === 'for-you'
+                ? 'Watch more titles to start getting personalized news, or explore other categories!'
+                : `No news articles found under ${activeLabel}.`}
             </p>
           </div>
         ) : (
           <StaggerContainer className="news-grid" instant={true}>
-            {articles.filter(a => a.image_url).map((article, index) => (
+            {articles.map((article, index) => (
               <StaggerItem key={article.id} index={index}>
                 <NewsCard article={article} variant="standard" />
               </StaggerItem>
@@ -303,7 +338,7 @@ export default function News() {
         )}
 
         {/* Sentinel — triggers next page load when visible */}
-        {!loading && hasMore && (
+        {!loading && !warming && hasMore && (
           <div
             ref={observerRef}
             className="news-scroll-sentinel"

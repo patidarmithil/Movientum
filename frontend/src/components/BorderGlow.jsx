@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { forwardRef, useRef, useCallback, useEffect } from 'react';
 import './BorderGlow.css';
 
 function parseHSL(hslStr) {
@@ -48,7 +48,7 @@ function animateValue({ start = 0, end = 100, duration = 1000, delay = 0, ease =
   setTimeout(() => requestAnimationFrame(tick), delay);
 }
 
-const BorderGlow = ({
+const BorderGlow = forwardRef(({
   children,
   className = '',
   edgeSensitivity = 30,
@@ -62,8 +62,14 @@ const BorderGlow = ({
   colors = ['#B048FF', '#00E5A0', '#FF4D6D'],
   fillOpacity = 0.5,
   ...rest
-}) => {
+}, forwardedRef) => {
   const cardRef = useRef(null);
+
+  const setRefs = useCallback((node) => {
+    cardRef.current = node;
+    if (typeof forwardedRef === 'function') forwardedRef(node);
+    else if (forwardedRef) forwardedRef.current = node;
+  }, [forwardedRef]);
 
   const getCenterOfElement = useCallback((el) => {
     const { width, height } = el.getBoundingClientRect();
@@ -132,7 +138,7 @@ const BorderGlow = ({
 
   return (
     <div
-      ref={cardRef}
+      ref={setRefs}
       onPointerMove={handlePointerMove}
       className={`border-glow-card ${className}`}
       style={{
@@ -153,6 +159,8 @@ const BorderGlow = ({
       </div>
     </div>
   );
-};
+});
+
+BorderGlow.displayName = 'BorderGlow';
 
 export default BorderGlow;
