@@ -10,11 +10,7 @@
 
 ## 🎥 Demo Video
 
-<p align="center">
-  <video src="Video/demo_video_movientum.mp4" controls width="850">
-    Your browser does not support the video tag. <a href="Video/demo_video_movientum.mp4">Download the demo video</a>.
-  </video>
-</p>
+📥 [**Download / watch the demo video**](Video/demo_video_movientum.mp4) — `Video/demo_video_movientum.mp4`
 
 ---
 
