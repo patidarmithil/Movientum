@@ -2,6 +2,20 @@
 
 > A full-stack movie discovery platform with a multi-tier ML recommendation engine as its AI core.
 
+<p align="center">
+  <img src="Screenshot/home.png" alt="Movientum Home Page" width="850">
+</p>
+
+---
+
+## 🎥 Demo Video
+
+<p align="center">
+  <video src="Video/demo_video_movientum.mp4" controls width="850">
+    Your browser does not support the video tag. <a href="Video/demo_video_movientum.mp4">Download the demo video</a>.
+  </video>
+</p>
+
 ---
 
 ## 🚀 What is Movientum?
@@ -22,6 +36,18 @@ Movientum is a cinematic discovery platform where users browse movies & TV shows
 - 📊 **User Analytics**: Visualization of user's watching behavior, favorite genres, and rating distribution patterns.
 - 🔐 **JWT Auth System**: Secure authentication utilizing access/refresh tokens with immediate Redis-based logout blacklisting.
 - 💬 **Interactive Feedback**: Quick ratings (`Skip`, `Timepass`, `Go For It`, `Perfection`) and thumbs up/down actions that shape your recommendations instantly.
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="Screenshot/content.png" alt="Movie & TV Details" width="410">
+  <img src="Screenshot/personalsied_and_AI_recommendations.png" alt="Personalized & AI Recommendations" width="410">
+</p>
+<p align="center">
+  <img src="Screenshot/analysis.png" alt="User Analytics Dashboard" width="850">
+</p>
 
 ---
 
