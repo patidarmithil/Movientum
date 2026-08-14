@@ -12,12 +12,15 @@ function ProfileEditor({ dateRangeData, onSave }) {
   const [prefs, setPrefs] = useState({
     content_type_pref: 'balanced',
     popularity_pref: 'mixed',
-    discovery_mode: 'explore'
+    discovery_mode: 'explore',
+    language_diversity_threshold: 0.70
   });
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tasteData, setTasteData] = useState([]);
   const [editedTaste, setEditedTaste] = useState({});
+  const [eraData, setEraData] = useState([]);
+  const [editedEra, setEditedEra] = useState({});
 
   useEffect(() => {
     if (dateRangeData) {
@@ -26,7 +29,8 @@ function ProfileEditor({ dateRangeData, onSave }) {
       setPrefs({
         content_type_pref: dateRangeData.content_type_pref || 'balanced',
         popularity_pref: dateRangeData.popularity_pref || 'mixed',
-        discovery_mode: dateRangeData.discovery_mode || 'explore'
+        discovery_mode: dateRangeData.discovery_mode || 'explore',
+        language_diversity_threshold: dateRangeData.language_diversity_threshold ?? 0.70
       });
     }
   }, [dateRangeData]);
@@ -42,6 +46,21 @@ function ProfileEditor({ dateRangeData, onSave }) {
           });
           setEditedTaste(initialEdits);
         }
+
+        // Decade buckets — must match backend bin_release_era ("YYYYs"),
+        // so the slider actually maps onto content's release_era field.
+        const currentDecade = Math.floor(new Date().getFullYear() / 10) * 10;
+        const decades = [];
+        for (let y = 1950; y <= currentDecade; y += 10) decades.push(`${y}s`);
+
+        const existingEra = {};
+        (res.era_data || []).forEach(e => { existingEra[e.id] = e.weight; });
+
+        const rows = decades.map(id => ({ id, name: id, weight: existingEra[id] ?? 0 }));
+        setEraData(rows);
+        const initialEraEdits = {};
+        rows.forEach(r => { initialEraEdits[r.id] = r.weight; });
+        setEditedEra(initialEraEdits);
       }).catch(err => console.error(err));
     }
   }, [expanded]);
@@ -57,10 +76,13 @@ function ProfileEditor({ dateRangeData, onSave }) {
       );
       await userService.saveRecPreferences(prefs);
       
-      if (Object.keys(editedTaste).length > 0) {
-        await userService.saveTasteProfile(editedTaste);
+      if (Object.keys(editedTaste).length > 0 || Object.keys(editedEra).length > 0) {
+        await userService.saveTasteProfile(
+          Object.keys(editedTaste).length > 0 ? editedTaste : undefined,
+          Object.keys(editedEra).length > 0 ? editedEra : undefined
+        );
       }
-      
+
       if (onSave) onSave();
     } catch (err) {
       console.error(err);
@@ -75,7 +97,8 @@ function ProfileEditor({ dateRangeData, onSave }) {
     setPrefs({
       content_type_pref: 'balanced',
       popularity_pref: 'mixed',
-      discovery_mode: 'explore'
+      discovery_mode: 'explore',
+      language_diversity_threshold: 0.70
     });
     setSaving(true);
     try {
@@ -83,7 +106,8 @@ function ProfileEditor({ dateRangeData, onSave }) {
       await userService.saveRecPreferences({
         content_type_pref: 'balanced',
         popularity_pref: 'mixed',
-        discovery_mode: 'explore'
+        discovery_mode: 'explore',
+        language_diversity_threshold: 0.70
       });
       if (onSave) onSave();
     } catch(err) {
@@ -107,6 +131,13 @@ function ProfileEditor({ dateRangeData, onSave }) {
 
   const handleSliderChange = (id, val) => {
     setEditedTaste(prev => ({
+      ...prev,
+      [id]: parseFloat(val)
+    }));
+  };
+
+  const handleEraSliderChange = (id, val) => {
+    setEditedEra(prev => ({
       ...prev,
       [id]: parseFloat(val)
     }));
@@ -168,35 +199,85 @@ function ProfileEditor({ dateRangeData, onSave }) {
               <option value="explore">Explore / Adventurous</option>
             </select>
           </div>
-          
-          <div className="taste-sliders-container">
-             <h3 className="taste-sliders-title">Adjust Genre Weights</h3>
-             <p className="taste-sliders-desc">Manually override how much weight the recommendation engine assigns to each genre.</p>
-             {tasteData.map(g => {
-                const minWeight = Math.min(0, Math.floor(Math.min(...tasteData.map(d => d.weight)) * 1.5));
-                const maxWeight = Math.max(100, Math.ceil(Math.max(...tasteData.map(d => d.weight)) * 1.5));
-                return (
-                <div key={g.id} className="taste-slider-row">
-                   <span className="ts-name">{g.name}</span>
-                   <input 
-                      type="range" 
-                      min={minWeight} 
-                      max={maxWeight} 
-                      step="0.1" 
-                      value={editedTaste[g.id] ?? g.weight}
-                      onChange={(e) => handleSliderChange(g.id, e.target.value)}
-                      className="ts-slider"
-                   />
-                   <input
-                      type="number"
-                      className="ts-number"
-                      value={editedTaste[g.id] !== undefined ? editedTaste[g.id] : g.weight}
-                      onChange={(e) => handleSliderChange(g.id, e.target.value)}
-                      step="0.1"
-                   />
-                </div>
-                );
-             })}
+          <div className="pref-group">
+            <label>Language Diversity Threshold ({Math.round(prefs.language_diversity_threshold * 100)}%)</label>
+            <input
+              type="range"
+              min="0.5"
+              max="0.95"
+              step="0.05"
+              value={prefs.language_diversity_threshold}
+              onChange={e => setPrefs({...prefs, language_diversity_threshold: parseFloat(e.target.value)})}
+              className="ts-slider"
+            />
+            <p className="taste-sliders-desc">
+              If more than {Math.round(prefs.language_diversity_threshold * 100)}% of what you've watched is in a single language,
+              we'll cap that language at {Math.round(prefs.language_diversity_threshold * 100)}% of your recommendations and mix in
+              at least 3 picks from other languages/countries. Below this threshold, recommendations are unchanged.
+            </p>
+          </div>
+
+          <div className="taste-sliders-row">
+            <div className="taste-sliders-container">
+               <h3 className="taste-sliders-title">Adjust Genre Weights</h3>
+               <p className="taste-sliders-desc">Manually override how much weight the recommendation engine assigns to each genre.</p>
+               {tasteData.map(g => {
+                  const minWeight = Math.min(0, Math.floor(Math.min(...tasteData.map(d => d.weight)) * 1.5));
+                  const maxWeight = Math.max(100, Math.ceil(Math.max(...tasteData.map(d => d.weight)) * 1.5));
+                  return (
+                  <div key={g.id} className="taste-slider-row">
+                     <span className="ts-name">{g.name}</span>
+                     <input
+                        type="range"
+                        min={minWeight}
+                        max={maxWeight}
+                        step="0.1"
+                        value={editedTaste[g.id] ?? g.weight}
+                        onChange={(e) => handleSliderChange(g.id, e.target.value)}
+                        className="ts-slider"
+                     />
+                     <input
+                        type="number"
+                        className="ts-number"
+                        value={editedTaste[g.id] !== undefined ? editedTaste[g.id] : g.weight}
+                        onChange={(e) => handleSliderChange(g.id, e.target.value)}
+                        step="0.1"
+                     />
+                  </div>
+                  );
+               })}
+            </div>
+
+            <div className="taste-sliders-container">
+               <h3 className="taste-sliders-title">Adjust Era Weights</h3>
+               <p className="taste-sliders-desc">Manually override how much weight the recommendation engine assigns to each decade.</p>
+               {eraData.map(era => {
+                  const eraVals = eraData.map(d => d.weight);
+                  const minWeight = Math.min(0, Math.floor(Math.min(...eraVals) * 1.5));
+                  const maxWeight = Math.max(100, Math.ceil(Math.max(...eraVals) * 1.5));
+                  return (
+                  <div key={era.id} className="taste-slider-row">
+                     <span className="ts-name">{era.name}</span>
+                     <input
+                        type="range"
+                        min={minWeight}
+                        max={maxWeight}
+                        step="0.1"
+                        value={editedEra[era.id] ?? era.weight}
+                        onChange={(e) => handleEraSliderChange(era.id, e.target.value)}
+                        className="ts-slider"
+                     />
+                     <input
+                        type="number"
+                        className="ts-number"
+                        value={editedEra[era.id] !== undefined ? editedEra[era.id] : era.weight}
+                        onChange={(e) => handleEraSliderChange(era.id, e.target.value)}
+                        step="0.1"
+                     />
+                  </div>
+                  );
+               })}
+            </div>
           </div>
         </div>
       )}

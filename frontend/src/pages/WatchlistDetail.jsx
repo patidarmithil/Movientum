@@ -525,7 +525,7 @@ export default function WatchlistDetail() {
                   onCancel={() => setEditing(false)}
                 />
               ) : (
-                <div className="wld-hero__info-block">
+                <div className={`wld-hero__info-block ${liked ? 'curator-marked' : ''}`}>
                   <h1 className="wld-title">
                     {loading ? <span className="wld-skeleton wld-skeleton--title" /> : (collection?.name || 'My Collection')}
                   </h1>
@@ -605,8 +605,8 @@ export default function WatchlistDetail() {
                 <span className="wld-empty__icon-glow">🍿</span>
                 <span className="wld-empty__icon">🍿</span>
               </div>
-              <h3 className="wld-empty__title">Your collection is empty.</h3>
-              <p className="wld-empty__msg">Start building your taste.</p>
+              <h3 className="wld-empty__title">Start your collection.</h3>
+              <p className="wld-empty__msg">Add movies and shows to curate your taste.</p>
               <button
                 className="btn btn--accent wld-empty__cta"
                 id="wld-add-first-btn"

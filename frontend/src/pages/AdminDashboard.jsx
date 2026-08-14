@@ -50,9 +50,13 @@ export default function AdminDashboard() {
       key: "check_episodes", name: "Check New Episodes", desc: "Checks for new episodes of tracked TV shows.",
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
     },
-    { 
+    {
       key: "expire_articles", name: "Expire Old Articles", desc: "Archives news articles older than 7 days.",
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+    },
+    {
+      key: "refresh_trailers", name: "Refresh Trailers", desc: "Rebuilds the home page trailer index from TMDB's newest releases per region.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
     }
   ];
 

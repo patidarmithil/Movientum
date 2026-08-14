@@ -58,11 +58,22 @@ function Avatar({ person, size = 72, isCrew = false }) {
   )
 }
 
-export default function CastCrew({ movieId, isTV = false }) {
-  const [credits, setCredits] = useState(null)
-  const [loading, setLoading] = useState(true)
+/**
+ * `credits` may be supplied by the caller — the detail pages get it inside their
+ * page bundle, so passing it down avoids a second request for data the page
+ * already holds. Without the prop the component fetches for itself exactly as
+ * before, which keeps every other caller working unchanged.
+ */
+export default function CastCrew({ movieId, isTV = false, credits: creditsProp = null }) {
+  const [credits, setCredits] = useState(creditsProp)
+  const [loading, setLoading] = useState(!creditsProp)
 
   useEffect(() => {
+    if (creditsProp) {
+      setCredits(creditsProp)
+      setLoading(false)
+      return
+    }
     let cancelled = false
     setLoading(true)
     const endpoint = isTV
@@ -73,7 +84,7 @@ export default function CastCrew({ movieId, isTV = false }) {
       .catch(() => { if (!cancelled) setCredits({ cast: [], crew: [] }) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [movieId, isTV])
+  }, [movieId, isTV, creditsProp])
 
   if (loading) {
     return (

@@ -116,10 +116,13 @@
 }
 
 /* ── Skeleton ── */
+/* Same pane as the loaded card, so nothing shifts shape when the data lands. */
 .news-card-skeleton {
-  background: var(--surface-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--glass-radius);
   overflow: hidden;
 }
 
@@ -286,9 +289,11 @@
 .news-filter-pill {
   flex-shrink: 0;
   padding: 8px 18px;
-  border-radius: 100px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 500;
@@ -301,15 +306,19 @@
   white-space: nowrap;
 }
 
+/* Selected state inverts to near-solid white rather than reaching for an accent:
+   on a surface made entirely of translucent white, brightness is the only
+   contrast axis left, and it reads harder than a hue. */
 .news-filter-pill--active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: white;
-  box-shadow: 0 0 16px var(--pill-glow, rgba(176, 72, 255, 0.4));
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0B0B0B;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 .news-filter-pill:hover:not(.news-filter-pill--active) {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.25);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
   color: var(--text-primary);
 }

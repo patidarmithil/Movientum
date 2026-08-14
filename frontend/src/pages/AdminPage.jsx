@@ -10,6 +10,7 @@ const TASKS = [
   { key: "fetch_cat_news",  label: "Fetch News (Category)",   icon: "📑" },
   { key: "check_episodes",  label: "Check Episodes",          icon: "📺" },
   { key: "expire_articles", label: "Expire Old Articles",     icon: "🗑️" },
+  { key: "refresh_trailers", label: "Refresh Trailers",       icon: "🎬" },
   { key: "nightly_job",     label: "Overall Nightly Job",     icon: "🌙" },
 ]
 

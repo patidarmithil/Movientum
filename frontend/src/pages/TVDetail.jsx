@@ -12,7 +12,7 @@
  */
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import api from '../utils/api'
+import { pageService } from '../services/pageService'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
 import { watchingTrackerService } from '../services/watchingTrackerService'
@@ -30,6 +30,7 @@ import { pageCache } from '../utils/pageCache'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import { tempTrackerService } from '../services/tempTrackerService'
+import { fireBurst } from '../utils/burstEffect'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
 import AIRecommendations from '../components/AIRecommendations'
@@ -314,6 +315,8 @@ export default function TVDetail() {
     }
   }, [loading])
   const [similarLoading, setSimilarLoading] = useState(!cachedData?.similar)
+  // Credits come down inside the page bundle and are handed to <CastCrew>.
+  const [credits, setCredits] = useState(cachedData?.credits || null)
 
   const [watchStatus,   setWatchStatus]   = useState(cachedData?.watchStatus || { watched: false, watchlisted: false })
   const [trackingStatus, setTrackingStatus] = useState(cachedData?.trackingStatus || false)
@@ -321,6 +324,7 @@ export default function TVDetail() {
   const [watchBusy,     setWatchBusy]     = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
   const [isModalOpen,   setIsModalOpen]   = useState(false)
+  const [overviewExpanded, setOverviewExpanded] = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
 
   const [showCollectionModal, setShowCollectionModal] = useState(false)
@@ -355,58 +359,64 @@ export default function TVDetail() {
     setError(null)
     setHasImgError(false)
 
-    api.get(`/api/v1/tv/${tvId}`)
-      .then((r) => {
-        if (!cancelled) {
-          setShow(r.data)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, show: r.data })
-        }
-      })
-      .catch(() => { if (!cancelled && (!show || !show.overview)) setError('Failed to load TV show') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-      
-    api.get(`/api/v1/tv/${tvId}/videos`)
-      .then((r) => {
-        if (!cancelled) {
-          setVideosData(r.data)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, videosData: r.data })
-        }
-      })
-      .catch(() => {})
-
-    return () => { cancelled = true }
-  }, [tvId])
-
-  // ── Fetch similar TV shows ───────────────────────────
-  useEffect(() => {
-    // Wait for the main TV show detail to load before fetching recommendations
-    if (!show) return
-
-    let cancelled = false
     if (similar.length === 0) {
       setSimilarLoading(true)
     }
 
-    api.get(`/api/v1/recommendations/similar/${tvId}?media_type=tv`)
-      .then((r) => {
-        const sim = r.data.movies || []
-        if (!cancelled) {
-          setSimilar(sim)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, similar: sim })
+    // One request for the whole page: detail + videos + credits + similar +
+    // this user's watch / collection / tracker state, all from a single Redis
+    // key (GET /api/v1/pages/tv/{id}).
+    pageService.getTV(tvId)
+      .then((data) => {
+        if (cancelled) return
+
+        const detail = data?.detail || null
+        const sim = data?.similar?.movies || []
+        const creditsData = data?.credits || null
+
+        if (detail) setShow(detail)
+        setVideosData(data?.videos || null)
+        setCredits(creditsData)
+        setSimilar(sim)
+
+        if (data?.watch_status) setWatchStatus(data.watch_status)
+        if (data?.collections) {
+          setIsInAnyCollection(data.collections.some((c) => c.has_movie))
+          const plan = data.collections.find((c) => c.name === 'Plan to Watch')
+          setPlanToWatch(plan ? plan.has_movie : false)
+          setPlanToWatchId(plan ? plan.id : null)
         }
+        if (data?.tracker) {
+          setTrackingStatus(Boolean(data.tracker.tracked || data.tracker.in_temp_tracker))
+        }
+
+        pageCache.set(cacheKey, {
+          ...(pageCache.get(cacheKey) || {}),
+          show: detail,
+          videosData: data?.videos || null,
+          credits: creditsData,
+          similar: sim,
+          watchStatus: data?.watch_status || undefined,
+          trackingStatus: data?.tracker
+            ? Boolean(data.tracker.tracked || data.tracker.in_temp_tracker)
+            : undefined,
+        })
       })
       .catch(() => {
-        if (!cancelled) setSimilar([])
+        if (cancelled) return
+        if (!show || !show.overview) setError('Failed to load TV show')
+        setSimilar([])
+        setCredits({ cast: [], crew: [] })
       })
       .finally(() => {
-        if (!cancelled) setSimilarLoading(false)
+        if (cancelled) return
+        setLoading(false)
+        setSimilarLoading(false)
       })
 
     return () => { cancelled = true }
-  }, [tvId, show])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tvId])
 
   // ── Fetch watch status (auth-gated) ─────────────────
   const fetchStatus = useCallback(() => {
@@ -450,11 +460,21 @@ export default function TVDetail() {
       .catch(() => {})
   }, [tvId, isLoggedIn])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  // First run skipped — the page bundle already carried watch / collection /
+  // tracker state. Later runs are post-mutation refreshes.
+  const statusInitRef = useRef(true)
+  useEffect(() => {
+    if (statusInitRef.current) {
+      statusInitRef.current = false
+      return
+    }
+    fetchStatus()
+  }, [fetchStatus])
 
   // ── Toggle Plan to Watch ─────────────────────────────
-  const handlePlanToWatch = async () => {
+  const handlePlanToWatch = async (e) => {
     if (!isLoggedIn || planBusy) return
+    const btn = e?.currentTarget
     setPlanBusy(true)
     try {
       if (planToWatch) {
@@ -466,6 +486,7 @@ export default function TVDetail() {
         setPlanToWatchId(listId)
         setPlanToWatch(true)
         setWatchMsg('Added to Plan to Watch!')
+        fireBurst(btn)
       }
       setTimeout(() => setWatchMsg(null), 2500)
     } catch {
@@ -483,8 +504,9 @@ export default function TVDetail() {
   }
 
   // ── Toggle watched (Ended series) ───────────────────────────────────
-  const handleMarkWatched = async () => {
+  const handleMarkWatched = async (e) => {
     if (!isLoggedIn || watchBusy) return
+    const btn = e?.currentTarget
     setWatchBusy(true)
     try {
       if (watchStatus.watched) {
@@ -499,6 +521,7 @@ export default function TVDetail() {
         await watchService.markWatched(tvId, 'tv')
         setWatchStatus((s) => ({ ...s, watched: true }))
         setWatchMsg('Added to watch history!')
+        fireBurst(btn)
         if (planToWatch) {
           try {
             await planToWatchService.remove(planToWatchId, tvId, 'tv')
@@ -764,7 +787,20 @@ export default function TVDetail() {
                 <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: 4 }} />
               </div>
             ) : show.overview && (
-              <p className="movie-detail__overview">{show.overview}</p>
+              <>
+                <p className={`movie-detail__overview ${!overviewExpanded && show.overview.length > 260 ? 'movie-detail__overview--clamped' : ''}`}>
+                  {show.overview}
+                </p>
+                {show.overview.length > 260 && (
+                  <button
+                    type="button"
+                    className="movie-detail__read-more"
+                    onClick={() => setOverviewExpanded((v) => !v)}
+                  >
+                    {overviewExpanded ? 'Show Less' : 'Read More'}
+                  </button>
+                )}
+              </>
             )}
 
             {/* Actions */}
@@ -843,6 +879,41 @@ export default function TVDetail() {
               <p className="movie-detail__toast" aria-live="polite">{watchMsg}</p>
             )}
 
+          </div>
+
+          {/* Rating Sidebar */}
+          <div className="movie-detail__rating-sidebar">
+            {showRatingMeter ? (
+              <div className="animate-rating-reveal">
+                <RatingMeter
+                  movieId={tvId}
+                  mediaType="tv"
+                  onRated={fetchStatus}
+                  onRatingRemoved={async () => {
+                    await watchService.removeFromHistory(tvId, 'tv')
+                    setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
+                  }}
+                  userRating={watchStatus.user_rating}
+                  userRatingId={watchStatus.rating_id}
+                  {...(show.moctale_rating || { total_votes: 0, perfection: 0, go_for_it: 0, timepass: 0, skip: 0 })}
+                />
+              </div>
+            ) : (
+              <div className="skeleton rating-meter-skeleton" style={{ height: 280, borderRadius: 16 }} />
+            )}
+            {showRatingMeter && (!show.moctale_rating || !show.moctale_rating.total_votes) && (
+              <div className="rating-needed-box animate-fade-lift">
+                <p className="rating-needed-box__msg">Want to know rating?</p>
+                <button
+                  className={`rating-needed-box__btn ${reqNeededState.success ? 'rating-needed-box__btn--success' : ''}`}
+                  onClick={handleRequestRating}
+                  disabled={reqNeededState.loading || reqNeededState.success}
+                >
+                  {reqNeededState.success ? '✓ Requested' : reqNeededState.loading ? 'Requesting...' : 'Request Rating'}
+                </button>
+              </div>
+            )}
+
             {/* Seasons Details Card */}
             {show.seasons && show.seasons.length > 0 && (
               <div className="tv-detail__seasons">
@@ -883,44 +954,10 @@ export default function TVDetail() {
               </div>
             )}
           </div>
-
-          {/* Rating Sidebar */}
-          <div className="movie-detail__rating-sidebar">
-            {showRatingMeter ? (
-              <div className="animate-rating-reveal">
-                <RatingMeter
-                  movieId={tvId}
-                  mediaType="tv"
-                  onRated={fetchStatus}
-                  onRatingRemoved={async () => {
-                    await watchService.removeFromHistory(tvId, 'tv')
-                    setWatchStatus((s) => ({ ...s, watched: false, user_rating: null, rating_id: null }))
-                  }}
-                  userRating={watchStatus.user_rating}
-                  userRatingId={watchStatus.rating_id}
-                  {...(show.moctale_rating || { total_votes: 0, perfection: 0, go_for_it: 0, timepass: 0, skip: 0 })}
-                />
-              </div>
-            ) : (
-              <div className="skeleton rating-meter-skeleton" style={{ height: 280, borderRadius: 16 }} />
-            )}
-            {showRatingMeter && (!show.moctale_rating || !show.moctale_rating.total_votes) && (
-              <div className="rating-needed-box animate-fade-lift">
-                <p className="rating-needed-box__msg">Want to know rating?</p>
-                <button
-                  className={`rating-needed-box__btn ${reqNeededState.success ? 'rating-needed-box__btn--success' : ''}`}
-                  onClick={handleRequestRating}
-                  disabled={reqNeededState.loading || reqNeededState.success}
-                >
-                  {reqNeededState.success ? '✓ Requested' : reqNeededState.loading ? 'Requesting...' : 'Request Rating'}
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ── Cast & Crew (reuse CastCrew with tvId flag) ── */}
-        <CastCrew movieId={tvId} isTV />
+        {credits && <CastCrew movieId={tvId} isTV credits={credits} />}
 
         {/* ── In The News ── */}
         <NewsArticlesSection itemId={tvId} mediaType="tv" />
@@ -929,12 +966,6 @@ export default function TVDetail() {
         <ProductionTags
           productionCompanies={productionCompanies}
           productionCountries={productionCountries}
-        />
-        {/* ── AI Recommendations (Phase 6) ── */}
-        <AIRecommendations
-          seedTmdbId={tvId}
-          seedMediaType="tv"
-          seedTitle={show?.name || show?.title || ''}
         />
 
         {/* ── Similar Items ── */}
@@ -946,9 +977,21 @@ export default function TVDetail() {
             seeAllHref="/explore"
             premiumScroll={true}
             showFeedback={true}
+            feedbackSource="more_like_this"
             emptyText="No similar titles found."
           />
         </div>
+
+        {/* ── AI Recommendations ── */}
+        {show && (
+          <div className="movie-detail__ai-recs">
+            <AIRecommendations
+              seedTmdbId={show.id}
+              seedMediaType="tv"
+              seedTitle={show.title}
+            />
+          </div>
+        )}
       </div>
 
       {/* Full screen modal */}

@@ -1,10 +1,10 @@
 /**
  * Dashboard.jsx — rebuilt
  *
- * Tabs:
- *   Watch History → GET /api/v1/watch/history    → { items: [{ movie: {...} }] }
- *   Watchlist     → GET /api/v1/watch/watchlist  → { items: [{ movie: {...} }] }
- *   My Ratings    → GET /api/v1/ratings/me       → { items: [{ movie: {...}, category }] }
+ * All three tabs load from ONE request: GET /api/v1/pages/dashboard
+ *   → { history: { items }, collections: { collections }, ratings: { items } }
+ * which is the watch-history, watchlist-collections and ratings endpoints
+ * composed into a single 48 h Redis bundle (backend/app/routers/pages.py).
  *
  * Backend returns nested movie object with:
  *   { id, title, poster_path, release_year, vote_average }
@@ -13,15 +13,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { watchService } from '../services/watchService'
-import { ratingService } from '../services/ratingService'
-import { watchlistService } from '../services/watchlistService'
+import { pageService } from '../services/pageService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import WatchlistCollectionCard from '../components/WatchlistCollectionCard'
 import Aurora from '../components/Aurora'
 import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
+import ScrollReveal from '../components/ScrollReveal'
 import './Dashboard.css'
 
 const TABS = [
@@ -106,13 +105,11 @@ function TabContent({ tab, data, loading, error }) {
 
   if (tab === 'watchlist') {
     return (
-      <StaggerContainer className="watchlist-grid" instant={true}>
-        {data.map((collection, index) => (
-          <StaggerItem key={collection.id} index={index}>
-            <WatchlistCollectionCard collection={collection} />
-          </StaggerItem>
+      <div className="watchlist-grid">
+        {data.map((collection) => (
+          <WatchlistCollectionCard key={collection.id} collection={collection} />
         ))}
-      </StaggerContainer>
+      </div>
     )
   }
 
@@ -147,47 +144,29 @@ export default function Dashboard() {
   const [errW, setErrW] = useState(null)
   const [errR, setErrR] = useState(null)
 
-  const fetchHistory = useCallback(() => {
-    setLoadH(true)
-    setErrH(null)
-    watchService.getHistory()
+  // One request, one Redis read, all three lists. The bundle is cached 48 h and
+  // busted server-side the moment the user rates / watches / plans / edits a
+  // collection, so a long TTL never shows stale library state.
+  const fetchAll = useCallback(() => {
+    setLoadH(true); setLoadW(true); setLoadR(true)
+    setErrH(null);  setErrW(null);  setErrR(null)
+    pageService.getDashboard()
       .then((d) => {
-        const items = Array.isArray(d) ? d : (d?.items || d?.history || d?.data || [])
-        setHistory(items)
+        setHistory(d?.history?.items || [])
+        setWatchlist(d?.collections?.collections || [])
+        setRatings(d?.ratings?.items || [])
       })
-      .catch(() => setErrH('Failed to load watch history'))
-      .finally(() => setLoadH(false))
-  }, [])
-
-  const fetchWatchlist = useCallback(() => {
-    setLoadW(true)
-    setErrW(null)
-    watchlistService.getCollections()
-      .then((d) => {
-        const items = Array.isArray(d) ? d : (d?.collections || d?.data || d || [])
-        setWatchlist(items)
+      .catch(() => {
+        setErrH('Failed to load watch history')
+        setErrW('Failed to load watchlists')
+        setErrR('Failed to load ratings')
       })
-      .catch(() => setErrW('Failed to load watchlists'))
-      .finally(() => setLoadW(false))
-  }, [])
-
-  const fetchRatings = useCallback(() => {
-    setLoadR(true)
-    setErrR(null)
-    ratingService.getMyRatings()
-      .then((d) => {
-        const items = Array.isArray(d) ? d : (d?.items || d?.ratings || d?.data || [])
-        setRatings(items)
-      })
-      .catch(() => setErrR('Failed to load ratings'))
-      .finally(() => setLoadR(false))
+      .finally(() => { setLoadH(false); setLoadW(false); setLoadR(false) })
   }, [])
 
   useEffect(() => {
-    fetchHistory()
-    fetchWatchlist()
-    fetchRatings()
-  }, [fetchHistory, fetchWatchlist, fetchRatings])
+    fetchAll()
+  }, [fetchAll])
 
   const tabData    = { history, watchlist, ratings }
   const tabLoading = { history: loadH, watchlist: loadW, ratings: loadR }
@@ -203,10 +182,10 @@ export default function Dashboard() {
       {/* ── Background Aurora Animation ── */}
       <div className="dashboard-aurora-bg" aria-hidden="true">
         <Aurora
-          colorStops={["#00F2FE", "#4FACFE", "#6A11CB"]}
+          colorStops={["#00D4FF", "#FF006E", "#6A00D4"]}
           blend={0.5}
-          amplitude={1.0}
-          speed={0.7}
+          amplitude={1.2}
+          speed={0.8}
         />
         <div className="dashboard-aurora-overlay" />
       </div>

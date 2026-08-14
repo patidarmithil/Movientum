@@ -12,6 +12,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { aiRecsService } from '../services/aiRecsService'
+import { recFeedback } from '../services/feedbackService'
 import ShinyText from './ShinyText'
 import BorderGlow from './BorderGlow'
 import { BsStars } from 'react-icons/bs'
@@ -262,6 +263,17 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
     } catch (err) {
       // Revert on failure
       setMemoryMap(prev => ({ ...prev, [key]: memoryMap[key] ?? undefined }))
+      return
+    }
+
+    // ai_rec_memory (above) only dedupes future Gemini prompts — it doesn't
+    // touch user_taste_profiles. Also send the standard rec-feedback signal
+    // so AI-recommendation thumbs feed the same graph/ranker taste profile
+    // as "More Like This" and "For You".
+    if (newSignal === 'up') {
+      recFeedback.thumbsUp(item.tmdb_id, item.media_type, 'ai_recommendations')
+    } else {
+      recFeedback.thumbsDown(item.tmdb_id, item.media_type, 'ai_recommendations')
     }
   }, [memoryMap])
 

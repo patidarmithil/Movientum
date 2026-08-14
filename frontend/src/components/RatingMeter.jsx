@@ -81,23 +81,14 @@ export default function RatingMeter({
   }, [userRating])
 
   const isUserRated = myRating !== null
-  const safeTotal = isUserRated ? 1 : (hasPropsData ? (total_votes ?? 0) : (dist?.total ?? 0))
+  // Always use moctale distribution total, even if user has rated
+  const safeTotal = hasPropsData ? (total_votes ?? 0) : (dist?.total ?? 0)
 
   let pctPerfection, pctGoForIt, pctTimepass, pctSkip
   let votesPerfection, votesGoForIt, votesTimepass, votesSkip
 
-  if (isUserRated) {
-    pctPerfection = myRating === 'perfection' ? 100 : 0
-    pctGoForIt = myRating === 'go_for_it' ? 100 : 0
-    pctTimepass = myRating === 'timepass' ? 100 : 0
-    pctSkip = myRating === 'skip' ? 100 : 0
-
-    votesPerfection = myRating === 'perfection' ? 1 : 0
-    votesGoForIt = myRating === 'go_for_it' ? 1 : 0
-    votesTimepass = myRating === 'timepass' ? 1 : 0
-    votesSkip = myRating === 'skip' ? 1 : 0
-  } else if (hasPropsData) {
-    // Props are percentages
+  if (hasPropsData) {
+    // Props are percentages (moctale distribution)
     pctPerfection = perfection ?? 0
     pctGoForIt = go_for_it ?? 0
     pctTimepass = timepass ?? 0
@@ -109,13 +100,13 @@ export default function RatingMeter({
     votesTimepass = safeTotal > 0 ? Math.round((pctTimepass / 100) * safeTotal) : 0
     votesSkip = safeTotal > 0 ? Math.round((pctSkip / 100) * safeTotal) : 0
   } else {
-    // API returns raw votes
+    // API returns raw votes from moctale distribution
     votesPerfection = dist?.perfection ?? 0
     votesGoForIt = dist?.go_for_it ?? 0
     votesTimepass = dist?.timepass ?? 0
     votesSkip = dist?.skip ?? 0
 
-    // Derive percentages
+    // Derive percentages from moctale
     pctPerfection = safeTotal > 0 ? (votesPerfection / safeTotal) * 100 : 0
     pctGoForIt = safeTotal > 0 ? (votesGoForIt / safeTotal) * 100 : 0
     pctTimepass = safeTotal > 0 ? (votesTimepass / safeTotal) * 100 : 0
@@ -517,11 +508,12 @@ export default function RatingMeter({
             const count = votes[cat.key]
             const pct = safeTotal > 0 ? Math.round((count / safeTotal) * 100) : 0
             const isActive = activeCategory === cat.key && safeTotal > 0
+            const userRatedThis = isUserRated && myRating === cat.key
 
             return (
               <div
                 key={cat.key}
-                className={`rating-meter__legend-item ${isActive ? 'is-active' : ''}`}
+                className={`rating-meter__legend-item ${isActive ? 'is-active' : ''} ${userRatedThis ? 'is-user-rated' : ''}`}
                 onMouseEnter={() => handleMouseEnter(cat.key)}
                 onMouseLeave={handleMouseLeave}
                 style={{
@@ -531,7 +523,7 @@ export default function RatingMeter({
                 <span className="rating-meter__legend-dot" style={{ background: cat.color }} />
                 <span className="rating-meter__legend-name">{cat.label}</span>
                 <span className="rating-meter__legend-pct" style={{ color: cat.color }}>
-                  {pct}%
+                  {pct}% {userRatedThis && <span className="rating-meter__user-indicator">✓</span>}
                 </span>
               </div>
             )

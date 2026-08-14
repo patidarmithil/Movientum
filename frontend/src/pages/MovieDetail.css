@@ -38,6 +38,7 @@
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
   transform-style: preserve-3d;
+  filter: brightness(1.15) saturate(1.08);
 }
 
 @keyframes backdropSlowZoom {
@@ -62,6 +63,7 @@
   opacity: 0;
   transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1;
+  filter: brightness(1.15) saturate(1.08);
 }
 
 .movie-detail__backdrop-video iframe {
@@ -121,9 +123,10 @@
   height: calc(70vh + 4px); /* Extra to avoid 1px gaps at bottom */
   background: linear-gradient(
     to bottom,
-    rgba(8, 8, 8, 0.15) 0%,
-    rgba(8, 8, 8, 0.5) 50%,
-    rgba(8, 8, 8, 0.8) 85%,
+    rgba(8, 8, 8, 0) 0%,
+    rgba(8, 8, 8, 0.05) 30%,
+    rgba(8, 8, 8, 0.4) 55%,
+    rgba(8, 8, 8, 0.85) 82%,
     rgba(8, 8, 8, 1) 100%
   );
   z-index: 1;
@@ -147,6 +150,12 @@
   align-items: start;
   padding-top: 30vh;
   padding-bottom: var(--space-10);
+}
+
+.movie-detail__rating-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 /* ── Poster column ── */
@@ -191,12 +200,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding-top: var(--space-6);
+  padding-top: var(--space-8);
 }
 
 .movie-detail__title {
-  font-size: clamp(var(--text-2xl), 4vw, var(--text-3xl));
+  font-size: clamp(var(--text-2xl), 3.4vw, var(--text-3xl));
   font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1.1;
 }
@@ -205,9 +215,10 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   font-size: var(--text-sm);
   color: var(--text-muted);
+  letter-spacing: 0.01em;
 }
 
 .movie-detail__meta .dot { opacity: 0.4; }
@@ -221,6 +232,12 @@
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.movie-detail__genres .genre-tag {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .movie-detail__director {
@@ -248,14 +265,56 @@
 .movie-detail__overview {
   font-size: var(--text-base);
   color: rgba(255, 255, 255, 0.75);
-  line-height: 1.8;
+  line-height: 1.7;
   max-width: 640px;
+  margin: 0;
+}
+
+.movie-detail__overview--clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.movie-detail__read-more {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.movie-detail__read-more:hover {
+  text-decoration: underline;
 }
 
 .movie-detail__actions {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+.movie-detail__actions .btn {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.movie-detail__actions .btn--accent {
+  background: rgba(176, 72, 255, 0.14);
+  border-color: rgba(176, 72, 255, 0.4);
+  color: var(--accent);
+}
+
+.movie-detail__actions .btn--success {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10B981;
 }
 
 /* ── Toast notification ── */
@@ -499,7 +558,7 @@
 }
 .clickable-poster:hover {
   transform: scale(1.02);
-  box-shadow: 0 12px 40px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 255, 255, 0.12);
 }
 
 /* ── Financial Details ── */
@@ -512,30 +571,35 @@
 
 .movie-detail__financials {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: var(--space-4, 16px);
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 12px);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  align-items: center;
+  flex-direction: column;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
 }
 
 .financial-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
   font-size: var(--text-xs, 0.75rem);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.financial-item:last-child {
+  border-bottom: none;
 }
 
 .financial-label {
   color: var(--text-muted, #9CA3AF);
   font-weight: 600;
-  display: flex;
-  align-items: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .financial-value {
@@ -564,30 +628,22 @@
   }
   .movie-detail__financials {
     width: 100%;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2, 8px);
-    padding: var(--space-3, 12px);
-  }
-  .financial-item {
-    justify-content: space-between;
-    width: 100%;
   }
 }
 
 /* ── TV Seasons Card ── */
 .tv-detail__seasons {
-  margin-top: var(--space-4, 16px);
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 12px);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  margin-top: 0;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 450px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -595,6 +651,8 @@
 .tv-detail__seasons-title {
   font-size: var(--text-sm, 14px);
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-primary);
   display: flex;
   align-items: center;

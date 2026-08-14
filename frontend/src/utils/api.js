@@ -129,11 +129,8 @@ api.interceptors.response.use(
       if (isNetworkOrServerError) {
         console.warn(`[API Fallback] Primary failed, retrying with secondary backend: ${SECONDARY_URL}`);
         original._secondaryRetry = true;
-        
-        // Update global instance so future requests also use the working backend
-        api.defaults.baseURL = SECONDARY_URL;
         original.baseURL = SECONDARY_URL;
-        
+
         return api(original);
       }
     }

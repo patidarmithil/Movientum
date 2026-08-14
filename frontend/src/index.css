@@ -5,6 +5,7 @@
 
 /* ── Google Fonts fallback (loaded in index.html) ──── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import './styles/burst.css';
 
 /* ── CSS Tokens ──────────────────────────────────────── */
 :root {
@@ -66,6 +67,17 @@
   --radius-sm:    6px;
   --radius-md:    12px;
   --radius-lg:    16px;
+
+  /* Glass — the neutral frosted-pane material shared by the intro page and the
+     auth pages: translucent white, hairline border, heavy blur, no colour of
+     its own so it takes on whatever sits behind it. */
+  --glass-bg:           rgba(255, 255, 255, 0.055);
+  --glass-bg-hover:     rgba(255, 255, 255, 0.11);
+  --glass-border:       rgba(255, 255, 255, 0.13);
+  --glass-border-hover: rgba(255, 255, 255, 0.26);
+  --glass-blur:         blur(20px) saturate(1.15);
+  --glass-shadow:       0 10px 34px rgba(0, 0, 0, 0.4);
+  --glass-radius:       20px;
 
   /* Motion */
   --ease-hover:   150ms ease;

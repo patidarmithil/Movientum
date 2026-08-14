@@ -1,1173 +1,1132 @@
-/* Intro.css — Redesigned Movientum Landing Page */
+/* Intro.css — Projector-gate landing page.
+   Uses the site's own type family (Outfit, loaded globally in index.html)
+   throughout, so the page stays visually consistent with the rest of Movientum. */
 
-/* ─────────────────────────────────────────────
-   Base
-───────────────────────────────────────────── */
+/* The --glass-* tokens live in index.css :root — the auth pages use the same
+   material. Declared here on <body> rather than on .intro-page because the
+   fixed navbar is a sibling of the page root, not a descendant.
+   No purple anywhere on this page: the only colour comes from the stills and
+   from the four rating tiers, which are semantic. */
+body:has(.intro-page) {
+  /* Labels, eyebrows, and section captions — the role the accent used to fill. */
+  --intro-quiet: rgba(255, 255, 255, 0.6);
+  --intro-loud: rgba(255, 255, 255, 0.88);
+}
+
+/* Rail links are in-page anchors; without this they land underneath the fixed
+   navbar. Smooth scrolling is scoped to this page only. */
+html:has(.intro-page) { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html:has(.intro-page) { scroll-behavior: auto; }
+}
+.intro-page [id] { scroll-margin-top: calc(var(--navbar-h) + var(--space-6)); }
+
 .intro-page {
-  padding-top: var(--navbar-h);
+  --intro-font-display: var(--font-display);
+  --intro-font-mono: var(--font-primary);
+
+  /* One rhythm for the whole page. Every section breathes on the same interval
+     and every section heading uses the same two sizes, so the page reads as one
+     document instead of a stack of separately-styled blocks. */
+  --intro-section-y: clamp(4.5rem, 8vw, 8rem);
+  --intro-gutter: var(--space-6);
+  --intro-title: clamp(1.9rem, 3.6vw, 2.75rem);
+  --intro-title-lg: clamp(2.2rem, 4.4vw, 3.3rem);
+  --intro-stack: clamp(2rem, 4vw, 3.25rem);
+  --intro-lead: 1.05rem;
+
+  /* No top padding — the hero runs full-bleed *under* the fixed navbar so the
+     glass has an image to blur, instead of floating over a black strip. */
   overflow-x: hidden;
   background-color: var(--bg-void);
   color: var(--text-primary);
+  position: relative;
 }
 
-.intro-reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+/* Intro-only navbar treatment: fully transparent, heavy blur, so it dissolves
+   into the hero still. Scoped with :has() so no other page is affected. */
+body:has(.intro-page) .navbar {
+  background: transparent;
+  backdrop-filter: blur(26px) saturate(1.3);
+  -webkit-backdrop-filter: blur(26px) saturate(1.3);
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+}
+body:has(.intro-page) .navbar:hover {
+  background: rgba(8, 8, 8, 0.25);
+}
+body:has(.intro-page) .navbar--scrolled {
+  background: rgba(8, 8, 8, 0.55);
+  backdrop-filter: blur(32px) saturate(1.3);
+  -webkit-backdrop-filter: blur(32px) saturate(1.3);
+}
+/* Navbar actions become pill-shaped frosted panes rather than filled buttons —
+   over a full-bleed still, a solid button reads as a sticker, a blurred pane
+   reads as glass laid on the image. */
+body:has(.intro-page) .navbar .btn {
+  border-radius: 999px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  color: var(--text-primary);
+  box-shadow: var(--glass-shadow);
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+body:has(.intro-page) .navbar .btn:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-1px);
 }
 
-.intro-reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+/* Longhands, not the `padding` shorthand. Several sections carry `.container`
+   *and* set their own vertical padding; with the shorthand this rule (0,2,0)
+   silently reset those sections to zero top/bottom padding, which is what
+   collapsed the page rhythm. */
+.intro-page .container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-left: var(--intro-gutter);
+  padding-right: var(--intro-gutter);
 }
-
-.intro-reveal-left {
-  opacity: 0;
-  transform: translateX(-40px);
-  transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.intro-reveal-left.is-visible { opacity: 1; transform: translateX(0); }
-
-.intro-reveal-right {
-  opacity: 0;
-  transform: translateX(40px);
-  transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.intro-reveal-right.is-visible { opacity: 1; transform: translateX(0); }
-
-.intro-reveal-scale {
-  opacity: 0;
-  transform: scale(0.92);
-  transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.intro-reveal-scale.is-visible { opacity: 1; transform: scale(1); }
 
 /* ─────────────────────────────────────────────
-   1. Hero Section — cinematic spotlight
+   Reveal utilities
+───────────────────────────────────────────── */
+.intro-reveal,
+.intro-reveal-left,
+.intro-reveal-right,
+.intro-reveal-scale {
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-reveal { transform: translateY(28px); }
+.intro-reveal-left { transform: translateX(-44px); }
+.intro-reveal-right { transform: translateX(44px); }
+.intro-reveal-scale { transform: scale(0.94); }
+
+.intro-reveal.is-visible,
+.intro-reveal-left.is-visible,
+.intro-reveal-right.is-visible,
+.intro-reveal-scale.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-reveal,
+  .intro-reveal-left,
+  .intro-reveal-right,
+  .intro-reveal-scale {
+    transform: none;
+    transition: opacity 0.3s ease;
+  }
+}
+
+/* Eyebrow (mono label + growing dash) */
+.intro-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--intro-quiet);
+  margin-bottom: var(--space-4);
+}
+.intro-eyebrow--center { justify-content: center; }
+.intro-eyebrow__dash {
+  display: inline-block;
+  width: 20px;
+  max-width: 20px;
+  height: 2px;
+  background: currentColor;
+  transition: max-width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-card-eyebrow-dash.is-visible .intro-eyebrow__dash,
+.intro-eyebrow__dash.is-visible {
+  max-width: 56px;
+}
+.intro-eyebrow__text {
+  font-family: var(--intro-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────
+   Projector gate — signature grain/vignette
+───────────────────────────────────────────── */
+.intro-card__glow {
+  position: absolute;
+  inset: -14%;
+  z-index: -1;
+  background-image: var(--card-glow);
+  background-size: cover;
+  background-position: center;
+  filter: blur(48px) saturate(1.4) brightness(0.85);
+  opacity: 0.55;
+  transform: scale(1.05);
+  pointer-events: none;
+}
+
+.intro-gate {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 90px -20px rgba(255, 255, 255, 0.06);
+  /* Soften the hard rectangular edge so the ghost word behind it reads as
+     one composed image rather than a photo pasted over text. */
+  -webkit-mask-image: linear-gradient(115deg, transparent 0%, black 9%, black 91%, transparent 100%);
+  mask-image: linear-gradient(115deg, transparent 0%, black 9%, black 91%, transparent 100%);
+}
+.intro-gate__image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-gate:hover .intro-gate__image { transform: scale(1.05); }
+.intro-gate__scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(8,8,8,0.55) 100%);
+  pointer-events: none;
+}
+.intro-gate__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ─────────────────────────────────────────────
+   0. Hero
 ───────────────────────────────────────────── */
 .intro-hero {
   position: relative;
-  min-height: 92vh;
+  min-height: 100svh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 5rem 1rem 0;
+  /* Content clears the fixed navbar; the image behind it does not. */
+  padding-top: var(--navbar-h);
   overflow: hidden;
+  isolation: isolate;
 }
 
-/* Cinematic Aurora Effect - Glowing animated blobs */
-.intro-hero__aurora {
+.intro-hero__placeholder {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    circle at 50% 20%,
-    rgba(8, 8, 8, 0) 40%,
-    var(--bg-void) 90%
-  );
+  z-index: -20;
 }
 
-.intro-hero__aurora-blob {
+/* A single full-bleed still (Interstellar) carries the hero — one clean image
+   reads better than a stack of competing stills behind the headline. */
+.intro-hero__layer {
   position: absolute;
-  filter: blur(130px);
-  opacity: 0.38;
-  mix-blend-mode: screen;
-  border-radius: 50%;
-  will-change: transform;
+  /* Oversized so the drift never exposes an edge */
+  inset: -6%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  will-change: transform, translate, scale;
+  /* Keeps the layer on its own compositor layer and stops the scaled bitmap
+     shimmering along its edges while it drifts. */
+  backface-visibility: hidden;
+}
+/* Slow drifting Ken Burns — scale and pan on different periods so the loop never
+   visibly repeats, `alternate` so it eases at both ends with no jump.
+   Amplitude is deliberately small and the periods long: the motion should
+   register as the image breathing, not as something sliding. Roughly a pixel of
+   travel every few seconds, which is below the threshold where the eye starts
+   tracking the movement instead of the picture. */
+.intro-hero__layer--far {
+  z-index: -6;
+  animation:
+    introHeroDrift 110s ease-in-out infinite alternate,
+    introHeroZoom 76s ease-in-out infinite alternate;
 }
 
-.intro-hero__aurora-blob--1 {
-  width: 550px;
-  height: 550px;
-  background: radial-gradient(circle, rgba(0, 245, 212, 0.95) 0%, rgba(0, 245, 212, 0) 70%);
-  top: -15%;
-  left: 5%;
-  animation: auroraFlow1 24s ease-in-out infinite alternate;
+.intro-hero__layer-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Centre vignette darkens just enough behind the headline, plus a bottom
+   fall-off into the page ground. */
+.intro-hero__layer-scrim--top {
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 75% 55% at 50% 42%, rgba(8,8,8,0.72) 0%, rgba(8,8,8,0.25) 55%, transparent 80%),
+    linear-gradient(180deg, rgba(8,8,8,0.55) 0%, transparent 22%, transparent 62%, rgba(8,8,8,0.92) 100%);
 }
 
-.intro-hero__aurora-blob--2 {
-  width: 650px;
-  height: 650px;
-  background: radial-gradient(circle, rgba(123, 44, 191, 0.9) 0%, rgba(123, 44, 191, 0) 70%);
-  top: -25%;
-  right: 0%;
-  animation: auroraFlow2 30s ease-in-out infinite alternate;
-  animation-delay: -3s;
+/* `translate` and `scale` are their own properties, so the two animations
+   compose instead of overwriting each other — and both compose with the
+   `transform` the scroll parallax writes inline. */
+@keyframes introHeroDrift {
+  0%   { translate: -0.7% 0.5%; }
+  100% { translate: 0.7% -0.7%; }
+}
+@keyframes introHeroZoom {
+  0%   { scale: 1.06; }
+  100% { scale: 1.11; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-hero__layer--far { animation: none; }
 }
 
-.intro-hero__aurora-blob--3 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(0, 180, 216, 0.85) 0%, rgba(0, 180, 216, 0) 70%);
-  top: 10%;
-  left: 25%;
-  animation: auroraFlow3 27s ease-in-out infinite alternate;
-  animation-delay: -6s;
-}
-
-.intro-hero__aurora-blob--4 {
-  width: 480px;
-  height: 480px;
-  background: radial-gradient(circle, rgba(176, 72, 255, 0.85) 0%, rgba(176, 72, 255, 0) 70%);
-  top: 5%;
-  right: 20%;
-  animation: auroraFlow4 22s ease-in-out infinite alternate;
-  animation-delay: -9s;
-}
-
-@keyframes auroraFlow1 {
-  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate(90px, 50px) scale(1.18) rotate(180deg); }
-  100% { transform: translate(-50px, -70px) scale(0.92) rotate(360deg); }
-}
-
-@keyframes auroraFlow2 {
-  0% { transform: translate(0, 0) scale(1.05) rotate(0deg); }
-  50% { transform: translate(-110px, 70px) scale(0.88) rotate(-180deg); }
-  100% { transform: translate(70px, -50px) scale(1.12) rotate(-360deg); }
-}
-
-@keyframes auroraFlow3 {
-  0% { transform: translate(0, 0) scale(0.92) rotate(0deg); }
-  50% { transform: translate(70px, -90px) scale(1.12) rotate(120deg); }
-  100% { transform: translate(-90px, 50px) scale(1) rotate(240deg); }
-}
-
-@keyframes auroraFlow4 {
-  0% { transform: translate(0, 0) scale(1.12) rotate(0deg); }
-  50% { transform: translate(-60px, 40px) scale(0.92) rotate(90deg); }
-  100% { transform: translate(50px, -60px) scale(1.08) rotate(180deg); }
+.intro-hero__grain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .intro-hero__content {
   position: relative;
   z-index: 2;
-  max-width: 820px;
+  max-width: 900px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.6rem;
-  padding-bottom: 2rem;
+  gap: var(--space-6);
+  padding: 0 var(--space-4);
 }
 
-/* BETA badge with shimmer sweep */
-.intro-hero__badge {
-  background: rgba(176, 72, 255, 0.1);
-  border: 1px solid rgba(176, 72, 255, 0.35);
-  padding: 0.3rem 1.1rem;
-  border-radius: 999px;
-  position: relative;
-  overflow: hidden;
+/* Staged entrance on load — each child rises in with its own delay */
+.intro-hero__content > * {
+  animation: introRiseIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
-.intro-hero__badge-text {
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  color: var(--accent);
+.intro-hero__content > *:nth-child(1) { animation-delay: 0.05s; }
+.intro-hero__content > *:nth-child(2) { animation-delay: 0.15s; }
+.intro-hero__content > *:nth-child(3) { animation-delay: 0.25s; }
+.intro-hero__content > *:nth-child(4) { animation-delay: 0.4s; }
+.intro-hero__content > *:nth-child(5) { animation-delay: 0.55s; }
+.intro-hero__content > *:nth-child(6) { animation-delay: 0.7s; }
+@keyframes introRiseIn {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-.intro-hero__badge::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 55%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-  animation: shimmerSweep 2.8s infinite;
-}
-
-@keyframes shimmerSweep {
-  100% { left: 200%; }
+@media (prefers-reduced-motion: reduce) {
+  .intro-hero__content > * { animation: none; }
 }
 
 .intro-hero__title {
-  background: linear-gradient(135deg, #ffffff 0%, #d080ff 45%, #9B59FF 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-size: clamp(2.6rem, 6.5vw, 4.2rem);
-  font-weight: 800;
-  line-height: 1.08;
+  font-family: var(--intro-font-display);
+  font-size: clamp(2.6rem, 7vw, 5.5rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.01em;
   margin: 0;
-  letter-spacing: -0.5px;
-}
-
-.intro-hero__sub {
-  font-size: clamp(1.05rem, 2vw, 1.2rem);
-  color: var(--text-muted);
-  line-height: 1.65;
-  max-width: 580px;
+  /* Slightly off pure white so it sits in the starfield rather than glaring
+     off it, with a soft dark spread underneath for contrast on bright pixels. */
+  color: #ECEAF2;
+  text-shadow:
+    0 2px 30px rgba(0, 0, 0, 0.55),
+    0 0 90px rgba(0, 0, 0, 0.4);
 }
 
 .intro-hero__ctas {
   display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  gap: var(--space-4);
   flex-wrap: wrap;
   justify-content: center;
+  margin-top: var(--space-2);
 }
 
-/* ── Horizontal poster rows — staggered cards ── */
-.intro-hero__posters-container {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  width: 100%;
-  margin-top: 2rem;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-}
-
-.intro-hero__poster-row {
-  display: flex;
-  gap: 20px;
+/* Deliberately not `.btn--primary`. The hero sits on a starfield; a purple fill
+   and glow fights the image instead of resting on it. These are neutral glass —
+   the only colour in the hero stays in the image itself. */
+.intro-cta {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 0 2rem;
-  pointer-events: none;
+  gap: var(--space-2);
+  padding: 0.85rem 1.9rem;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+.intro-cta:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
+}
+/* Panel-level action — same material, one size down, so a link inside a card
+   never competes with the page's own calls to action. */
+.intro-cta--sm {
+  padding: 0.6rem 1.3rem;
+  font-size: 0.9rem;
+}
+/* The one action that carries weight — still colourless, just brighter. */
+.intro-cta--solid {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0B0B0B;
+}
+.intro-cta--solid:hover {
+  background: #fff;
+  border-color: transparent;
+}
+.intro-cta:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
 }
 
-.intro-hero__poster-row--offset {
-  transform: translateX(40px);
-}
-
-.intro-hero__poster-card {
-  flex-shrink: 0;
-  width: 130px;
-  height: 195px;   /* 2:3 ratio */
-  border-radius: 14px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+.intro-hero__scroll-down {
   display: flex;
-  align-items: flex-end;
-  padding: 10px 10px;
-  position: relative;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
-}
-
-/* Alternating vertical offsets + slight tilts */
-.intro-hero__poster-card--1 { transform: translateY(40px)  rotate(-3deg);  animation: posterFloat 5s ease-in-out infinite alternate; }
-.intro-hero__poster-card--2 { transform: translateY(-20px) rotate(2deg);   animation: posterFloat 6s ease-in-out infinite alternate; animation-delay: -1s; }
-.intro-hero__poster-card--3 { transform: translateY(60px)  rotate(-2deg);  animation: posterFloat 5.5s ease-in-out infinite alternate; animation-delay: -2s; }
-.intro-hero__poster-card--4 { transform: translateY(-40px) rotate(3deg);   animation: posterFloat 7s ease-in-out infinite alternate; animation-delay: -0.5s; }
-.intro-hero__poster-card--5 { transform: translateY(30px)  rotate(-1.5deg);animation: posterFloat 6.5s ease-in-out infinite alternate; animation-delay: -3s; }
-.intro-hero__poster-card--6 { transform: translateY(-30px) rotate(2.5deg); animation: posterFloat 5.8s ease-in-out infinite alternate; animation-delay: -1.5s; }
-
-@keyframes posterFloat {
-  0%   { translate: 0 0; }
-  100% { translate: 0 -14px; }
-}
-
-.intro-hero__poster-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 1px;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--intro-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: var(--space-8);
+}
+.intro-hero__scroll-arrow {
+  animation: introBounce 1.8s ease-in-out infinite;
+}
+@keyframes introBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-hero__scroll-arrow { animation: none; }
 }
 
-/* Inner shimmer overlay */
-.intro-hero__poster-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 60%);
-  border-radius: inherit;
-}
-
-/* Bottom fade blending poster row into next section */
 .intro-hero__bottom-fade {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 220px;
+  height: 260px;
   background: linear-gradient(to top, var(--bg-void) 0%, transparent 100%);
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
 }
 
 /* ─────────────────────────────────────────────
-   2. Features — asymmetric alternating rows
+   Lede — platform description, moved out of the hero
 ───────────────────────────────────────────── */
-.intro-features-section {
-  padding: 7rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 7rem;
+.intro-lede {
+  padding-top: var(--intro-section-y);
+  padding-bottom: var(--intro-section-y);
+  max-width: 900px;
+  text-align: center;
 }
-
-.intro-feature-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5rem;
-  align-items: center;
-}
-
-.intro-feature-row--reverse {
-  direction: rtl;
-}
-
-.intro-feature-row--reverse > * {
-  direction: ltr;
-}
-
-.intro-feature-row__visual {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Mini poster collage */
-.intro-feature-collage {
-  position: relative;
-  width: 260px;
-  height: 300px;
-}
-
-.intro-fc-card {
-  position: absolute;
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.intro-fc-card--a {
-  width: 160px;
-  height: 240px;
-  top: 0;
-  left: 0;
-  transform: rotate(-5deg);
-  z-index: 3;
-}
-
-.intro-fc-card--b {
-  width: 140px;
-  height: 210px;
-  top: 30px;
-  left: 70px;
-  transform: rotate(3deg);
-  z-index: 2;
-  opacity: 0.85;
-}
-
-.intro-fc-card--c {
-  width: 120px;
-  height: 180px;
-  top: 70px;
-  left: 130px;
-  transform: rotate(-2deg);
-  z-index: 1;
-  opacity: 0.65;
-}
-
-.intro-feature-collage:hover .intro-fc-card--a { transform: rotate(-8deg) translateY(-8px); }
-.intro-feature-collage:hover .intro-fc-card--b { transform: rotate(5deg) translateX(10px); }
-.intro-feature-collage:hover .intro-fc-card--c { transform: rotate(-4deg) translateX(15px) translateY(5px); }
-
-/* AI collage badge */
-.intro-feature-collage--ai .intro-fc-ai-badge {
-  position: absolute;
-  bottom: 20px;
-  right: -10px;
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  border-radius: 999px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #22C55E;
-  z-index: 4;
-}
-
-.intro-feature-row__text {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-
-.intro-feature-row__icon {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-md);
-  border: 1px solid;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
-  transition: transform 0.3s ease;
-}
-
-.intro-feature-row__icon:hover {
-  transform: scale(1.1) rotate(-3deg);
-}
-
-.intro-feature-row__title {
-  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
-  font-weight: 800;
-  margin: 0;
-  letter-spacing: -0.5px;
-}
-
-.intro-feature-row__desc {
-  font-size: 1.1rem;
+.intro-lede p {
+  font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+  line-height: 1.65;
   color: var(--text-muted);
-  line-height: 1.7;
-  max-width: 440px;
+  margin: 0;
 }
-
-/* Rating poster with floating tags */
-.intro-rating-poster-wrap {
-  position: relative;
-  width: 200px;
-  height: 300px;
-  margin: 0 auto;
-}
-
-.intro-rating-poster {
-  width: 100%;
-  height: 100%;
-  border-radius: 16px;
-  box-shadow: 0 10px 36px rgba(0,0,0,0.55);
-  display: flex;
-  align-items: flex-end;
-  padding: 14px;
-}
-
-.intro-rating-poster__label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: rgba(255,255,255,0.55);
-  text-transform: uppercase;
-}
-
-.intro-floating-tag {
-  position: absolute;
-  background: var(--surface-card);
-  border: 1px solid color-mix(in srgb, var(--tag-color) 40%, transparent);
-  color: var(--tag-color);
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35), 0 0 12px color-mix(in srgb, var(--tag-color) 25%, transparent);
-  animation: tagFloat 4s ease-in-out infinite alternate;
-}
-
-.intro-floating-tag:nth-child(2) { animation-delay: 0s; }
-.intro-floating-tag:nth-child(3) { animation-delay: -1.5s; }
-.intro-floating-tag:nth-child(4) { animation-delay: -3s; }
-
-@keyframes tagFloat {
-  0%   { translate: 0 0; }
-  100% { translate: 0 -8px; }
-}
-
-/* Responsive features */
-@media (max-width: 900px) {
-  .intro-feature-row {
-    grid-template-columns: 1fr;
-    gap: 3rem;
-  }
-  .intro-feature-row--reverse {
-    direction: ltr;
-  }
-  .intro-feature-row__visual {
-    order: -1;
-  }
-  .intro-feature-collage {
-    width: 220px;
-    height: 260px;
-  }
+.intro-lede strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* ─────────────────────────────────────────────
-   3. Ratings Showcase
+   Right-side vertical pagination rail
+───────────────────────────────────────────── */
+/* The rail floats over whatever section happens to be beneath it, so it needs
+   its own ground: the same frosted pane as the navbar, as a rounded rectangle.
+   It stays mounted and hittable at all times — the old auto-hide left it
+   `visibility: hidden`, which swallowed the first click of every jump. */
+.intro-rail {
+  display: flex;
+  gap: var(--space-6);
+  position: fixed;
+  top: 50vh;
+  right: 40px;
+  transform: translateY(-50%);
+  height: 44vh;
+  z-index: 40;
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--glass-radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  opacity: 0.75;
+  transition: opacity 0.3s ease, background 0.3s ease;
+}
+.intro-rail:hover,
+.intro-rail:focus-within {
+  opacity: 1;
+  background: var(--glass-bg-hover);
+}
+
+.intro-rail ul {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.intro-rail li { display: flex; align-items: center; justify-content: flex-end; }
+
+.intro-rail a {
+  font-family: var(--intro-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-primary);
+  opacity: 0.45;
+  text-decoration: none;
+  transition: opacity 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
+}
+.intro-rail a:hover { opacity: 0.8; }
+.intro-rail a.is-active {
+  opacity: 1;
+  color: #fff;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+}
+.intro-rail a:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 4px;
+  opacity: 1;
+}
+
+.intro-rail__track {
+  width: 3px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  position: relative;
+}
+.intro-rail__indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+  transition: transform 0.3s linear;
+}
+
+@media (max-width: 744px) {
+  .intro-rail { display: none; }
+}
+
+/* ─────────────────────────────────────────────
+   1–3. Feature cards
+───────────────────────────────────────────── */
+.intro-feature-cards {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Cards sit slightly further apart than sections do — they are peers of each
+     other, so they need to read as a group rather than as three sections. */
+  gap: calc(var(--intro-section-y) * 1.15);
+  padding-top: var(--intro-section-y);
+  padding-bottom: var(--intro-section-y);
+}
+
+.intro-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: var(--space-10);
+  isolation: isolate;
+}
+.intro-card--reverse { direction: rtl; }
+.intro-card--reverse > * { direction: ltr; }
+
+/* The oversized backdrop word was removed — it repeated the section title
+   verbatim, so the same word rendered twice in the same eyeline. */
+
+.intro-card__visual { position: relative; z-index: 1; aspect-ratio: 4 / 3; }
+
+/* Scroll-driven zoom: the still opens out to full size as the card travels up
+   the viewport, so the image arrives rather than simply appearing. Driven by
+   the scroll position itself (`animation-timeline: view()`), not by a timer, so
+   it tracks the scrollbar in both directions and reverses when you scroll back.
+   Animates the `scale` property rather than `transform`, so it composes with the
+   reveal transform on the parent and the hover transform on the inner image.
+   Browsers without scroll-driven animations keep the plain reveal. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .intro-card__visual .intro-gate {
+      animation: introScrollZoom linear both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 42%;
+    }
+  }
+}
+@keyframes introScrollZoom {
+  from { scale: 0.8; }
+  to   { scale: 1; }
+}
+
+.intro-card__text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+/* Cascading stagger — each child rises in slightly after the last, replays
+   every time the card re-enters the viewport (up or down). */
+.intro-card__text > * {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-card__text.is-visible > *:nth-child(1) { transition-delay: 0ms; }
+.intro-card__text.is-visible > *:nth-child(2) { transition-delay: 90ms; }
+.intro-card__text.is-visible > *:nth-child(3) { transition-delay: 180ms; }
+.intro-card__text.is-visible > *:nth-child(4) { transition-delay: 260ms; }
+.intro-card__text.is-visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-card__text > * { transform: none; transition: opacity 0.3s ease; }
+}
+
+.intro-card__title {
+  font-family: var(--intro-font-display);
+  font-size: var(--intro-title-lg);
+  font-weight: 700;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.intro-card__desc {
+  font-size: var(--intro-lead);
+  color: var(--text-muted);
+  line-height: 1.75;
+  max-width: 440px;
+  margin: 0;
+}
+
+@media (max-width: 1104px) {
+  .intro-card {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+  .intro-card--reverse { direction: ltr; }
+  .intro-card__visual { order: -1; }
+}
+
+/* ─────────────────────────────────────────────
+   4. Ratings showcase
 ───────────────────────────────────────────── */
 .intro-ratings {
   text-align: center;
-  padding: 5rem 1rem;
+  padding-top: var(--intro-section-y);
+  padding-bottom: var(--intro-section-y);
 }
-
 .intro-ratings__header h2 {
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-family: var(--intro-font-display);
+  font-size: var(--intro-title);
   margin-bottom: 0.8rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+  font-weight: 700;
 }
-
-.intro-ratings__header p {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  margin-bottom: 3.5rem;
-}
+.intro-ratings__header p { color: var(--text-muted); font-size: var(--intro-lead); margin-bottom: var(--intro-stack); }
 
 .intro-ratings__content {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3rem;
+  gap: var(--space-10);
   align-items: center;
   max-width: 900px;
   margin: 0 auto;
 }
+@media (max-width: 768px) {
+  .intro-ratings__content { grid-template-columns: 1fr; }
+}
 
+.intro-ratings__visual {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.intro-ratings__visual::before {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  z-index: -1;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.12) 0%, transparent 65%);
+  filter: blur(30px);
+  opacity: 0.8;
+}
 .intro-ratings__visual img {
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-  animation: floatUpDown 6s ease-in-out infinite;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 60px -10px rgba(255,255,255,0.1);
+  border: 1px solid var(--glass-border);
+  animation: introFloatUpDown 6s ease-in-out infinite;
 }
-
-@keyframes floatUpDown {
+@keyframes introFloatUpDown {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
+  50% { transform: translateY(-14px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-ratings__visual img { animation: none; }
 }
 
-@media (max-width: 768px) {
-  .intro-ratings__content {
-    grid-template-columns: 1fr;
-  }
-}
+.intro-ratings__pills { display: flex; flex-direction: column; gap: 1rem; }
 
-.intro-ratings__pills {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  margin: 0;
-}
-
+/* Same frosted pane as the navbar. The only colour each pill keeps is its own
+   tier colour on the leading rule and the dot — that colour *is* the content. */
 .intro-rating-pill {
-  background: var(--surface-card);
-  padding: 1.25rem 1.75rem;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  padding: 1.1rem 1.5rem;
   border-radius: 100px;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.1rem;
   font-weight: 700;
-  font-size: 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 1.02rem;
+  border: 1px solid var(--glass-border);
   position: relative;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.3s ease;
   overflow: hidden;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease, box-shadow 0.3s ease;
 }
-
+.intro-reveal-scale.is-visible .intro-rating-pill { opacity: 1; transform: translateX(0); }
 .intro-rating-pill::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
   background: var(--pill-color);
-  border-radius: 100px 0 0 100px;
 }
-
 .intro-rating-pill:hover {
-  transform: translateX(12px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4),
-              -4px 0 24px color-mix(in srgb, var(--pill-color) 20%, transparent);
+  transform: translateX(8px) !important;
+  box-shadow: -4px 0 24px color-mix(in srgb, var(--pill-color) 25%, transparent);
 }
-
 .intro-rating-pill .dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
   background: var(--pill-color);
-  box-shadow: 0 0 14px var(--pill-color);
+  box-shadow: 0 0 12px var(--pill-color);
   flex-shrink: 0;
 }
-
-.intro-rating-pill__name {
-  flex-shrink: 0;
-}
-
-.intro-rating-pill .desc {
-  color: var(--text-muted);
-  font-weight: 400;
-  font-size: 0.95rem;
-  margin-left: auto;
-}
+.intro-rating-pill .desc { color: var(--text-muted); font-weight: 400; font-size: 0.9rem; margin-left: auto; }
 
 /* ─────────────────────────────────────────────
-   4. Watchlists
+   5. Watchlists
 ───────────────────────────────────────────── */
 .intro-watchlists {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 5rem;
+  gap: var(--space-10);
   align-items: center;
-  padding: 5rem 1rem;
+  padding-top: var(--intro-section-y);
+  padding-bottom: var(--intro-section-y);
 }
-
 .intro-watchlists__text h2 {
-  font-size: clamp(1.7rem, 3.5vw, 2.4rem);
-  margin-bottom: 1.2rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+  font-family: var(--intro-font-display);
+  font-size: var(--intro-title);
+  margin-bottom: 1.1rem;
+  font-weight: 700;
 }
-
-.intro-watchlists__text p {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  margin-bottom: 2rem;
-  line-height: 1.6;
+.intro-watchlists__text p { color: var(--text-muted); font-size: var(--intro-lead); line-height: 1.7; }
+.intro-watchlists__visual { position: relative; display: flex; justify-content: center; }
+.intro-watchlists__visual::before {
+  content: '';
+  position: absolute;
+  inset: -10% 15%;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, transparent 70%);
+  filter: blur(40px);
 }
-
-.intro-watchlists__list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.intro-watchlists__list li {
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  color: var(--text-muted);
-}
-
-.intro-watchlists__visual {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
 .intro-watchlists__image--curved {
   position: relative;
   width: 100%;
   max-width: 360px;
   border-radius: 30px 10px 30px 10px;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-  border: 2px solid rgba(176, 72, 255, 0.35);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+  border: 1px solid var(--glass-border);
+  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s ease;
 }
-
-.intro-watchlists__image--curved img {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: cover;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
+.intro-watchlists__image--curved img { width: 100%; height: auto; display: block; object-fit: cover; }
 .intro-watchlists__image--curved:hover {
   transform: translateY(-8px);
-  box-shadow: 0 30px 60px rgba(176, 72, 255, 0.25);
-  border-color: rgba(176, 72, 255, 0.6);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6);
 }
-
-.intro-watchlists__image--curved:hover img {
-  transform: scale(1.03);
-}
-
-@media (max-width: 768px) {
-  .intro-watchlists {
-    grid-template-columns: 1fr;
-    gap: 3rem;
-  }
-  .intro-watchlists__visual { height: 340px; }
-  .intro-watchlist-card { width: 240px; }
-}
-
-/* ─────────────────────────────────────────────
-   5. AI Recommendations
-───────────────────────────────────────────── */
-.intro-ai {
-  position: relative;
-  text-align: center;
-  padding: 8rem 1rem;
-  overflow: hidden;
-}
-
-.intro-ai__bg-mesh {
+.intro-watchlists__badge {
   position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(176, 72, 255, 0.13) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(176, 72, 255, 0.13) 1px, transparent 1px);
-  background-size: 28px 28px;
-  animation: meshMove 12s linear infinite;
-  z-index: 0;
-  mask-image: radial-gradient(ellipse 70% 65% at center, black 0%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 65% at center, black 0%, transparent 75%);
-}
-
-.intro-ai__bg-mesh::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(176,72,255,0.4) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: pulseAiGlow 4s ease-in-out infinite alternate;
-  z-index: -1;
-}
-
-@keyframes pulseAiGlow {
-  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
-  100% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
-}
-
-@keyframes meshMove {
-  0%   { background-position: 0 0; }
-  100% { background-position: 28px 28px; }
-}
-
-.intro-ai__content {
-  position: relative;
-  z-index: 1;
-  max-width: 700px;
-  margin: 0 auto;
-}
-
-.intro-ai__content h2 {
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
-  margin-bottom: 1.2rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-
-.intro-ai__content p {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  line-height: 1.7;
-  margin-bottom: 3rem;
-}
-
-.intro-ai__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.intro-ai-chip {
-  background: var(--surface-card);
-  padding: 0.8rem 1.6rem;
-  border-radius: 999px;
-  border: 1px solid rgba(176, 72, 255, 0.3);
+  bottom: 12%;
+  left: 4%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  cursor: default;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: var(--glass-shadow);
+  animation: introFloatUpDown 5s ease-in-out infinite;
+  animation-delay: -1.5s;
 }
-
-.intro-ai-chip:hover {
-  background: rgba(176, 72, 255, 0.18);
-  transform: scale(1.06);
-  box-shadow: 0 0 20px rgba(176, 72, 255, 0.35), inset 0 0 0 1px rgba(176,72,255,0.5);
+@media (prefers-reduced-motion: reduce) {
+  .intro-watchlists__badge { animation: none; }
+}
+@media (max-width: 480px) {
+  .intro-watchlists__badge { left: 2%; bottom: 8%; }
+}
+@media (max-width: 768px) {
+  .intro-watchlists { grid-template-columns: 1fr; gap: var(--space-8); }
 }
 
 /* ─────────────────────────────────────────────
-   6. News & Explore
+   6. News & Explore split panels
 ───────────────────────────────────────────── */
 .intro-news-explore {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  padding: 5rem 1rem;
+  gap: var(--space-6);
+  padding-top: var(--intro-section-y);
+  padding-bottom: var(--intro-section-y);
 }
-
 .intro-split-panel {
-  background: var(--surface-card);
-  padding: 3rem;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  padding: 2.75rem 2.5rem 2.5rem;
+  border-radius: var(--glass-radius);
+  border: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1.1rem;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  gap: var(--space-4);
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1),
+              box-shadow 0.35s ease,
+              border-color 0.35s ease;
 }
-
+/* Light catching the top edge of the pane — the thing that makes glass read as
+   glass rather than as a flat translucent rectangle. Brightens on hover. */
 .intro-split-panel::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent), #ff4d6d);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.5), transparent 70%);
+  opacity: 0.5;
+  transition: opacity 0.35s ease;
+}
+/* Ambient corner sheen, revealed on hover */
+.intro-split-panel::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -25%;
+  width: 60%;
+  height: 120%;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%);
+  filter: blur(30px);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.4s ease;
 }
-
 .intro-split-panel:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(176,72,255,0.3);
+  transform: translateY(-6px);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 24px 50px rgba(0,0,0,0.55);
 }
-
 .intro-split-panel:hover::before { opacity: 1; }
+.intro-split-panel:hover::after { opacity: 1; }
 
-.intro-split-panel h2 { margin: 0; font-size: clamp(1.6rem, 3.5vw, 2.2rem); font-weight: 800; letter-spacing: -0.5px; }
-.intro-split-panel p  { color: var(--text-muted); font-size: 1.05rem; flex-grow: 1; line-height: 1.6; }
-
-.intro-split-panel .btn--ghost {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
+.intro-split-panel__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
 }
+.intro-split-panel:hover .intro-split-panel__icon { transform: scale(1.08) rotate(-4deg); }
 
-.intro-split-panel .btn--ghost:hover {
-  background: #fff;
-  color: #000;
-  border-color: #fff;
-  box-shadow: 0 0 20px rgba(255,255,255,0.3);
+/* One step below the section scale — these are two panels inside a section,
+   not two sections. */
+.intro-split-panel h2 {
+  font-family: var(--intro-font-display);
+  margin: 0;
+  font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+  font-weight: 700;
 }
+.intro-split-panel p {
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.7;
+  flex-grow: 1;
+  margin: 0;
+}
+.intro-split-panel .intro-cta { margin-top: var(--space-2); }
 
 @media (max-width: 768px) {
   .intro-news-explore { grid-template-columns: 1fr; }
+  .intro-split-panel { padding: 2rem 1.75rem; }
 }
 
 /* ─────────────────────────────────────────────
-   7. TMDB Library Grid
+   7. Poster marquee + Library CTA
 ───────────────────────────────────────────── */
 .intro-library {
-  padding: 5rem 1rem;
+  padding: var(--intro-section-y) 0;
   text-align: center;
+  overflow: hidden;
 }
-
-.intro-library__header {
-  max-width: 600px;
-  margin: 0 auto 3rem;
+/* Header and closing CTA sit on the same frosted plate as everything else, so
+   the poster marquee between them reads as art hung between two panes rather
+   than as loose text floating over the page ground. */
+.intro-library__header,
+.intro-library__cta {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius);
 }
-
-.intro-library__header h2 {
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
-  margin-bottom: 1rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+/* Compound selector so this beats `.intro-page .container`'s gutter longhands —
+   both are (0,2,0) and this one comes later in the file. */
+.intro-page .intro-library__header {
+  max-width: 620px;
+  margin: 0 auto var(--intro-stack);
+  padding: var(--space-8);
 }
+.intro-library__header h2 { font-family: var(--intro-font-display); font-size: var(--intro-title); margin-bottom: 1rem; font-weight: 700; }
+.intro-library__header p { color: var(--text-muted); font-size: var(--intro-lead); margin: 0; }
 
-.intro-library__header p {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-}
-
-.intro-library__filters {
+.intro-marquee {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1rem;
-  margin-bottom: 3rem;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--intro-stack);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+.intro-marquee__row {
+  display: flex;
+  gap: var(--space-4);
+  width: max-content;
+  animation: introMarqueeLeft 70s linear infinite;
+}
+.intro-marquee__row--right { animation-name: introMarqueeRight; animation-duration: 80s; }
+
+@keyframes introMarqueeLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes introMarqueeRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .intro-marquee__row { animation: none; }
 }
 
-.intro-library__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 3rem;
-  padding: 0 1rem;
-}
-
-.intro-library-card {
+.intro-marquee__poster {
+  flex-shrink: 0;
   position: relative;
-  aspect-ratio: 2 / 3;
+  width: 150px;
+  height: 225px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  cursor: pointer;
-}
-
-.intro-library-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.5s ease;
-}
-
-.intro-library-card__overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 60%);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   display: flex;
   align-items: flex-end;
-  padding: 1rem;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  padding: var(--space-3);
+  border: 1px solid rgba(255,255,255,0.06);
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.3s ease;
 }
-
-.intro-library-card__title {
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.9rem;
-  line-height: 1.3;
-}
-
-.intro-library-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.6);
-  z-index: 2;
-}
-
-.intro-library-card:hover img {
-  transform: scale(1.08);
-}
-
-.intro-library-card:hover .intro-library-card__overlay {
-  opacity: 1;
-}
-
-.intro-library__load-more {
-  margin-top: 3rem;
-}
-
-/* ─────────────────────────────────────────────
-   8. Final CTA — distinct gradient identity
-───────────────────────────────────────────── */
-.intro-cta {
-  position: relative;
-  padding: 10rem 1rem;
-  text-align: center;
-  overflow: hidden;
-  margin-bottom: 2rem;
-}
-
-/* Strong top-to-bottom gradient — dark navy/purple → void */
-.intro-cta__gradient-bg {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #1B1521 0%, #6C37A0 100%);
-  z-index: 0;
-}
-
-/* Subtle purple radial on top */
-.intro-cta__gradient-bg::after {
+.intro-marquee__poster::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 60% 50% at 50% 30%, rgba(176, 72, 255, 0.22) 0%, transparent 65%);
-  animation: heroSpotlight 7s ease-in-out infinite alternate;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, transparent 55%);
 }
-
-.intro-cta__content {
+.intro-marquee__poster:hover { transform: translateY(-6px) scale(1.03); }
+.intro-marquee__poster span {
   position: relative;
   z-index: 1;
+  font-family: var(--intro-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+@media (max-width: 744px) {
+  .intro-marquee__row--right { display: none; }
 }
 
-.intro-cta h2 {
-  font-size: clamp(2.2rem, 5vw, 3.6rem);
-  margin-bottom: 1rem;
-  font-weight: 800;
-  letter-spacing: -1px;
+.intro-page .intro-library__cta {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-8);
 }
-
-.intro-cta p {
-  color: var(--text-muted);
-  font-size: 1.2rem;
-  margin-bottom: 2.5rem;
-}
-
-.intro-cta__buttons {
-  display: flex;
-  gap: 1.5rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.glow-pulse {
-  animation: glowPulse 2.2s infinite alternate;
-}
-
-@keyframes glowPulse {
-  0%   { box-shadow: 0 0 12px rgba(176, 72, 255, 0.5); }
-  100% { box-shadow: 0 0 32px rgba(176, 72, 255, 0.95), 0 0 60px rgba(176,72,255,0.3); }
-}
+.intro-library__cta h2 { font-family: var(--intro-font-display); font-size: var(--intro-title-lg); margin-bottom: 0.8rem; font-weight: 700; }
+.intro-library__cta p { color: var(--text-muted); font-size: var(--intro-lead); margin-bottom: 2rem; }
+.intro-library__cta-buttons { display: flex; gap: var(--space-5); justify-content: center; flex-wrap: wrap; }
 
 /* ─────────────────────────────────────────────
-   9. Creator Section
+   8. Creator
 ───────────────────────────────────────────── */
-.intro-creator {
-  padding: 4rem 1rem 6rem;
-}
-
-.intro-creator__content h2 {
-  text-align: center;
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
-  margin-bottom: 3rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-
+.intro-creator { padding: var(--intro-section-y) 0; }
+.intro-creator__content h2 { font-family: var(--intro-font-display); text-align: center; font-size: var(--intro-title); margin-bottom: var(--intro-stack); font-weight: 700; }
 .intro-creator__card--redesigned {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
-  gap: 4rem;
-  text-align: left;
-  background: none;
-  box-shadow: none;
-  padding: 0;
-  border: none;
+  gap: var(--space-10);
   max-width: 900px;
   margin: 0 auto;
 }
-
 .intro-creator__image--curved {
-  position: relative;
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   aspect-ratio: 1;
   border-radius: 40px 10px 40px 10px;
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-  border: 2px solid rgba(176, 72, 255, 0.3);
+  border: 1px solid var(--glass-border);
 }
-
-.intro-creator__image--curved img {
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
-  border: none;
-  object-fit: cover;
-  transition: transform 0.5s ease;
-}
-
-.intro-creator__image--curved:hover img {
-  transform: scale(1.05);
-}
-
+.intro-creator__image--curved img { width: 100%; height: 100%; object-fit: cover; }
 .intro-creator__details {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  z-index: 2;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius);
+  padding: var(--space-8);
 }
-
-.intro-creator__details h3 {
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 800;
-  margin-bottom: 0.5rem;
-}
-
-.intro-creator__role {
-  color: var(--accent);
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 2rem;
-}
-
-.intro-creator__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
+.intro-creator__details h3 { font-family: var(--intro-font-display); font-size: clamp(1.7rem, 3.4vw, 2.3rem); font-weight: 700; margin-bottom: 0.4rem; }
+.intro-creator__role { color: var(--intro-quiet); font-size: 1.05rem; font-weight: 600; margin-bottom: 1.6rem; }
+.intro-creator__badges { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .creator-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0.8rem 1.5rem;
-  border-radius: var(--radius-md);
-  color: #fff;
+  gap: var(--space-2);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  padding: 0.7rem 1.3rem;
+  border-radius: 999px;
+  color: var(--text-primary);
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
 }
-
 .creator-badge:hover {
-  background: rgba(176, 72, 255, 0.15);
-  border-color: var(--accent);
-  transform: translateY(-4px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-3px);
+}
+@media (max-width: 768px) {
+  .intro-creator__card--redesigned { grid-template-columns: 1fr; text-align: center; }
+  .intro-creator__details { align-items: center; }
+  .intro-creator__badges { justify-content: center; }
 }
 
 /* ─────────────────────────────────────────────
    Footer
 ───────────────────────────────────────────── */
+/* The footer is a pane too, inset from the page edges rather than welded to
+   them — it closes the page with the same material every panel above it uses. */
 .intro-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 3rem 1rem;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.intro-footer__links {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius);
+  width: calc(100% - var(--intro-gutter) * 2);
+  max-width: calc(var(--max-width) - var(--intro-gutter) * 2);
+  margin: 0 auto calc(var(--intro-section-y) * 0.5);
   display: flex;
-  justify-content: center;
-  gap: 2rem;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding: calc(var(--intro-section-y) * 0.7) var(--space-8);
 }
+.intro-footer__info { display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-4); max-width: 320px; }
+.intro-footer__logo { font-family: var(--intro-font-display); font-size: 1.8rem; font-weight: 700; }
+.intro-footer__info p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin: 0; }
+.intro-footer__copyright { font-family: var(--intro-font-mono); font-size: 12px; color: var(--text-muted); opacity: 0.7; }
 
-.intro-footer__links a,
-.intro-footer__links span {
+.intro-footer__navlinks { display: flex; gap: 100px; }
+.intro-footer__navheader {
+  font-family: var(--intro-font-mono);
+  font-weight: 600;
+  color: var(--intro-quiet);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-5);
+}
+.intro-footer__navlinks ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.intro-footer__navlinks a,
+.intro-footer__navlinks button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  transition: color 0.2s ease;
 }
+.intro-footer__navlinks a:hover,
+.intro-footer__navlinks button:hover { color: #fff; }
 
-.intro-footer__links a:hover {
-  color: var(--accent);
+@media (max-width: 1104px) {
+  .intro-footer { flex-direction: column; gap: var(--space-8); }
+  .intro-footer__navlinks { gap: 60px; }
 }
-
-.intro-footer__note {
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  opacity: 0.7;
+@media (max-width: 480px) {
+  .intro-footer__navlinks { flex-direction: column; gap: var(--space-8); }
 }
 
 /* ─────────────────────────────────────────────
-   Responsive Hero
+   Contact modal
 ───────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .intro-hero {
-    min-height: 80vh;
-  }
-  .intro-hero__poster-row {
-    gap: 12px;
-    padding: 0 1rem;
-    margin-top: 2.5rem;
-  }
-  .intro-hero__poster-card {
-    width: 90px;
-    height: 135px;
-    border-radius: 10px;
-  }
-  .intro-hero__poster-card--1 { transform: translateY(25px) rotate(-3deg); }
-  .intro-hero__poster-card--2 { transform: translateY(-12px) rotate(2deg); }
-  .intro-hero__poster-card--3 { transform: translateY(35px) rotate(-2deg); }
-  .intro-hero__poster-card--4 { transform: translateY(-22px) rotate(3deg); }
-  .intro-hero__poster-card--5 { transform: translateY(18px) rotate(-1.5deg); }
-  .intro-hero__poster-card--6 { display: none; }
-  .intro-features-section { padding: 4rem 1rem; gap: 4rem; }
-  .intro-community__stats { gap: 3rem; }
-}
-
-/* Contact Modal Styles */
 .intro-contact-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(10, 10, 15, 0.7);
+  inset: 0;
+  background: rgba(8,8,8,0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
@@ -1176,67 +1135,129 @@
   z-index: 1100;
   animation: introFadeIn 0.3s ease-out;
 }
-
 .intro-contact-modal {
-  background: rgba(20, 20, 28, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  background: var(--surface-card);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-lg);
   width: 90%;
   max-width: 480px;
   padding: 2.5rem;
   position: relative;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 100px rgba(176, 72, 255, 0.15);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 100px rgba(255,255,255,0.05);
   animation: introScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
 .intro-contact-modal__close {
   position: absolute;
   top: 1.25rem;
   right: 1.5rem;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255,255,255,0.6);
   font-size: 2rem;
   cursor: pointer;
   line-height: 1;
-  transition: color 0.2s;
+}
+.intro-contact-modal__close:hover { color: #fff; }
+.intro-contact-modal h3 { font-family: var(--intro-font-display); font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+.intro-contact-modal__subtitle { color: rgba(255,255,255,0.6); font-size: 0.95rem; line-height: 1.5; margin-bottom: 2rem; }
+.intro-contact-modal__subtitle a { color: var(--intro-loud); text-decoration: none; font-weight: 600; }
+.intro-contact-modal__subtitle a:hover { text-decoration: underline; }
+
+@keyframes introFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes introScaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ─────────────────────────────────────────────
+   Responsive — global adjustments
+───────────────────────────────────────────── */
+/* Narrower viewports retune the two page-wide tokens rather than re-declaring
+   padding per section — the rhythm stays proportional all the way down. */
+@media (max-width: 1366px) {
+  .intro-hero__title { font-size: clamp(2.4rem, 6.5vw, 4.6rem); }
+  .intro-rail { right: 24px; }
 }
 
-.intro-contact-modal__close:hover {
-  color: #fff;
+@media (max-width: 900px) {
+  .intro-ratings__content,
+  .intro-watchlists,
+  .intro-creator__card--redesigned { grid-template-columns: 1fr; }
 }
 
-.intro-contact-modal h3 {
-  font-size: 1.75rem;
-  font-weight: 800;
-  margin-bottom: 0.5rem;
-  color: #fff;
-  letter-spacing: -0.5px;
+/* ── Phone ───────────────────────────────────
+   Everything below is the single-column reading experience. The tokens carry
+   most of it; these rules handle the cases where a desktop composition device
+   (a two-up grid, a pill with the caption pushed to the right edge, a second
+   marquee row) stops being readable rather than just getting narrower. */
+@media (max-width: 744px) {
+  .intro-page {
+    --intro-gutter: var(--space-5);
+    --intro-section-y: clamp(3.25rem, 11vw, 4.5rem);
+    --intro-stack: 1.75rem;
+    --intro-title: clamp(1.65rem, 6.4vw, 2.1rem);
+    --intro-title-lg: clamp(1.85rem, 7.4vw, 2.4rem);
+    --intro-lead: 1rem;
+    --glass-radius: 16px;
+  }
+
+  .intro-hero { min-height: 88svh; }
+  .intro-hero__title { font-size: clamp(2.1rem, 9vw, 3rem); }
+  .intro-hero__content { gap: var(--space-5); padding: 0; }
+  .intro-hero__scroll-down { margin-top: var(--space-6); }
+
+  /* Full-width actions read as buttons on a phone; two half-width pills
+     side by side read as a broken row. */
+  .intro-hero__ctas,
+  .intro-library__cta-buttons { width: 100%; flex-direction: column; align-items: stretch; }
+  .intro-hero__ctas .intro-cta,
+  .intro-library__cta-buttons .intro-cta { justify-content: center; }
+
+  .intro-card__visual { aspect-ratio: 16 / 10; }
+  .intro-card__desc { max-width: none; }
+
+  /* The tier caption belongs under the tier name once the pill can no longer
+     hold both on one line without crushing them. */
+  .intro-rating-pill {
+    border-radius: var(--glass-radius);
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.6rem 0.9rem;
+    padding: 1rem 1.2rem 1rem 1.4rem;
+    font-size: 0.98rem;
+  }
+  .intro-rating-pill .desc { margin-left: 0; flex-basis: 100%; }
+  /* Hover translate is meaningless on touch and leaves the pill stuck offset. */
+  .intro-rating-pill:hover { transform: none !important; }
+
+  .intro-split-panel { padding: 1.75rem 1.5rem; }
+  .intro-page .intro-library__header,
+  .intro-page .intro-library__cta { padding: var(--space-8) var(--space-5); }
+  .intro-creator__details { padding: var(--space-6) var(--space-5); }
+
+  .intro-marquee__poster { width: 116px; height: 174px; }
+
+  .intro-footer {
+    padding: var(--space-8) var(--space-5);
+    gap: var(--space-8);
+  }
+  .intro-footer__info { max-width: none; }
+  .intro-footer__navlinks { gap: var(--space-8); }
 }
 
-.intro-contact-modal__subtitle {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.95rem;
-  line-height: 1.5;
-  margin-bottom: 2rem;
+@media (max-width: 425px) {
+  .intro-page {
+    --intro-gutter: var(--space-4);
+    --intro-section-y: 3rem;
+  }
+  .intro-creator__image--curved { border-radius: 24px 8px 24px 8px; }
+  .intro-watchlists__image--curved { border-radius: 20px 8px 20px 8px; }
+  .intro-contact-modal { padding: 1.75rem 1.25rem; }
 }
 
-.intro-contact-modal__subtitle a {
-  color: #b048ff;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.intro-contact-modal__subtitle a:hover {
-  text-decoration: underline;
-}
-
-@keyframes introFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes introScaleIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+/* Hover styling is a lie on touch devices: without this the "hover" state
+   sticks after a tap on every panel and pill. */
+@media (hover: none) {
+  .intro-split-panel:hover,
+  .intro-cta:hover,
+  .creator-badge:hover,
+  .intro-watchlists__image--curved:hover,
+  .intro-marquee__poster:hover { transform: none; }
 }

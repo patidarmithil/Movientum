@@ -26,10 +26,13 @@ const MOCTALE_SYMBOLS = {
  *   variant?:     'standard' | 'compact' | 'featured'  (default: 'standard')
  *   showFeedback?: boolean — render thumbs-up/down overlay and track scroll-ignore
  *                  Pass true only from authenticated recommendation carousels.
+ *   feedbackSource?: string — which carousel this is, for interaction_log tagging:
+ *                  "more_like_this" | "for_you" | "other" (default). Only matters
+ *                  when showFeedback is true.
  *   dateBadge?:   string — optional text to show in a badge at the top right (e.g. "17 Jul")
  *   hideRating?:  boolean — optional flag to hide the rating
  */
-const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false, dateBadge = null, hideRating = false }) {
+const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false, feedbackSource = 'other', dateBadge = null, hideRating = false }) {
   const navigate = useNavigate()
   const [hasError, setHasError]               = useState(false)
   const [imageLoaded, setImageLoaded]         = useState(false)
@@ -55,10 +58,10 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
 
   const handleClick = useCallback(() => {
     if (showFeedback && tmdbId) {
-      recFeedback.click(tmdbId, mediaType)
+      recFeedback.click(tmdbId, mediaType, feedbackSource)
     }
     navigate(isTV ? `/tv/${movie.id}` : `/movies/${movie.id}`)
-  }, [isTV, movie.id, showFeedback, tmdbId, mediaType, navigate])
+  }, [isTV, movie.id, showFeedback, tmdbId, mediaType, feedbackSource, navigate])
 
   useEffect(() => {
     const parentEl = cardRef.current
@@ -87,19 +90,19 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     impressionLogged.current = true
 
     if (signalType === 'thumbs_up') {
-      recFeedback.thumbsUp(tmdbId, mediaType)
+      recFeedback.thumbsUp(tmdbId, mediaType, feedbackSource)
       setFeedbackSent('up')
     } else {
-      recFeedback.thumbsDown(tmdbId, mediaType)
+      recFeedback.thumbsDown(tmdbId, mediaType, feedbackSource)
       setFeedbackSent('down')
     }
-  }, [tmdbId, mediaType])
+  }, [tmdbId, mediaType, feedbackSource])
 
   const handleLinkClick = useCallback(() => {
     if (showFeedback && tmdbId) {
-      recFeedback.click(tmdbId, mediaType)
+      recFeedback.click(tmdbId, mediaType, feedbackSource)
     }
-  }, [showFeedback, tmdbId, mediaType])
+  }, [showFeedback, tmdbId, mediaType, feedbackSource])
 
   const ratingColor =
     movie.vote_average >= 8 ? '#22C55E' :

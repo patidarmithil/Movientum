@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { movieService } from '../services/movieService'
+import { pageService } from '../services/pageService'
 import { useAuth } from '../context/AuthContext'
 import { useSessionState } from '../hooks/useSessionState'
 import Aurora from '../components/Aurora'
@@ -77,7 +78,12 @@ export default function Home() {
   // Control full screen cold start loader visibility.
   // Enforces a minimum display time (1.1s) so a fast/warm response doesn't flash the
   // loader on and off before the poster wall has a chance to fade in.
+  // Also enforces a MAX display time (2.5s): on a cold Azure/Render start the
+  // backend can take 40-50s, and a blank fullscreen loader for that long loses
+  // visitors. Past the cap we drop straight to the page shell (aurora bg, nav,
+  // static rails) with per-row skeletons — something on screen beats nothing.
   const MIN_LOADER_MS = 1100
+  const MAX_LOADER_MS = 2500
   useEffect(() => {
     if (!trendLoad) {
       const elapsed = performance.now() - mountedAt
@@ -87,7 +93,25 @@ export default function Home() {
       }, remaining)
       return () => clearTimeout(timer)
     }
+    const capTimer = setTimeout(() => {
+      setShowLoader(false)
+    }, MAX_LOADER_MS)
+    return () => clearTimeout(capTimer)
   }, [trendLoad, mountedAt])
+
+  // Cold-start notice: if backend still hasn't answered by 5s, tell the user
+  // why — free-tier hosting cold starts run 20-30s. Auto-clears the moment
+  // trendLoad flips false, whichever effect fires first.
+  const [showColdBootMsg, setShowColdBootMsg] = useState(false)
+  const COLD_BOOT_MSG_MS = 5000
+  useEffect(() => {
+    if (!trendLoad) {
+      setShowColdBootMsg(false)
+      return
+    }
+    const timer = setTimeout(() => setShowColdBootMsg(true), COLD_BOOT_MSG_MS)
+    return () => clearTimeout(timer)
+  }, [trendLoad])
 
   const [topRated, setTopRated] = useSessionState('home_topRated', [])
   const [topRatedLoad, setTopRatedLoad] = useState(topRated.length === 0)
@@ -122,57 +146,67 @@ export default function Home() {
   // Refs to track if filter changed vs initial mount
   const lastGenreIdRef = useRef(selectedGenreId)
   const lastUpcomingFilterRef = useRef(upcomingFilter)
+  // The home bundle delivers the upcoming + trailer rails on first paint, so
+  // those two effects sit out their initial run instead of duplicating it.
+  const upcomingInitRef = useRef(true)
+  const trailersInitRef = useRef(true)
 
-  // Fetch Trending
+  // Cache poster paths for the cold-start loader on the NEXT visit.
+  // Deliberately localStorage (not the storage.js wrapper — that is auth-only and
+  // switches between local/session based on "Remember me"; this must survive
+  // across sessions unconditionally).
+  const cacheLoaderPosters = (movies) => {
+    try {
+      const paths = movies.map((m) => m.poster_path).filter(Boolean).slice(0, 40)
+      if (paths.length >= 12) {
+        localStorage.setItem('mv_loader_posters', JSON.stringify({ v: 1, t: Date.now(), paths }))
+      }
+    } catch { /* quota exceeded / private mode — non-fatal */ }
+  }
+
+  // ── Home bundle ─────────────────────────────────────────────────
+  // ONE request (GET /api/v1/pages/home) fills trending + top rated + upcoming
+  // + trailers, and the backend serves all four from a single Redis key. This
+  // replaces four parallel requests that were four separate Redis reads.
+  //
+  // The rails the user can change after load (genre picker, upcoming filter,
+  // trailer region) still refetch through their own endpoints below — only the
+  // initial paint goes through the bundle.
   useEffect(() => {
-    if (trending.length > 0) {
-      setTrendLoad(false)
+    const haveLists = trending.length > 0 && topRated.length > 0 && upcoming.length > 0
+
+    if (haveLists) {
+      // Restored from session state — only the trailer rail (never session-cached)
+      // still needs the network.
+      setTrendLoad(false); setTopRatedLoad(false); setUpcomingLoad(false)
+      setTrailersLoad(true)
+      getHomeTrailers(trailerRegion)
+        .then((data) => setTrailers(data?.data || []))
+        .catch(() => setTrailers([]))
+        .finally(() => setTrailersLoad(false))
       return
     }
-    setTrendLoad(true)
-    movieService.getTrending()
-      .then((data) => {
-        const movies = data?.movies || data || []
-        setTrending(movies)
 
-        // Cache poster paths for the cold-start loader on the NEXT visit.
-        // Deliberately localStorage (not the storage.js wrapper — that is auth-only and
-        // switches between local/session based on "Remember me"; this must survive
-        // across sessions unconditionally).
-        try {
-          const paths = movies
-            .map((m) => m.poster_path)
-            .filter(Boolean)
-            .slice(0, 40)
-          if (paths.length >= 12) {
-            localStorage.setItem('mv_loader_posters', JSON.stringify({ v: 1, t: Date.now(), paths }))
-          }
-        } catch { /* quota exceeded / private mode — non-fatal */ }
+    setTrendLoad(true); setTopRatedLoad(true); setUpcomingLoad(true); setTrailersLoad(true)
+    pageService.getHome({
+      upcomingFilter,
+      region: trailerRegion === 'All' ? null : trailerRegion,
+    })
+      .then((data) => {
+        const trendingItems = data?.trending?.movies || []
+        setTrending(trendingItems)
+        cacheLoaderPosters(trendingItems)
+        setTopRated(data?.top_rated?.movies || [])
+        setUpcoming(data?.upcoming?.movies || [])
+        setTrailers(data?.trailers?.data || [])
       })
       .catch(() => {
-        setTrending([])
+        setTrending([]); setTopRated([]); setUpcoming([]); setTrailers([])
         setHasError(true)
       })
-      .finally(() => setTrendLoad(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Fetch Top Rated
-  useEffect(() => {
-    if (topRated.length > 0) {
-      setTopRatedLoad(false)
-      return
-    }
-    setTopRatedLoad(true)
-    movieService.getTopRated()
-      .then((data) => {
-        setTopRated(data?.movies || data || [])
+      .finally(() => {
+        setTrendLoad(false); setTopRatedLoad(false); setUpcomingLoad(false); setTrailersLoad(false)
       })
-      .catch(() => {
-        setTopRated([])
-        setHasError(true)
-      })
-      .finally(() => setTopRatedLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -246,8 +280,13 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 
-  // Fetch Trailers — re-fetch whenever region pill changes
+  // Fetch Trailers — re-fetch whenever region pill changes.
+  // The first run is skipped: the home bundle above already delivered this rail.
   useEffect(() => {
+    if (trailersInitRef.current) {
+      trailersInitRef.current = false
+      return
+    }
     setTrailersLoad(true)
     setTrailers([])
     getHomeTrailers(trailerRegion)
@@ -258,12 +297,15 @@ export default function Home() {
         setTrailers([])
       })
       .finally(() => setTrailersLoad(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, trailerRegion])
 
 
-  // Fetch Upcoming
+  // Fetch Upcoming — first run skipped, the home bundle covers it.
   useEffect(() => {
+    if (upcomingInitRef.current) {
+      upcomingInitRef.current = false
+      return
+    }
     if (lastUpcomingFilterRef.current === upcomingFilter && upcoming.length > 0) {
       setUpcomingLoad(false)
       return
@@ -321,6 +363,12 @@ export default function Home() {
         <div className="home-aurora-overlay" />
       </div>
 
+      {showColdBootMsg && (
+        <div className="cold-boot-notice" role="status">
+          Sorry, our server is booting up — can take around 20-30 seconds. Thanks for waiting!
+        </div>
+      )}
+
       <div className="home-layout-container container">
         
         {/* ── Left Content Column ── */}
@@ -374,12 +422,14 @@ export default function Home() {
               <MovieRow 
                 title="For You" 
                 icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle></svg>}
-                movies={forYou} 
-                loading={forYouLoad} 
+                movies={forYou}
+                loading={forYouLoad}
                 seeAllHref="/recommendations"
                 premiumScroll={true}
+                showFeedback={true}
+                feedbackSource="for_you"
               />
-              <TrailerRow 
+              <TrailerRow
                 title="🎬 Trailers" 
                 items={trailers} 
                 loading={trailersLoad} 

@@ -80,7 +80,13 @@ export const movieService = {
    * POST /api/v1/recommendations/content
    * Returns content similar to a basket of movies/TV shows.
    */
-  getContentBasketRecommendations: (items, page = 1) =>
-    api.post('/api/v1/recommendations/content', { items, page }).then(r => r.data),
+  getContentBasketRecommendations: (items, page = 1, options = {}) =>
+    api.post('/api/v1/recommendations/content', {
+      items,
+      page,
+      filters: options.filters || null,
+      negative_items: options.negativeItems || [],
+      ignore_taste: options.ignoreTaste || false,
+    }).then(r => r.data),
 }
 

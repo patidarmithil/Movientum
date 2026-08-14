@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { watchService } from '../services/watchService'
 import { watchlistService } from '../services/watchlistService'
+import { fireBurst } from '../utils/burstEffect'
 import './SaveToCollectionModal.css'
 
 function SaveToCollectionModal({ movieId, mediaType = "movie", isOpen, onClose }) {
@@ -60,10 +61,11 @@ function SaveToCollectionModal({ movieId, mediaType = "movie", isOpen, onClose }
     return () => { isMounted = false }
   }, [isOpen, movieId])
 
-  const handleToggle = async (collection) => {
+  const handleToggle = async (collection, rowEl) => {
     const cid = collection.id
     const isChecked = checkedState[cid]
     const willCheck = !isChecked
+    if (willCheck) fireBurst(rowEl)
 
     // Optimistic UI
     setCheckedState(prev => ({ ...prev, [cid]: willCheck }))
@@ -108,7 +110,8 @@ function SaveToCollectionModal({ movieId, mediaType = "movie", isOpen, onClose }
       // 4. Update local state
       setCollections([newColl, ...collections])
       setCheckedState(prev => ({ ...prev, [newColl.id]: true }))
-      
+      fireBurst(e.currentTarget)
+
       // Back to list
       setIsCreateView(false)
       setNewName('')
@@ -194,10 +197,10 @@ function SaveToCollectionModal({ movieId, mediaType = "movie", isOpen, onClose }
                       key={coll.id} 
                       className={`collection-row ${loadingIds.has(coll.id) ? 'loading' : ''}`}
                     >
-                      <input 
-                        type="checkbox" 
-                        checked={!!checkedState[coll.id]} 
-                        onChange={() => handleToggle(coll)}
+                      <input
+                        type="checkbox"
+                        checked={!!checkedState[coll.id]}
+                        onChange={(e) => handleToggle(coll, e.currentTarget.closest('.collection-row'))}
                         disabled={loadingIds.has(coll.id)}
                       />
                       <div className="collection-info">

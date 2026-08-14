@@ -28,6 +28,31 @@
               linear-gradient(to right, transparent 50%, var(--bg-void) 100%);
 }
 
+/* ── Cold-start notice banner ── */
+.cold-boot-notice {
+  position: relative;
+  z-index: 1;
+  margin: var(--space-8) auto 0;
+  max-width: 640px;
+  width: calc(100% - var(--space-8) * 2);
+  padding: 12px 18px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #cfcfcf);
+  background: rgba(20, 20, 30, 0.55);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: coldBootFadeIn 0.4s ease;
+}
+
+@keyframes coldBootFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .home-layout-container {
   position: relative;
   z-index: 1; /* Place above the Aurora background */
@@ -60,29 +85,53 @@
   display: none;
 }
 
+/* Frosted pills, the same material as the navbar and the intro page. Used both
+   inside .genre-pills and inside .movie-row__pills-container.
+
+   The selected state inverts to a near-solid white pill rather than reaching for
+   an accent colour: on a surface made entirely of translucent white, brightness
+   is the only contrast axis left, and it is a stronger signal than a hue. */
 .genre-pill-btn {
-  background: var(--surface-card);
+  background: var(--glass-bg);
   color: var(--text-muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 999px;
   font-size: var(--text-xs);
   font-weight: 500;
   white-space: nowrap;
-  transition: all 200ms ease;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    transform 200ms ease;
 }
 
 .genre-pill-btn:hover {
-  border-color: var(--accent);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
   color: var(--text-primary);
-  background: var(--accent-hover);
+  transform: translateY(-1px);
 }
 
 .genre-pill-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-primary);
-  box-shadow: 0 0 12px var(--accent-glow);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0B0B0B;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.genre-pill-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+/* Hover lift is a lie on touch — it sticks after a tap. */
+@media (hover: none) {
+  .genre-pill-btn:hover { transform: none; }
 }
 
 /* ── Sidebar styling ── */

@@ -1,17 +1,29 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigationType } from 'react-router-dom'
 
+// Routes that opt out of scroll restoration entirely.
+//
+// The landing page is a scroll narrative, not a list you come back to, so there
+// is no position worth remembering. Restoration is also actively harmful there:
+// the page sets `scroll-behavior: smooth`, so every window.scrollTo() below
+// animates, and the restore loop below re-issues that call for up to 300 frames.
+// Each call restarts the animation and fights whatever the reader is doing with
+// the wheel, which reads as the page sticking on one section.
+const NO_SCROLL_RESTORE = new Set(['/intro', '/about'])
+
 export default function ScrollRestore() {
   const location = useLocation()
   const navigationType = useNavigationType() // 'PUSH', 'POP', or 'REPLACE'
   const scrollRegistry = useRef({}) // In-memory fallback if sessionStorage is slow
   const prevPathname = useRef(location.pathname)
+  const skip = NO_SCROLL_RESTORE.has(location.pathname)
 
   // Use pathname + search to uniquely identify every URL state including parameters
   const getCacheKey = (loc) => `scroll_cache_${loc.pathname}${loc.search}`
 
   // 1. Capture-based scroll listener to continuously save the scroll position of window AND sub-elements
   useEffect(() => {
+    if (skip) return
     let timeoutId
     const cacheKey = getCacheKey(location)
     
@@ -89,10 +101,18 @@ export default function ScrollRestore() {
       window.removeEventListener('scroll', handleScroll, { capture: true })
       clearTimeout(timeoutId)
     }
-  }, [location])
+  }, [location, skip])
 
   // 2. Perform scroll restoration on location change (POP navigation only)
   useEffect(() => {
+    if (skip) {
+      // Still land at the top on arrival — just once, with no retry loop and no
+      // saved position to chase.
+      prevPathname.current = location.pathname
+      window.scrollTo(0, 0)
+      return
+    }
+
     const cacheKey = getCacheKey(location)
     let savedData = null
 
@@ -219,7 +239,7 @@ export default function ScrollRestore() {
         console.log(`[ScrollRestore] ${navigationType} navigation to ${location.pathname}${location.search} (path changed: ${pathChanged}). Keeping scroll position.`)
       }
     }
-  }, [location, navigationType])
+  }, [location, navigationType, skip])
 
   return null
 }

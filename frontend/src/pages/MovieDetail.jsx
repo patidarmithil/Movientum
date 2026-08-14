@@ -10,7 +10,7 @@
  */
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { movieService } from '../services/movieService'
+import { pageService } from '../services/pageService'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
 import { useAuth } from '../context/AuthContext'
@@ -24,6 +24,7 @@ import ProductionTags from '../components/ProductionTags'
 import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import { pageCache } from '../utils/pageCache'
+import { fireBurst } from '../utils/burstEffect'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
@@ -167,6 +168,7 @@ export default function MovieDetail() {
   const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
   const [isModalOpen,   setIsModalOpen]   = useState(false)
+  const [overviewExpanded, setOverviewExpanded] = useState(false)
   const [reqNeededState, setReqNeededState] = useState({ loading: false, success: false })
   
   const [showCollectionModal, setShowCollectionModal] = useState(false)
@@ -194,6 +196,9 @@ export default function MovieDetail() {
   const trailerKey = videosData?.trailer_key || null
 
   const [collection, setCollection] = useState(null)
+  // Credits ride along in the page bundle and are handed to <CastCrew> as a prop
+  // so it doesn't fire its own request.
+  const [credits, setCredits] = useState(cachedData?.credits || null)
 
   useEffect(() => {
     if (movie) {
@@ -441,95 +446,94 @@ export default function MovieDetail() {
     }
   }
 
-  // ── Fetch movie detail ───────────────────────────────
+  // ── Fetch the whole page in one request ──────────────
+  // GET /api/v1/pages/movie/{id} returns detail + videos + credits + collection
+  // + similar + this user's watch/list status, all from a single Redis key.
+  // Previously this page fired five requests in sequence-ish waves (detail and
+  // videos on mount, then collection and similar once detail resolved, then
+  // three more for status) — the similar/collection waves in particular made the
+  // page render in stages.
   useEffect(() => {
     let cancelled = false
     if (!cachedData?.movie) {
       setLoading(true)
     }
-    setError(null)
-    setHasImgError(false)
-
-    movieService.getMovieById(movieId)
-      .then((data) => {
-        if (!cancelled) {
-          setMovie(data)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, movie: data })
-        }
-      })
-      .catch(() => { if (!cancelled && (!movie || !movie.overview)) setError('Failed to load movie') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-      
-    movieService.getVideos(movieId)
-      .then((data) => {
-        if (!cancelled) {
-          setVideosData(data)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, videosData: data })
-        }
-      })
-      .catch(() => {})
-
-    return () => { cancelled = true }
-  }, [movieId])
-
-  // ── Fetch collection (sequel/prequel) ──────────────────────
-  useEffect(() => {
-    if (!movie?.belongs_to_collection) { setCollection(null); return }
-    const collId = movie.belongs_to_collection.id
-    let cancelled = false
-    import('../utils/api').then(({ default: api }) =>
-      api.get(`/api/v1/movies/collection/${collId}`)
-        .then(r => {
-          if (!cancelled) {
-            // filter out current movie, tag each part
-            const currentDate = movie.release_date || ''
-            const parts = (r.data.parts || [])
-              .filter(p => p.id !== movieId)
-              .map((p, idx, arr) => {
-                let badge = `PART ${idx + 1}`
-                if (p.release_date && currentDate) {
-                  badge = p.release_date < currentDate ? 'PREQUEL' : 'SEQUEL'
-                }
-                return { ...p, badge }
-              })
-            if (parts.length > 0) setCollection({ name: r.data.name, parts })
-          }
-        })
-        .catch(() => {})
-    )
-    return () => { cancelled = true }
-  }, [movieId, movie?.belongs_to_collection?.id])
-
-  // ── Fetch similar movies ─────────────────────────────
-  useEffect(() => {
-    // Wait for the main movie detail to load before fetching recommendations
-    if (!movie) return
-
-    let cancelled = false
     if (similar.length === 0) {
       setSimilarLoading(true)
     }
+    setError(null)
+    setHasImgError(false)
 
-    import('../utils/api').then(({ default: api }) =>
-      api.get(`/api/v1/recommendations/similar/${movieId}`)
-        .then((r) => {
-          const similarData = r.data?.movies || r.data || []
-          if (!cancelled) {
-            setSimilar(similarData)
-            const curr = pageCache.get(cacheKey) || {}
-            pageCache.set(cacheKey, { ...curr, similar: similarData })
-          }
+    pageService.getMovie(movieId)
+      .then((data) => {
+        if (cancelled) return
+
+        const detail = data?.detail || null
+        const similarData = data?.similar?.movies || []
+        const creditsData = data?.credits || null
+
+        if (detail) setMovie(detail)
+        setVideosData(data?.videos || null)
+        setCredits(creditsData)
+        setSimilar(similarData)
+
+        // Franchise strip: drop the movie being viewed, then label each remaining
+        // part relative to its release date.
+        const rawColl = data?.collection
+        if (rawColl && detail) {
+          const currentDate = detail.release_date || ''
+          const parts = (rawColl.parts || [])
+            .filter((p) => p.id !== movieId)
+            .map((p, idx) => {
+              let badge = `PART ${idx + 1}`
+              if (p.release_date && currentDate) {
+                badge = p.release_date < currentDate ? 'PREQUEL' : 'SEQUEL'
+              }
+              return { ...p, badge }
+            })
+          setCollection(parts.length > 0 ? { name: rawColl.name, parts } : null)
+        } else {
+          setCollection(null)
+        }
+
+        // Auth-only sections — null for guests, in which case the effect below
+        // leaves the defaults alone.
+        if (data?.watch_status) setWatchStatus(data.watch_status)
+        if (data?.collections) {
+          setIsInAnyCollection(data.collections.some((c) => c.has_movie))
+          const plan = data.collections.find((c) => c.name === 'Plan to Watch')
+          setPlanToWatch(plan ? plan.has_movie : false)
+          setPlanToWatchId(plan ? plan.id : null)
+        }
+
+        pageCache.set(cacheKey, {
+          ...(pageCache.get(cacheKey) || {}),
+          movie: detail,
+          videosData: data?.videos || null,
+          credits: creditsData,
+          similar: similarData,
+          watchStatus: data?.watch_status || undefined,
         })
-        .catch(() => { if (!cancelled) setSimilar([]) })
-        .finally(() => { if (!cancelled) setSimilarLoading(false) })
-    )
+      })
+      .catch(() => {
+        if (cancelled) return
+        if (!movie || !movie.overview) setError('Failed to load movie')
+        setSimilar([])
+        setCredits({ cast: [], crew: [] })
+      })
+      .finally(() => {
+        if (cancelled) return
+        setLoading(false)
+        setSimilarLoading(false)
+      })
 
     return () => { cancelled = true }
-  }, [movieId, movie])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movieId])
 
-  // ── Fetch watch status (auth-gated) ─────────────────
+  // ── Refetch watch status after a mutation ────────────
+  // Still goes through the individual endpoints: it runs *after* the user acts,
+  // when the bundle for this title has just been invalidated server-side anyway.
   const fetchStatus = useCallback(() => {
     if (!isLoggedIn) return
     watchService.getStatus(movieId)
@@ -555,11 +559,20 @@ export default function MovieDetail() {
       .catch(() => {})
   }, [movieId, isLoggedIn])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  // First run is skipped — the bundle above already carried the status.
+  const statusInitRef = useRef(true)
+  useEffect(() => {
+    if (statusInitRef.current) {
+      statusInitRef.current = false
+      return
+    }
+    fetchStatus()
+  }, [fetchStatus])
 
   // ── Toggle Plan to Watch ─────────────────────────────
-  const handlePlanToWatch = async () => {
+  const handlePlanToWatch = async (e) => {
     if (!isLoggedIn || planBusy) return
+    const btn = e?.currentTarget
     setPlanBusy(true)
     try {
       if (planToWatch) {
@@ -571,6 +584,7 @@ export default function MovieDetail() {
         setPlanToWatchId(listId)
         setPlanToWatch(true)
         setWatchMsg('Added to Plan to Watch!')
+        fireBurst(btn)
       }
       setTimeout(() => setWatchMsg(null), 2500)
     } catch {
@@ -582,8 +596,9 @@ export default function MovieDetail() {
   }
 
   // ── Toggle watched ───────────────────────────────────
-  const handleWatchedToggle = async () => {
+  const handleWatchedToggle = async (e) => {
     if (!isLoggedIn || watchBusy) return
+    const btn = e?.currentTarget
     setWatchBusy(true)
     try {
       if (watchStatus.watched) {
@@ -598,6 +613,7 @@ export default function MovieDetail() {
         await watchService.markWatched(movieId)
         setWatchStatus((s) => ({ ...s, watched: true }))
         setWatchMsg('Added to watch history!')
+        fireBurst(btn)
         if (planToWatch) {
           try {
             await planToWatchService.remove(planToWatchId, movieId)
@@ -801,7 +817,20 @@ export default function MovieDetail() {
                 <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: 4 }} />
               </div>
             ) : movie.overview && (
-              <p className="movie-detail__overview">{movie.overview}</p>
+              <>
+                <p className={`movie-detail__overview ${!overviewExpanded && movie.overview.length > 260 ? 'movie-detail__overview--clamped' : ''}`}>
+                  {movie.overview}
+                </p>
+                {movie.overview.length > 260 && (
+                  <button
+                    type="button"
+                    className="movie-detail__read-more"
+                    onClick={() => setOverviewExpanded((v) => !v)}
+                  >
+                    {overviewExpanded ? 'Show Less' : 'Read More'}
+                  </button>
+                )}
+              </>
             )}
 
             {/* Actions & Financials Container */}
@@ -864,47 +893,20 @@ export default function MovieDetail() {
                   </>
                 )}
               </div>
-
-              {/* Financial Information (Budget & Revenue) */}
-              {(movie.budget > 0 || movie.revenue > 0) && (
-                <div className="movie-detail__financials">
-                  {movie.budget > 0 && (
-                    <div className="financial-item">
-                      <span className="financial-label">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', opacity: 0.7 }}>
-                          <line x1="12" y1="1" x2="12" y2="23"></line>
-                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                        </svg>
-                        Budget
-                      </span>
-                      <span className="financial-value">
-                        <span className="usd-val">{formatUSD(movie.budget)}</span>
-                        <span className="inr-val"> ({formatINR(movie.budget)})</span>
-                      </span>
-                    </div>
-                  )}
-                  {movie.revenue > 0 && (
-                    <div className="financial-item">
-                      <span className="financial-label">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', opacity: 0.7 }}>
-                          <line x1="12" y1="1" x2="12" y2="23"></line>
-                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                        </svg>
-                        Revenue
-                      </span>
-                      <span className="financial-value">
-                        <span className="usd-val">{formatUSD(movie.revenue)}</span>
-                        <span className="inr-val"> ({formatINR(movie.revenue)})</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Toast */}
             {watchMsg && (
               <p className="movie-detail__toast" aria-live="polite">{watchMsg}</p>
+            )}
+
+            {/* Collection Box */}
+            {collection && (
+              <CollectionBox
+                name={collection.name}
+                parts={collection.parts}
+                currentMovieDate={movie.release_date}
+              />
             )}
           </div>
 
@@ -927,6 +929,31 @@ export default function MovieDetail() {
             ) : (
               <div className="skeleton rating-meter-skeleton" style={{ height: 280, borderRadius: 16 }} />
             )}
+
+            {/* Financial Information (Budget & Revenue) */}
+            {(movie.budget > 0 || movie.revenue > 0) && (
+              <div className="movie-detail__financials">
+                {movie.budget > 0 && (
+                  <div className="financial-item">
+                    <span className="financial-label">Budget</span>
+                    <span className="financial-value">
+                      <span className="usd-val">{formatUSD(movie.budget)}</span>
+                      <span className="inr-val"> ({formatINR(movie.budget)})</span>
+                    </span>
+                  </div>
+                )}
+                {movie.revenue > 0 && (
+                  <div className="financial-item">
+                    <span className="financial-label">Revenue</span>
+                    <span className="financial-value">
+                      <span className="usd-val">{formatUSD(movie.revenue)}</span>
+                      <span className="inr-val"> ({formatINR(movie.revenue)})</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {showRatingMeter && (!movie.moctale_rating || !movie.moctale_rating.total_votes) && (
               <div className="rating-needed-box animate-fade-lift">
                 <p className="rating-needed-box__msg">Want to know rating?</p>
@@ -939,20 +966,13 @@ export default function MovieDetail() {
                 </button>
               </div>
             )}
-
-            {/* Collection Box */}
-            {collection && (
-              <CollectionBox
-                name={collection.name}
-                parts={collection.parts}
-                currentMovieDate={movie.release_date}
-              />
-            )}
           </div>
         </div>
 
         {/* ── Cast & Crew ── */}
-        <CastCrew movieId={movieId} />
+        {/* Rendered once the bundle has delivered credits, so CastCrew never
+            falls back to fetching them itself. */}
+        {credits && <CastCrew movieId={movieId} credits={credits} />}
 
         {/* ── In The News ── */}
         <NewsArticlesSection itemId={movieId} mediaType="movie" />
@@ -961,12 +981,6 @@ export default function MovieDetail() {
         <ProductionTags
           productionCompanies={movie.production_companies || []}
           productionCountries={movie.production_countries || []}
-        />
-        {/* ── AI Recommendations (Phase 6) ── */}
-        <AIRecommendations
-          seedTmdbId={movieId}
-          seedMediaType="movie"
-          seedTitle={movie?.title || ''}
         />
 
         {/* ── Similar Movies ── */}
@@ -978,9 +992,21 @@ export default function MovieDetail() {
             seeAllHref="/movies"
             premiumScroll={true}
             showFeedback={true}
+            feedbackSource="more_like_this"
             emptyText="No similar movies found."
           />
         </div>
+
+        {/* ── AI Recommendations ── */}
+        {movie && (
+          <div className="movie-detail__ai-recs">
+            <AIRecommendations
+              seedTmdbId={movie.id}
+              seedMediaType="movie"
+              seedTitle={movie.title}
+            />
+          </div>
+        )}
       </div>
 
       {/* Full screen modal */}

@@ -4,6 +4,17 @@ import './MovieCard.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return null
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return null
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  } catch {
+    return null
+  }
+}
+
 export default function TrailerCard({ item, onPlayTrailer }) {
   const [hasError, setHasError]     = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
@@ -107,7 +118,7 @@ export default function TrailerCard({ item, onPlayTrailer }) {
           <h3 className="movie-card__title">{item.title}</h3>
           <p className="movie-card__meta">
             <span className="movie-card__year">
-              {item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || 'Upcoming'}
+              {formatReleaseDate(item.release_date || item.first_air_date) || 'Upcoming'}
             </span>
           </p>
         </div>

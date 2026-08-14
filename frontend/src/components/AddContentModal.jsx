@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom'
 import { searchService } from '../services/searchService'
 import { watchlistService } from '../services/watchlistService'
 import { watchService } from '../services/watchService'
+import { fireBurst } from '../utils/burstEffect'
 import './AddContentModal.css'
 
 const TMDB_BASE = 'https://image.tmdb.org/t/p/w342'
@@ -43,7 +44,7 @@ function ResultCard({ item, isAdded, isLoading, onAdd }) {
         {/* + / ✓ button */}
         <button
           className={`acm-card__add-btn ${isAdded ? 'is-added' : ''} ${isLoading ? 'is-loading' : ''}`}
-          onClick={() => !isAdded && !isLoading && onAdd(item)}
+          onClick={(e) => !isAdded && !isLoading && onAdd(item, e.currentTarget)}
           aria-label={isAdded ? `${item.title} already added` : `Add ${item.title}`}
           disabled={isAdded || isLoading}
           id={`acm-add-${item.id}`}
@@ -141,7 +142,7 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
   }, [])
 
   // Add item to collection
-  const handleAdd = useCallback(async (item) => {
+  const handleAdd = useCallback(async (item, btnEl) => {
     const isTv = item.media_type === 'tv' || item.type === 'tv'
     const absId = Math.abs(Number(item.id))
     const mediaType = isTv ? 'tv' : 'movie'
@@ -150,6 +151,7 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
     // Optimistic
     setAddedIds((prev) => new Set([...prev, addedKey]))
     setLoadingIds((prev) => new Set([...prev, addedKey]))
+    fireBurst(btnEl)
 
     try {
       await watchlistService.addToCollection(collectionId, absId, mediaType)

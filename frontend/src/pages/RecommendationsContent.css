@@ -1,166 +1,680 @@
-/* RecommendationsContent.css */
+/* RecommendationsContent.css — Premium DNA discovery page */
 
-/* Search section container */
+/* ── Page structure & aurora background ── */
+.reccontent-page {
+  position: relative;
+  overflow: hidden;
+}
+
+.reccontent-aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: -2;
+  pointer-events: none;
+}
+
+.reccontent-aurora-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 212, 255, 0.1) 0%,
+    rgba(8, 8, 8, 0.5) 40%,
+    rgba(8, 8, 8, 0.7) 100%
+  );
+  z-index: -1;
+}
+
+.reccontent-page__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 24px 40px;
+}
+
+/* ── Hero Header ── */
+.reccontent-header-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.reccontent-hero-title {
+  font-size: 48px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #00D4FF 0%, #FF006E 50%, #6A00D4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.reccontent-hero-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 12px 0 0;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+/* ── Search section ── */
 .reccontent-search-section {
   max-width: 700px;
   margin: 0 auto 32px;
 }
 
-/* Type toggle pills (Movie / TV) */
-.reccontent-type-pills {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-/* Active state uses .filter-pill.active */
-
-/* Search input */
-.reccontent-input-wrap {
-  position: relative;
-}
-.reccontent-input {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: #fff;
-  font-family: 'Outfit', sans-serif;
-  font-size: 16px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.reccontent-input:focus {
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Autocomplete dropdown */
-.reccontent-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 200;
-  background: rgba(10, 10, 15, 0.95);
-  backdrop-filter: blur(20px);
+.acm-panel {
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  margin-top: 8px;
-  max-height: 300px;
-  overflow-y: auto;
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
 }
-.reccontent-dropdown-item {
+
+.acm-panel:focus-within {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.acm-search-wrap {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-}
-.reccontent-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-.reccontent-dropdown-thumb {
-  width: 32px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 4px;
+  gap: 12px;
+  padding: 14px 20px;
+  position: relative;
 }
 
-/* Basket chips row */
+.acm-search-icon {
+  color: rgba(0, 212, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.acm-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+}
+
+.acm-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Results wrap (for dropdown) ── */
+.acm-results-wrap {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.acm-results-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 20px 8px;
+  margin: 0;
+}
+
+.acm-results-scroll {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.acm-state-msg {
+  text-align: center;
+  padding: 24px 20px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+}
+
+.acm-state-icon {
+  display: block;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.acm-state-msg--error {
+  color: rgba(255, 100, 100, 0.6);
+}
+
+.acm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.acm-card:hover {
+  background: rgba(0, 212, 255, 0.08);
+  border-radius: 12px;
+}
+
+.acm-card__poster-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.acm-card__poster {
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
+}
+
+.acm-card__poster--fallback {
+  width: 40px;
+  height: 60px;
+  background: rgba(82, 39, 255, 0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: rgba(82, 39, 255, 0.5);
+}
+
+.acm-card__add-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 212, 255, 0.7);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.2s;
+  opacity: 0;
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+}
+
+.acm-card:hover .acm-card__add-btn {
+  opacity: 1;
+}
+
+.acm-card__add-btn:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 1);
+  transform: scale(1.15);
+  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+}
+
+.acm-card__add-btn.is-added {
+  opacity: 1;
+  background: rgba(0, 194, 255, 0.7);
+}
+
+.acm-card__add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.acm-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.acm-card__info {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.acm-card__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+
+.acm-card__year {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 2px 0 0;
+}
+
+.acm-search-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 212, 255, 0.15);
+  border-top-color: rgba(0, 212, 255, 0.7);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Basket chips ── */
 .reccontent-basket {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 16px 0;
+  margin: 20px 0;
   min-height: 0;
+  padding: 0 0 16px;
 }
+
 .reccontent-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.07);
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 4px 8px 4px 4px;
-  transition: opacity 0.2s, transform 0.2s;
+  border-radius: 12px;
+  padding: 8px 12px 8px 8px;
+  transition: all 0.2s;
 }
+
+.reccontent-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
 .reccontent-chip-poster {
-  width: 24px;
-  height: 36px;
+  width: 40px;
+  height: 60px;
   object-fit: cover;
-  border-radius: 3px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
+
 .reccontent-chip-title {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
   max-width: 120px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
+
 .reccontent-chip-type {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(0, 194, 255, 0.15);
-  color: #00C2FF;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
+
 .reccontent-chip-remove {
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 16px;
   line-height: 1;
-}
-.reccontent-chip-remove:hover {
-  color: rgba(255, 255, 255, 0.8);
+  padding: 2px;
+  margin-left: 2px;
+  transition: color 0.2s;
 }
 
-/* Find Similar CTA */
+.reccontent-chip-remove:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── CTA Button ── */
 .reccontent-find-btn {
-  width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #00C2FF, #7B2FBE);
-  border: none;
-  border-radius: 10px;
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #00D4FF 0%, #FF006E 100%);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 12px;
   cursor: pointer;
-  font-family: 'Outfit', sans-serif;
-  font-size: 16px;
+  font-family: inherit;
+  font-size: 15px;
   font-weight: 600;
   color: #fff;
-  transition: opacity 0.2s, transform 0.15s;
-  margin-top: 16px;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
 }
+
 .reccontent-find-btn:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  border-color: rgba(0, 212, 255, 0.6);
+  box-shadow: 0 12px 32px rgba(0, 212, 255, 0.35);
+  transform: translateY(-2px);
 }
+
 .reccontent-find-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* Common Traits bar */
-.reccontent-traits-bar {
+/* ── DNA Fingerprint Section ── */
+.reccontent-dna-section {
+  max-width: 700px;
+  margin: 32px auto 0;
+}
+
+.reccontent-dna-fingerprint {
+  padding: 28px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.reccontent-dna-fingerprint:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+
+.dna-content {
   display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dna-header {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dna-precision-label {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  letter-spacing: 0.2px;
+}
+
+.dna-traits {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dna-trait {
+  display: inline-flex;
   align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.dna-trait:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dna-trait--language {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dna-trait--media {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dna-trait-purity {
+  font-weight: 700;
+  opacity: 1;
+}
+
+.dna-tags {
+  display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 0 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 24px;
 }
-.reccontent-traits-label {
+
+.dna-tag {
+  display: inline-block;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  padding: 5px 12px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 500;
+  transition: all 0.2s;
 }
-.reccontent-trait-tag {
-  font-size: 12px;
-  padding: 3px 10px;
+
+.dna-tag:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dna-tag--genre {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.dna-tag--keyword {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ── Filter bar (from explore.css, customized) ── */
+.explore-filter-bar {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  padding: 16px 20px;
+  margin-top: 32px;
+  margin-bottom: 32px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.explore-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
-  background: rgba(0, 194, 255, 0.1);
-  color: rgba(0, 194, 255, 0.9);
-  border: 1px solid rgba(0, 194, 255, 0.2);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.2px;
+}
+
+.filter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.filter-pill.active {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.25), rgba(255, 0, 110, 0.15));
+  border-color: rgba(0, 212, 255, 0.5);
+  color: #fff;
+}
+
+.filter-clear-all-btn {
+  padding: 8px 16px;
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 100, 100, 0.25);
+  border-radius: 20px;
+  color: rgba(255, 100, 100, 0.8);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-clear-all-btn:hover {
+  background: rgba(255, 100, 100, 0.15);
+  border-color: rgba(255, 100, 100, 0.4);
+}
+
+/* ── Results grid ── */
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.error-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 100, 100, 0.7);
+  font-size: 14px;
+}
+
+/* ── Scroll triggers & empty states ── */
+.no-upcoming-text {
+  text-align: center;
+  padding: 24px 20px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+  margin: 0;
+}
+
+.fixed-bottom-fade {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, rgba(8, 8, 8, 0.8));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .reccontent-page__inner {
+    padding: 48px 16px 40px;
+  }
+
+  .reccontent-hero-title {
+    font-size: 36px;
+  }
+
+  .reccontent-hero-subtitle {
+    font-size: 14px;
+  }
+
+  .explore-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .explore-filter-row {
+    gap: 8px;
+  }
+
+  .filter-pill {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .dna-trait {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .reccontent-chip {
+    padding: 3px 6px 3px 3px;
+  }
+
+  .reccontent-chip-poster {
+    width: 24px;
+    height: 36px;
+  }
+
+  .acm-card__poster {
+    width: 36px;
+    height: 54px;
+  }
+}
+
+@media (max-width: 480px) {
+  .reccontent-page__inner {
+    padding: 40px 12px 40px;
+  }
+
+  .reccontent-hero-title {
+    font-size: 28px;
+  }
+
+  .reccontent-search-section {
+    max-width: 100%;
+  }
+
+  .explore-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .reccontent-find-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .explore-filter-bar {
+    padding: 12px 16px;
+  }
 }

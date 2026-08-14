@@ -25,8 +25,11 @@ export const userService = {
     const response = await api.get('/api/v1/users/me/analysis/taste-profile')
     return response.data
   },
-  saveTasteProfile: async (genreWeights) => {
-    const response = await api.patch('/api/v1/users/me/analysis/taste-profile', { genre_weights: genreWeights })
+  saveTasteProfile: async (genreWeights, eraWeights) => {
+    const body = {}
+    if (genreWeights !== undefined) body.genre_weights = genreWeights
+    if (eraWeights !== undefined) body.era_weights = eraWeights
+    const response = await api.patch('/api/v1/users/me/analysis/taste-profile', body)
     return response.data
   }
 }

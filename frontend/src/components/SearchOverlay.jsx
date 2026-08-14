@@ -107,6 +107,13 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
   }, [isOpen])
 
   const fetchResults = useCallback(async (val) => {
+    const cached = getCache(val, searchType)
+    if (cached) {
+      setResults(cached)
+      setIsLoading(false)
+      return
+    }
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -114,11 +121,12 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
     abortControllerRef.current = controller
 
     try {
-      const data = searchService.instantSearch 
+      const data = searchService.instantSearch
         ? await searchService.instantSearch(val, searchType, controller.signal)
         : await searchService.autocomplete(val, searchType, controller.signal)
-        
+
       const list = Array.isArray(data) ? data : (data.results ?? [])
+      setCache(val, searchType, list)
       setResults(list)
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError' || err.message === 'canceled') {

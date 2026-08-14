@@ -88,15 +88,18 @@
   line-height: 1.1;
 }
 
+/* Frosted chip rather than a violet one — same material as the navbar pills. */
 .person-page__dept {
   display: inline-block;
   font-size: var(--text-sm);
-  color: var(--accent);
+  color: rgba(255, 255, 255, 0.78);
   font-weight: 600;
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  border-radius: var(--radius-sm);
-  padding: 2px 10px;
+  background: var(--glass-bg-hover);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 999px;
+  padding: 3px 12px;
 }
 
 .person-page__meta {

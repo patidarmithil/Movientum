@@ -4,10 +4,18 @@
  */
 
 /* ── Section wrapper ─────────────────────────────────────────── */
+/* Frosted pane, same material as the navbar and the intro page. This section
+   sits among plain rows on the detail pages, so giving it a ground is what marks
+   it as a distinct, generated block rather than one more carousel. */
 .ai-recs {
   margin: 2rem 0 1.5rem;
-  padding: 1.5rem 0; /* Align with normal sections */
-  background: transparent;
+  padding: 1.5rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
   position: relative;
   overflow: hidden;
 }

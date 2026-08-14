@@ -2,12 +2,12 @@
  * PersonPage.jsx — Improvement 1.4
  *
  * Route: /person/:id
- * Fetches GET /api/v1/person/{id} → biography + filmography.
- * No DB — TMDB passthrough, 24 h Redis cache.
+ * Fetches GET /api/v1/pages/person/{id} → biography + filmography in one
+ * request, served from one 24 h Redis bundle. No DB — TMDB passthrough.
  */
 import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
-import api from '../utils/api'
+import { pageService } from '../services/pageService'
 import Aurora from '../components/Aurora'
 import { pageCache } from '../utils/pageCache'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
@@ -50,41 +50,36 @@ export default function PersonPage() {
     }
   }, [person])
 
+  // Biography + credits arrive together from one bundle request, served from a
+  // single Redis key (GET /api/v1/pages/person/{id}).
   useEffect(() => {
     let cancelled = false
-    if (!person) {
-      setLoading(true)
-    }
+    if (!person) setLoading(true)
+    if (credits.length === 0) setCreditsLoading(true)
     setError(null)
-    api.get(`/api/v1/person/${personId}`)
-      .then((r) => {
-        if (!cancelled) {
-          setPerson(r.data)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, person: r.data })
-        }
+
+    pageService.getPerson(personId)
+      .then((d) => {
+        if (cancelled) return
+        const detail = d?.detail || null
+        const creditList = d?.credits || []
+        if (detail) setPerson(detail)
+        setCredits(creditList)
+        pageCache.set(cacheKey, {
+          ...(pageCache.get(cacheKey) || {}),
+          person: detail,
+          credits: creditList,
+        })
       })
       .catch(() => { if (!cancelled && !person) setError('Person not found') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [personId])
-
-  useEffect(() => {
-    let cancelled = false
-    if (credits.length === 0) {
-      setCreditsLoading(true)
-    }
-    api.get(`/api/v1/person/${personId}/credits`)
-      .then((r) => {
-        if (!cancelled) {
-          setCredits(r.data)
-          const curr = pageCache.get(cacheKey) || {}
-          pageCache.set(cacheKey, { ...curr, credits: r.data })
-        }
+      .finally(() => {
+        if (cancelled) return
+        setLoading(false)
+        setCreditsLoading(false)
       })
-      .catch((err) => console.error('Error fetching credits:', err))
-      .finally(() => { if (!cancelled) setCreditsLoading(false) })
+
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personId])
 
   const images = person?.images?.length ? person.images : (person?.profile_path ? [person.profile_path] : [])

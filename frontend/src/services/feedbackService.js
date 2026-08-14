@@ -19,10 +19,12 @@ const BASE_URL = import.meta.env.VITE_API_URL || ''
  * @param {number}  params.tmdbId         - TMDB item ID
  * @param {string}  params.mediaType      - "movie" | "tv"
  * @param {string}  params.signalType     - "thumbs_up" | "thumbs_down" | "click"
+ * @param {string}  params.source         - Which UI surface sent it: "more_like_this" |
+ *                                          "for_you" | "ai_recommendations" | "other"
  * @param {object?} params.featureSnapshot - Optional 16-dim feature dict (from Phase 4)
  * @returns {Promise<void>}               - Always resolves, never rejects
  */
-export async function sendRecSignal({ tmdbId, mediaType = 'movie', signalType, featureSnapshot = {} }) {
+export async function sendRecSignal({ tmdbId, mediaType = 'movie', signalType, source = 'other', featureSnapshot = {} }) {
   try {
     const token = storage.getItem('mv_access_token')
     if (!token) return  // anonymous users — skip
@@ -37,6 +39,7 @@ export async function sendRecSignal({ tmdbId, mediaType = 'movie', signalType, f
         tmdb_id:          tmdbId,
         media_type:       mediaType,
         signal_type:      signalType,
+        source,
         feature_snapshot: featureSnapshot,
       }),
     })
@@ -46,12 +49,14 @@ export async function sendRecSignal({ tmdbId, mediaType = 'movie', signalType, f
 }
 
 /**
- * Convenience wrappers for each signal type.
+ * Convenience wrappers for each signal type. `source` tags which UI surface
+ * sent the signal (see sendRecSignal) so interaction_log/analytics can tell
+ * "More Like This" thumbs apart from "For You" or "AI Recommendations".
  */
 export const recFeedback = {
-  thumbsUp:   (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'thumbs_up' }),
-  thumbsDown: (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'thumbs_down' }),
-  click:      (tmdbId, mediaType) => sendRecSignal({ tmdbId, mediaType, signalType: 'click' }),
+  thumbsUp:   (tmdbId, mediaType, source = 'other') => sendRecSignal({ tmdbId, mediaType, signalType: 'thumbs_up', source }),
+  thumbsDown: (tmdbId, mediaType, source = 'other') => sendRecSignal({ tmdbId, mediaType, signalType: 'thumbs_down', source }),
+  click:      (tmdbId, mediaType, source = 'other') => sendRecSignal({ tmdbId, mediaType, signalType: 'click', source }),
 }
 
 export default recFeedback

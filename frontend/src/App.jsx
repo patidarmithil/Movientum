@@ -141,7 +141,7 @@ function MobileRefreshDetector() {
 
 function AppRoutes() {
   const location = useLocation()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, isLoading } = useAuth()
 
   useEffect(() => {
     const path = location.pathname;
@@ -211,15 +211,17 @@ function AppRoutes() {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public */}
-          <Route 
-            path="/" 
+          {/* The root is a fork, never a destination: signed-in visitors land on
+              /home, everyone else on /intro. Rendered as a redirect rather than
+              the Intro component so the address bar matches the page.
+              `isLoading` is held on deliberately — the session resolves
+              asynchronously, and redirecting before it does would bounce a
+              signed-in visitor with a stored token out to /intro. */}
+          <Route
+            path="/"
             element={
-              isLoggedIn || localStorage.getItem('hasSeenIntro') === 'true' ? (
-                <PageTransition><Navigate to="/home" replace /></PageTransition>
-              ) : (
-                <PageTransition><Intro /></PageTransition>
-              )
-            } 
+              isLoading ? null : <Navigate to={isLoggedIn ? '/home' : '/intro'} replace />
+            }
           />
           <Route path="/home"       element={<PageTransition><Home /></PageTransition>} />
           <Route path="/movies"     element={<PageTransition><MovieList /></PageTransition>} />

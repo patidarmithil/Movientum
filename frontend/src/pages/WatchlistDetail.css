@@ -1,4 +1,5 @@
-/* WatchlistDetail.css — Cinematic Redesign */
+/* WatchlistDetail.css — Curated Collections Design System */
+/* Uses site-wide theme from index.css: purple accent #B048FF */
 
 /* ── Page shell ─────────────────────────────────────────────────────────── */
 .wld-page {
@@ -6,7 +7,7 @@
   min-height: 100vh;
   padding-top: var(--navbar-h);
   padding-bottom: var(--space-20);
-  background-color: var(--bg-void, #080808);
+  background-color: var(--bg-void);
   overflow-x: hidden;
 }
 
@@ -31,81 +32,90 @@
   top: calc(var(--navbar-h) + 20px);
   height: fit-content;
 
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 
-  padding: 20px;
+  padding: var(--space-6);
 }
 
 .wld-sidebar-title {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 700;
-  margin-bottom: 20px;
-  color: #fff;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  padding-bottom: 12px;
+  margin-bottom: var(--space-6);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: var(--space-3);
 }
 
 .wld-filter-group {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-4);
 }
 
 .wld-filter-group label {
   display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.6);
-  margin-bottom: 8px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 1px;
 }
 
 .wld-filter-input {
   width: 100%;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  color: #fff;
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   padding: 10px 12px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .wld-filter-input:focus {
   border-color: var(--accent);
+  background: rgba(176, 72, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(176, 72, 255, 0.1);
 }
 
 .wld-filter-select {
   width: 100%;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  color: #fff;
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   padding: 10px 12px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   outline: none;
   cursor: pointer;
   appearance: none;
+  transition: all 0.2s ease;
+}
+
+.wld-filter-select:focus {
+  border-color: var(--accent);
+  background: rgba(176, 72, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(176, 72, 255, 0.1);
 }
 
 .wld-filter-select option {
-  background: var(--bg-void, #080808);
-  color: #fff;
+  background: var(--bg-void);
+  color: var(--text-primary);
 }
 
 /* ── Banner Section ──────────────────────────────────────────────────────── */
 .wld-banner {
   position: relative;
   width: 100%;
-  height: 480px;
+  height: 420px;
   overflow: hidden;
-  background: #06060c;
-  border-radius: 16px;
+  background: var(--bg-void);
+  border-radius: var(--radius-lg);
 }
 
 .wld-banner__backdrop-wrap {
@@ -157,7 +167,7 @@
   bottom: 0;
   background:
     linear-gradient(to right, rgba(8,8,8,0.85) 0%, rgba(8,8,8,0.6) 60%, rgba(8,8,8,0.9) 100%),
-    linear-gradient(to bottom, transparent 30%, #080808 100%);
+    linear-gradient(to bottom, transparent 30%, var(--bg-void) 100%);
   pointer-events: none;
 }
 
@@ -214,24 +224,21 @@
 
 .wld-add-btn {
   white-space: nowrap;
-  background: linear-gradient(135deg, rgba(176, 72, 255, 0.25) 0%, rgba(176, 72, 255, 0.1) 100%) !important;
-  border: 1.5px solid rgba(176, 72, 255, 0.55) !important;
+  background: var(--accent) !important;
+  border: 1.5px solid var(--accent) !important;
   color: #fff !important;
-  padding: 10px 22px !important;
-  border-radius: 9999px !important;
+  padding: 10px 24px !important;
+  border-radius: var(--radius-sm) !important;
   font-weight: 700 !important;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 15px rgba(176, 72, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(176, 72, 255, 0.2);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .wld-add-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(176, 72, 255, 0.45) 0%, rgba(176, 72, 255, 0.2) 100%) !important;
-  border-color: var(--accent) !important;
-  transform: scale(1.05) translateY(-2px);
-  box-shadow: 0 6px 20px rgba(176, 72, 255, 0.3);
+  background: linear-gradient(135deg, var(--accent) 0%, #8f3dd8 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(176, 72, 255, 0.4);
 }
 
 .wld-edit-btn,
@@ -262,10 +269,10 @@
 }
 
 .wld-action-circ-btn.active {
-  background: rgba(176, 72, 255, 0.25);
+  background: var(--accent-glow);
   border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 15px rgba(176, 72, 255, 0.3);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(176, 72, 255, 0.3);
 }
 
 .wld-edit-btn:disabled {
@@ -277,15 +284,15 @@
 /* ── Split Hero Layout (Collection details overlay) ──────────────────────── */
 .wld-hero {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 32px;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
   align-items: center;
   margin-top: auto;
   animation: wld-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .wld-hero__left {
-  width: 220px;
+  width: 260px;
   flex-shrink: 0;
 }
 
@@ -302,7 +309,7 @@
 .wld-poster-stack {
   position: relative;
   width: 100%;
-  height: 285px;
+  height: 340px;
 }
 
 .wld-poster {
@@ -385,21 +392,30 @@
   background: rgba(10,10,15,0.45);
   border: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(18px);
-  padding: 20px;
-  border-radius: 16px;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border-left: 4px solid transparent;
+  transition: border-left-color 0.3s ease;
+}
+
+/* Curator's Mark — appears when collection is liked */
+.wld-hero__info-block.curator-marked {
+  border-left-color: var(--accent);
 }
 
 .wld-title {
-  font-size: clamp(2rem, 4.5vw, 3rem);
-  font-weight: 800;
-  color: #fff;
+  font-size: clamp(1.8rem, 4.5vw, 3.5rem);
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+  line-height: 1.15;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-family: var(--font-display);
 }
 
@@ -408,13 +424,15 @@
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: var(--space-1);
 }
 
 .wld-count {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: capitalize;
 }
 
 .wld-desc-dot {
@@ -434,8 +452,8 @@
 .wld-creator {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
   font-size: var(--text-sm);
   color: rgba(255, 255, 255, 0.65);
 }
@@ -470,23 +488,23 @@
 .wld-inline-edit {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   max-width: 480px;
-  background: rgba(8, 8, 12, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 16px;
-  border-radius: 12px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 
 .wld-inline-edit__name {
   font-size: 1.4rem;
   font-weight: 800;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1.5px solid rgba(176, 72, 255, 0.35);
-  border-radius: 8px;
+  background: var(--surface-input);
+  border: 1.5px solid var(--accent-hover);
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   padding: 8px 12px;
   font-family: var(--font-display);
@@ -501,21 +519,24 @@
 }
 
 .wld-inline-edit__desc {
-  font-size: var(--text-sm);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  font-size: 0.9rem;
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
-  padding: 6px 10px;
+  padding: 8px 10px;
   font-family: var(--font-primary);
   outline: none;
   resize: vertical;
   min-height: 60px;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
+  line-height: 1.5;
 }
 
 .wld-inline-edit__desc:focus {
   border-color: var(--accent);
+  background: rgba(176, 72, 255, 0.08);
+  box-shadow: 0 0 10px rgba(176, 72, 255, 0.2);
 }
 
 .wld-inline-edit__char {
@@ -545,19 +566,20 @@
 .wld-content {
   position: relative;
   z-index: 3;
-  margin-top: 40px;
+  margin-top: 48px;
   animation: wld-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .wld-section {
-  margin-top: 32px;
+  margin-top: var(--space-8);
 }
 
 .wld-section-title {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  margin-bottom: 16px;
-  color: #fff;
+  margin-bottom: var(--space-6);
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
 }
 
 .wld-grid-container {
@@ -610,13 +632,13 @@
 .movie-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
 /* Hover scales cards, glow border effect */
 .wld-movie-wrap:hover {
-  transform: scale(1.04) translateY(-4px) !important;
-  box-shadow: 0 12px 30px rgba(176, 72, 255, 0.3);
+  transform: scale(1.03) translateY(-4px) !important;
+  box-shadow: 0 8px 24px rgba(176, 72, 255, 0.25);
   z-index: 5;
   transition-delay: 0s !important; /* Instant hover reaction, bypass scroll delay */
 }
@@ -665,10 +687,11 @@
 }
 
 .wld-remove-btn:hover {
-  background: rgba(239, 68, 68, 0.85);
-  border-color: rgba(239, 68, 68, 0.95);
+  background: var(--error);
+  border-color: var(--error);
   color: #fff;
   transform: scale(1.1) rotate(90deg) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
 /* ── Enhanced Empty State ────────────────────────────────────────────────── */
@@ -710,21 +733,36 @@
 }
 
 .wld-empty__title {
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
   font-family: var(--font-display);
+  letter-spacing: 0.5px;
 }
 
 .wld-empty__msg {
-  font-size: var(--text-sm);
+  font-size: 1rem;
   opacity: 0.7;
-  margin: 0 0 20px 0;
+  margin: 0 0 24px 0;
+  color: var(--text-muted);
+  line-height: 1.6;
 }
 
 .wld-empty__cta {
-  padding: 10px 24px;
+  padding: 12px 28px;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 8px rgba(176, 72, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.wld-empty__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(176, 72, 255, 0.4);
 }
 
 /* ── Skeleton Title Placement ────────────────────────────────────────────── */
@@ -792,19 +830,19 @@
 /* ── Responsive Styling overrides ────────────────────────────────────────── */
 @media (max-width: 992px) {
   .wld-banner {
-    height: 420px;
+    height: 380px;
   }
-  
+
   .wld-hero__left {
-    width: 170px;
+    width: 200px;
   }
-  
+
   .wld-poster-stack {
-    height: 240px;
+    height: 285px;
   }
-  
+
   .wld-poster-stack.empty {
-    height: 240px;
+    height: 285px;
   }
 }
 
@@ -822,13 +860,13 @@
 @media (max-width: 768px) {
   .wld-banner {
     height: auto;
-    min-height: 480px;
+    min-height: 420px;
   }
 
   .wld-banner__container {
     justify-content: flex-start;
-    gap: 30px;
-    padding-bottom: 30px;
+    gap: var(--space-8);
+    padding-bottom: var(--space-8);
   }
 
   .wld-hero {
@@ -836,19 +874,19 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 20px;
+    gap: var(--space-5);
   }
 
   .wld-hero__left {
-    width: 160px;
+    width: 180px;
   }
 
   .wld-poster-stack {
-    height: 228px;
+    height: 255px;
   }
 
   .wld-poster-stack.empty {
-    height: 228px;
+    height: 255px;
   }
 
   .wld-hero__right {
@@ -885,19 +923,19 @@
 
 @media (max-width: 480px) {
   .wld-banner {
-    min-height: 460px;
+    min-height: 420px;
   }
-  
+
   .wld-hero__left {
-    width: 130px;
+    width: 140px;
   }
-  
+
   .wld-poster-stack {
-    height: 185px;
+    height: 200px;
   }
 
   .wld-poster-stack.empty {
-    height: 185px;
+    height: 200px;
   }
   
   .wld-description {

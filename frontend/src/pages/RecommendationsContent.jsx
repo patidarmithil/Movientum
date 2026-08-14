@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { movieService } from '../services/movieService'
 import { searchService } from '../services/searchService'
 import MovieCard from '../components/MovieCard'
@@ -6,6 +6,7 @@ import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import FilterDropdown from '../components/FilterDropdown'
+import ShinyText from '../components/ShinyText'
 import '../pages/Explore.css'
 import './RecommendationsContent.css'
 import '../components/AddContentModal.css'
@@ -15,16 +16,10 @@ const MAX_BASKET_ITEMS = 10
 
 // --- Filter Constants ---
 const SORT_OPTIONS = [
-  { value: 'popularity',   label: 'Most Popular' },
-  { value: 'rating',       label: 'Top Rated' },
-  { value: 'release_date', label: 'Newest First' },
-  { value: 'title',        label: 'A – Z' },
-]
-
-const AGE_RATING_OPTIONS = [
-  { value: '', label: 'Any Age' },
-  { value: 'kids', label: 'Kids & Family (PG and below)' },
-  { value: 'teens', label: 'Teens (PG-13 and below)' },
+  { value: 'relevance', label: 'Best Match' },
+  { value: 'popularity', label: 'Most Popular' },
+  { value: 'rating',     label: 'Top Rated' },
+  { value: 'year',       label: 'Newest First' },
 ]
 
 const TYPE_OPTIONS = [
@@ -57,14 +52,9 @@ const COUNTRIES = [
   { code: 'FR', label: 'France' },
 ]
 
-const PROVIDERS = [
-  { id: '8', label: 'Netflix' },
-  { id: '119', label: 'Prime Video' },
-  { id: '122,337', label: 'Disney' },
-  { id: '1899', label: 'HBO' },
-  { id: '220', label: 'JioCinema' },
-  { id: '350', label: 'Apple TV+' },
-]
+// Providers/age-rating dropped (plans/dna.md §3.1) — content_catalog carries
+// neither watch-provider nor certification data, so those controls would be
+// dead weight the server can never honor.
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -93,7 +83,7 @@ function RangeSlider({ min, max, value, onChange, step = 1, label, format = (v) 
 }
 
 // --- Result Card (acm-panel style) ---
-function ResultCard({ item, isAdded, isLoading, onAdd }) {
+function ResultCard({ item, isAdded, isLoading, onAdd, onAddNeg }) {
   const poster = item.poster_path ? `${TMDB_IMAGE_BASE}/w342${item.poster_path}` : null
   const year   = item.release_year || (item.release_date ? item.release_date.slice(0, 4) : '')
 
@@ -125,6 +115,17 @@ function ResultCard({ item, isAdded, isLoading, onAdd }) {
             </svg>
           )}
         </button>
+        {onAddNeg && (
+          <button
+            className="acm-card__add-btn"
+            style={{ left: '6px', right: 'auto', background: 'rgba(255, 0, 128, 0.25)' }}
+            onClick={() => onAddNeg(item)}
+            title="Less like this"
+            aria-label="Add to less-like-this"
+          >
+            &minus;
+          </button>
+        )}
       </div>
       <div className="acm-card__info">
         <p className="acm-card__title">{item.title || item.name}</p>
@@ -137,7 +138,9 @@ function ResultCard({ item, isAdded, isLoading, onAdd }) {
 export default function RecommendationsContent() {
   // Basket state
   const [basket, setBasket] = useState([])
-  const [commonTraits, setCommonTraits] = useState({ genres: [] })
+  const [negBasket, setNegBasket] = useState([])          // "less like this" (§3.3)
+  const [ignoreTaste, setIgnoreTaste] = useState(false)    // personalization opt-out (§3.2)
+  const [dna, setDna] = useState(null)
 
   // Results state
   const [movies, setMovies] = useState([])
@@ -146,6 +149,13 @@ export default function RecommendationsContent() {
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
+
+  // Scroll loads 20 at a time up to a 200-item cap, then stops and asks
+  // before loading the next 200 (rather than auto-scrolling indefinitely).
+  const SCROLL_BATCH_CAP = 200
+  const [capLimit, setCapLimit] = useState(SCROLL_BATCH_CAP)
+  const cappedHasMore = hasMore && movies.length < capLimit
+  const capReached = hasMore && movies.length >= capLimit
 
   const isFetchingRef = useRef(false)
   const observerRef = useRef(null)
@@ -160,17 +170,17 @@ export default function RecommendationsContent() {
   const debounceRef = useRef(null)
   const abortRef    = useRef(null)
 
-  // ── Filter state ──────────────────────────────────────────
+  // ── Filter state (server-side, §3.1) ────────────────────────
   const [selectedGenres, setSelectedGenres] = useState([])
   const [selectedType, setSelectedType] = useState('')
   const [selectedCompanies, setSelectedCompanies] = useState([])
   const [selectedCountries, setSelectedCountries] = useState([])
-  const [selectedProviders, setSelectedProviders] = useState([])
   const [minRating,  setMinRating]  = useState(0)
   const [yearFrom,   setYearFrom]   = useState(1900)
   const [yearTo,     setYearTo]     = useState(CURRENT_YEAR)
-  const [sort,       setSort]       = useState('popularity')
-  const [ageRating,  setAgeRating]  = useState('')
+  const [sort,       setSort]       = useState('relevance')
+
+  const filterDebounceRef = useRef(null)
 
   // 1. Manage Basket
   const addToBasket = (item) => {
@@ -191,6 +201,35 @@ export default function RecommendationsContent() {
     setBasket(basket.filter(b => !(b.tmdb_id === id && b.media_type === type)))
   }
 
+  const addToNegBasket = (item) => {
+    const itemId = Number(item.id)
+    const mediaType = item.media_type || 'movie'
+    if (negBasket.length >= MAX_BASKET_ITEMS) return
+    if (negBasket.some(b => b.tmdb_id === itemId && b.media_type === mediaType)) return
+    setNegBasket([...negBasket, {
+      tmdb_id: itemId, media_type: mediaType,
+      title: item.title || item.name, poster_path: item.poster_path,
+    }])
+  }
+
+  const removeFromNegBasket = (id, type) => {
+    setNegBasket(negBasket.filter(b => !(b.tmdb_id === id && b.media_type === type)))
+  }
+
+  // Server-side filters payload — narrows the full ranked pool, not the
+  // 20 items on screen (§3.1).
+  const buildFilters = useCallback(() => ({
+    media_type: selectedType || null,
+    genres: selectedGenres,
+    languages: [],
+    countries: selectedCountries,
+    studios: selectedCompanies.map(Number),
+    year_from: yearFrom > 1900 ? yearFrom : null,
+    year_to: yearTo < CURRENT_YEAR ? yearTo : null,
+    min_rating: minRating,
+    sort,
+  }), [selectedType, selectedGenres, selectedCountries, selectedCompanies, yearFrom, yearTo, minRating, sort])
+
   // 2. Fetch Recommendations
   const fetchRecommendations = useCallback(async (p, isInitial = false) => {
     if (basket.length === 0) return
@@ -201,17 +240,22 @@ export default function RecommendationsContent() {
       setLoading(true)
       setError(null)
       setMovies([])
+      setCapLimit(SCROLL_BATCH_CAP)
     } else {
       setLoadingMore(true)
     }
 
     try {
-      const data = await movieService.getContentBasketRecommendations(basket, p)
+      const data = await movieService.getContentBasketRecommendations(basket, p, {
+        filters: buildFilters(),
+        negativeItems: negBasket,
+        ignoreTaste,
+      })
       const newMovies = data.movies || []
-      
+
       if (isInitial) {
         setMovies(newMovies)
-        setCommonTraits(data.common_traits || { genres: [] })
+        setDna(data.dna || null)
       } else {
         setMovies(prev => {
           const existing = new Set(prev.map(m => `${m.id}-${m.media_type}`))
@@ -219,7 +263,7 @@ export default function RecommendationsContent() {
           return [...prev, ...unique]
         })
       }
-      setHasMore(newMovies.length > 0 && p < (data.total_pages || 10000))
+      setHasMore(newMovies.length > 0 && p < (data.total_pages || 1))
     } catch (err) {
       if (isInitial) setError("Failed to fetch recommendations. Try adjusting your basket.")
     } finally {
@@ -227,7 +271,7 @@ export default function RecommendationsContent() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [basket])
+  }, [basket, negBasket, ignoreTaste, buildFilters])
 
   const handleFindSimilar = () => {
     setPage(1)
@@ -237,11 +281,24 @@ export default function RecommendationsContent() {
   useEffect(() => {
     if (basket.length === 0) {
       setMovies([])
-      setCommonTraits({ genres: [] })
+      setDna(null)
       setPage(1)
       setHasMore(false)
     }
   }, [basket.length])
+
+  // Filters/sort/negative-basket change: refetch page 1, debounced (house
+  // convention — 300ms) so a row of checkbox clicks doesn't fire N requests.
+  useEffect(() => {
+    if (basket.length === 0 || movies.length === 0) return
+    clearTimeout(filterDebounceRef.current)
+    filterDebounceRef.current = setTimeout(() => {
+      setPage(1)
+      fetchRecommendations(1, true)
+    }, 300)
+    return () => clearTimeout(filterDebounceRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType, selectedGenres, selectedCountries, selectedCompanies, yearFrom, yearTo, minRating, sort, negBasket, ignoreTaste])
 
   // Infinite Scroll Trigger
   useEffect(() => {
@@ -251,11 +308,11 @@ export default function RecommendationsContent() {
   }, [page, fetchRecommendations])
 
   useEffect(() => {
-    if (loading || loadingMore || !hasMore) return
+    if (loading || loadingMore || !cappedHasMore) return
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isFetchingRef.current && hasMore) {
+        if (entries[0].isIntersecting && !isFetchingRef.current && cappedHasMore) {
           setPage(p => p + 1)
         }
       },
@@ -272,7 +329,12 @@ export default function RecommendationsContent() {
         observer.unobserve(currentTrigger)
       }
     }
-  }, [loading, loadingMore, hasMore])
+  }, [loading, loadingMore, cappedHasMore])
+
+  const loadNextBatch = () => {
+    setCapLimit(c => c + SCROLL_BATCH_CAP)
+    setPage(p => p + 1)
+  }
 
   // ACM Search Logic
   const handleQueryChange = useCallback((e) => {
@@ -313,11 +375,6 @@ export default function RecommendationsContent() {
   const showEmpty = !searching && !searchError && query.trim().length >= 2 && results.length === 0
 
   // 3. Filter Actions & Logic
-  const toggleGenre = (g) =>
-    setSelectedGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
-    )
-
   const toggleCompany = (c) =>
     setSelectedCompanies((prev) =>
       prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
@@ -328,97 +385,50 @@ export default function RecommendationsContent() {
       prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
     )
 
-  const toggleProvider = (p) =>
-    setSelectedProviders((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-    )
-
   const clearAll = () => {
     setSelectedGenres([])
     setSelectedCompanies([])
     setSelectedCountries([])
-    setSelectedProviders([])
     setMinRating(0)
     setYearFrom(1900)
     setYearTo(CURRENT_YEAR)
-    setSort('popularity')
+    setSort('relevance')
     setSelectedType('')
-    setAgeRating('')
   }
 
   const hasFilters =
     selectedGenres.length > 0 ||
     selectedCompanies.length > 0 ||
     selectedCountries.length > 0 ||
-    selectedProviders.length > 0 ||
     minRating > 0 ||
     yearFrom > 1900 ||
     yearTo < CURRENT_YEAR ||
-    sort !== 'popularity' ||
-    selectedType !== '' ||
-    ageRating !== ''
+    sort !== 'relevance' ||
+    selectedType !== ''
 
-  const filteredMovies = useMemo(() => {
-    let result = [...movies]
-    
-    // Apply local filters since API does not support them currently for recommendations
-    if (selectedType) {
-      result = result.filter(m => m.media_type === selectedType)
-    }
-    if (minRating > 0) {
-      result = result.filter(m => (m.vote_average || 0) >= minRating)
-    }
-    if (yearFrom > 1900 || yearTo < CURRENT_YEAR) {
-      result = result.filter(m => {
-        const dateStr = m.release_date || m.first_air_date
-        if (!dateStr) return false
-        const y = parseInt(dateStr.substring(0, 4), 10)
-        return y >= yearFrom && y <= yearTo
-      })
-    }
-    if (selectedGenres.length > 0) {
-      result = result.filter(m => {
-        if (!m.genre_ids) return false
-        return true 
-      })
-    }
-    
-    // Apply sort
-    result.sort((a, b) => {
-      if (sort === 'rating') return (b.vote_average || 0) - (a.vote_average || 0)
-      if (sort === 'release_date') {
-        const aDate = new Date(a.release_date || a.first_air_date || '1900-01-01').getTime()
-        const bDate = new Date(b.release_date || b.first_air_date || '1900-01-01').getTime()
-        return bDate - aDate
-      }
-      if (sort === 'title') {
-        const aTitle = a.title || a.name || ''
-        const bTitle = b.title || b.name || ''
-        return aTitle.localeCompare(bTitle)
-      }
-      return (b.popularity || 0) - (a.popularity || 0)
-    })
-    
-    return result
-  }, [movies, selectedType, minRating, yearFrom, yearTo, selectedGenres, sort])
+  // Server already returns the filtered/sorted/paginated pool (§3.1) — no
+  // client-side re-filtering.
+  const filteredMovies = movies
 
   return (
-    <main className="explore-page page-content">
-      <div className="explore-aurora-bg" aria-hidden="true">
+    <main className="reccontent-page page-content">
+      <div className="reccontent-aurora-bg" aria-hidden="true">
         <Aurora
-          colorStops={["#00C2FF", "#7B2FBE", "#FF0080"]}
-          blend={0.5}
-          amplitude={1.0}
-          speed={0.7}
+          colorStops={['#00D4FF', '#FF006E', '#6A00D4']}
+          blend={0.6}
+          amplitude={1.2}
+          speed={0.8}
         />
-        <div className="explore-aurora-overlay" />
+        <div className="reccontent-aurora-overlay" />
       </div>
 
-      <div className="explore-page__inner" style={{ paddingTop: '60px' }}>
-        <header className="explore-header-section" style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 className="explore-hero-title">Content DNA</h1>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '16px', marginTop: '8px' }}>
-            Mix movies and TV shows to discover unique recommendations
+      <div className="reccontent-page__inner">
+        <header className="reccontent-header-section">
+          <h1 className="reccontent-hero-title">
+            <ShinyText text="Content DNA" />
+          </h1>
+          <p className="reccontent-hero-subtitle">
+            Mix movies and shows to uncover recommendations unique to your taste
           </p>
         </header>
 
@@ -469,6 +479,7 @@ export default function RecommendationsContent() {
                           isAdded={basket.some(b => b.tmdb_id === Number(item.id) && b.media_type === (item.media_type || 'movie'))}
                           isLoading={false}
                           onAdd={addToBasket}
+                          onAddNeg={addToNegBasket}
                         />
                       ))}
                     </div>
@@ -508,93 +519,84 @@ export default function RecommendationsContent() {
             })}
           </div>
 
-          {basket.length > 0 && (
-            <button 
-              className="reccontent-find-btn"
-              onClick={handleFindSimilar}
-              disabled={loading || basket.length === 0}
-            >
-              {loading ? 'Analyzing DNA...' : `Find Content Similar to these ${basket.length} ${basket.length === 1 ? 'item' : 'items'}`}
-            </button>
+          {negBasket.length > 0 && (
+            <div className="reccontent-basket" style={{ marginTop: '12px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', alignSelf: 'center', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Less like:</span>
+              {negBasket.map((b) => {
+                const posterUrl = b.poster_path ? `${TMDB_IMAGE_BASE}/w92${b.poster_path}` : null
+                return (
+                  <div key={`neg-${b.tmdb_id}-${b.media_type}`} className="reccontent-chip" style={{ borderColor: 'rgba(255, 0, 128, 0.3)', background: 'rgba(255, 0, 128, 0.08)' }}>
+                    {posterUrl ? (
+                      <img src={posterUrl} alt="" className="reccontent-chip-poster" style={{ filter: 'grayscale(1)', opacity: 0.7 }} />
+                    ) : (
+                      <div className="reccontent-chip-poster" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                    )}
+                    <span className="reccontent-chip-title">{b.title}</span>
+                    <button
+                      className="reccontent-chip-remove"
+                      onClick={() => removeFromNegBasket(b.tmdb_id, b.media_type)}
+                      aria-label="Remove item"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           )}
 
-          {commonTraits && movies.length > 0 && (
-            <div className="reccontent-traits-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '16px' }}>
-              <span className="reccontent-traits-label" style={{ fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginRight: '8px' }}>Shared DNA:</span>
-              {(commonTraits.genres || []).map(g => (
-                <span key={g} className="reccontent-trait-tag">{g}</span>
-              ))}
-              {(commonTraits.languages || []).map(lang => (
-                <span key={lang} className="reccontent-trait-tag" style={{ background: 'rgba(123, 47, 190, 0.2)', border: '1px solid rgba(123, 47, 190, 0.5)', color: '#c084fc' }}>{lang}</span>
-              ))}
-              {commonTraits.era && (
-                <span className="reccontent-trait-tag" style={{ background: 'rgba(255, 165, 0, 0.1)', border: '1px solid rgba(255, 165, 0, 0.4)', color: '#ffb74d' }}>{commonTraits.era}</span>
-              )}
-              {commonTraits.basket_type && commonTraits.basket_type !== 'mixed' && (
-                <span className="reccontent-trait-tag" style={{ background: 'rgba(255, 0, 128, 0.15)', border: '1px solid rgba(255, 0, 128, 0.4)', color: '#FF0080', fontWeight: 'bold' }}>
-                  [{commonTraits.basket_type.toUpperCase()}]
-                </span>
-              )}
+          {basket.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '8px' }}>
+              <button
+                className="reccontent-find-btn"
+                onClick={handleFindSimilar}
+                disabled={loading || basket.length === 0}
+              >
+                {loading ? 'Analyzing DNA...' : `Find Content Similar to these ${basket.length} ${basket.length === 1 ? 'item' : 'items'}`}
+              </button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontWeight: 500 }}>
+                <input type="checkbox" checked={ignoreTaste} onChange={(e) => setIgnoreTaste(e.target.checked)} style={{ cursor: 'pointer' }} />
+                Ignore my taste
+              </label>
+            </div>
+          )}
+
+          {dna && movies.length > 0 && (
+            <div className="reccontent-dna-section">
+              <div className="reccontent-dna-fingerprint">
+                <div className="dna-content">
+                  <div className="dna-header">
+                    <span className="dna-precision-label">
+                      {dna.precision === 'high' ? '🧬 High precision match'
+                        : dna.precision === 'medium' ? `🧬 Add ${Math.max(0, 4 - basket.length)} more to sharpen results`
+                        : '🧬 Add more titles to sharpen results'}
+                    </span>
+                    <div className="dna-traits">
+                      {dna.language?.label && (
+                        <span className="dna-trait dna-trait--language">
+                          {dna.language.label} <span className="dna-trait-purity">{Math.round((dna.language.purity || 0) * 100)}%</span>
+                        </span>
+                      )}
+                      {dna.media_type?.value && (
+                        <span className="dna-trait dna-trait--media">
+                          {dna.media_type.value === 'tv' ? 'TV' : 'Movies'} <span className="dna-trait-purity">{Math.round((dna.media_type.purity || 0) * 100)}%</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="dna-tags">
+                    {(dna.keywords || []).map(k => (
+                      <span key={`kw-${k.id}`} className="dna-tag dna-tag--keyword" style={{ opacity: 0.5 + Math.min(k.weight, 1) * 0.5 }}>{k.label}</span>
+                    ))}
+                    {(dna.genres || []).map(g => (
+                      <span key={`g-${g.id}`} className="dna-tag dna-tag--genre">{g.label}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </section>
-
-        <div style={{
-          background: 'rgba(255, 165, 0, 0.1)',
-          border: '1px solid rgba(255, 165, 0, 0.3)',
-          borderRadius: '8px',
-          padding: '12px 16px',
-          margin: '0 auto 24px auto',
-          maxWidth: '600px',
-          color: '#ffb74d',
-          textAlign: 'center',
-          fontSize: '14px',
-          fontWeight: '500'
-        }}>
-          🚧 Work in Progress: We're upgrading this page currently and upgrading its system to give more enhanced results till then you can try with our current system!
-        </div>
-
-        {/* DNA Graph Preview Animation */}
-        <div style={{
-          maxWidth: '800px',
-          margin: '0 auto 32px auto',
-          background: 'rgba(18, 18, 18, 0.6)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-          borderRadius: '16px',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '24px'
-        }}>
-          <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.7)' }}>
-            <strong>How it works:</strong> Our AI extracts content DNA (Genres, Keywords, Cast) to build a relational graph.
-          </div>
-          <div style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
-            {/* Mock Node 1 */}
-            <div style={{
-              width: '100px', height: '140px', background: 'var(--surface-card)',
-              borderRadius: '8px', border: '1px solid rgba(0, 194, 255, 0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 15px rgba(0, 194, 255, 0.2)', fontSize: '32px'
-            }}>🎬</div>
-            {/* Edges */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: '#00C2FF', fontSize: '12px', fontWeight: 'bold' }}>
-              <span style={{ borderBottom: '2px dashed rgba(0, 194, 255, 0.4)', paddingBottom: '4px' }}>Shared Genre ↔</span>
-              <span style={{ borderBottom: '2px dashed rgba(123, 47, 190, 0.4)', paddingBottom: '4px', color: '#c084fc' }}>Same Director ↔</span>
-              <span style={{ borderBottom: '2px dashed rgba(255, 0, 128, 0.4)', paddingBottom: '4px', color: '#FF0080' }}>Shared Vibe ↔</span>
-            </div>
-            {/* Mock Node 2 */}
-            <div style={{
-              width: '100px', height: '140px', background: 'var(--surface-card)',
-              borderRadius: '8px', border: '1px solid rgba(255, 0, 128, 0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 15px rgba(255, 0, 128, 0.2)', fontSize: '32px'
-            }}>📺</div>
-          </div>
-        </div>
-
-
 
         {/* --- Explore Page Filter Section (shown after results come) --- */}
         {movies.length > 0 && (
@@ -614,8 +616,8 @@ export default function RecommendationsContent() {
               </div>
 
               <FilterDropdown
-                label={`Sort: ${SORT_OPTIONS.find(o => o.value === sort)?.label || 'Most Popular'}`}
-                active={sort !== 'popularity'}
+                label={`Sort: ${SORT_OPTIONS.find(o => o.value === sort)?.label || 'Best Match'}`}
+                active={sort !== 'relevance'}
               >
                 <div className="filter-dropdown__menu-list">
                   {SORT_OPTIONS.map((o) => (
@@ -721,66 +723,22 @@ export default function RecommendationsContent() {
               </FilterDropdown>
 
               <FilterDropdown
-                label={`Age Rating: ${AGE_RATING_OPTIONS.find(o => o.value === ageRating)?.label || 'Any Age'}`}
-                active={ageRating !== ''}
+                label={selectedCompanies.length > 0 ? `Studios (${selectedCompanies.length})` : 'Studios'}
+                active={selectedCompanies.length > 0}
               >
-                <div className="filter-dropdown__menu-list">
-                  {AGE_RATING_OPTIONS.map((o) => (
-                    <label key={o.value} className={`filter-dropdown__menu-item ${ageRating === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="age-rating-option"
-                        className="filter-dropdown__radio"
-                        checked={ageRating === o.value}
-                        onChange={() => setAgeRating(o.value)}
-                      />
-                      <span>{o.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </FilterDropdown>
-
-              <FilterDropdown
-                label={
-                  (selectedCompanies.length + selectedProviders.length) > 0 
-                    ? `More (${selectedCompanies.length + selectedProviders.length})` 
-                    : 'More'
-                }
-                active={(selectedCompanies.length + selectedProviders.length) > 0}
-              >
-                <div className="filter-dropdown__custom-container filter-dropdown__custom-container--scrollable" style={{ minWidth: '280px', maxHeight: '380px', overflowY: 'auto', gap: '16px' }}>
-                  <div>
-                    <span className="filter-section-header">Production Houses</span>
-                    <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                      {COMPANIES.map((c) => (
-                        <label key={c.id} className={`filter-dropdown__menu-item ${selectedCompanies.includes(c.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                          <input
-                            type="checkbox"
-                            className="filter-dropdown__checkbox"
-                            checked={selectedCompanies.includes(c.id)}
-                            onChange={() => toggleCompany(c.id)}
-                          />
-                          <span>{c.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="filter-section-header">OTT Platforms</span>
-                    <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                      {PROVIDERS.map((p) => (
-                        <label key={p.id} className={`filter-dropdown__menu-item ${selectedProviders.includes(p.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                          <input
-                            type="checkbox"
-                            className="filter-dropdown__checkbox"
-                            checked={selectedProviders.includes(p.id)}
-                            onChange={() => toggleProvider(p.id)}
-                          />
-                          <span>{p.label}</span>
-                        </label>
-                      ))}
-                    </div>
+                <div className="filter-dropdown__custom-container filter-dropdown__custom-container--scrollable" style={{ minWidth: '240px', maxHeight: '380px', overflowY: 'auto' }}>
+                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {COMPANIES.map((c) => (
+                      <label key={c.id} className={`filter-dropdown__menu-item ${selectedCompanies.includes(c.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
+                        <input
+                          type="checkbox"
+                          className="filter-dropdown__checkbox"
+                          checked={selectedCompanies.includes(c.id)}
+                          onChange={() => toggleCompany(c.id)}
+                        />
+                        <span>{c.label}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </FilterDropdown>
@@ -815,7 +773,18 @@ export default function RecommendationsContent() {
               {loadingMore && <MovieCardSkeleton count={5} />}
             </StaggerContainer>
 
-            <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
+            {cappedHasMore && <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />}
+
+            {!loading && !loadingMore && capReached && (
+              <div style={{ textAlign: 'center', margin: '30px 0 20px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '12px' }}>
+                  Showing {movies.length} results. Keep going?
+                </p>
+                <button className="reccontent-find-btn" onClick={loadNextBatch}>
+                  Load 200 more
+                </button>
+              </div>
+            )}
 
             {!loading && !loadingMore && !hasMore && (
               <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
