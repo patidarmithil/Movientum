@@ -1286,6 +1286,18 @@ export default function Navbar() {
       {/* ── Mobile bottom tab bar (fast nav, portalled to document.body) ── */}
       {createPortal(
         <nav className="navbar__mobile-tabbar" aria-label="Quick navigation">
+          {/* Order is fixed: Home, Explore, News, DNA, Recommendations, then
+              Dashboard when signed in. Tab bars are learned by position, so the
+              sequence stays the same regardless of the current route. */}
+          <NavLink
+            to="/home"
+            className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
+            aria-label="Home"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+            </svg>
+          </NavLink>
           <NavLink
             to="/explore"
             className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
@@ -1331,39 +1343,17 @@ export default function Navbar() {
             </svg>
           </NavLink>
           {isLoggedIn ? (
-            <>
-              <NavLink
-                to="/analysis"
-                className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
-                aria-label="Analysis"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="3" y1="22" x2="21" y2="22"></line>
-                  <line x1="4" y1="22" x2="4" y2="16"></line>
-                  <line x1="8" y1="22" x2="8" y2="12"></line>
-                  <line x1="12" y1="22" x2="12" y2="9"></line>
-                  <line x1="16" y1="22" x2="16" y2="11"></line>
-                  <line x1="20" y1="22" x2="20" y2="5"></line>
-                  <path d="M4 12l4-4 4-3 4 3.5 4-5.5"></path>
-                  <circle cx="4" cy="12" r="1.2" fill="currentColor"></circle>
-                  <circle cx="8" cy="8" r="1.2" fill="currentColor"></circle>
-                  <circle cx="12" cy="5" r="1.2" fill="currentColor"></circle>
-                  <circle cx="16" cy="8.5" r="1.2" fill="currentColor"></circle>
-                  <circle cx="20" cy="3" r="1.2" fill="currentColor"></circle>
-                </svg>
-              </NavLink>
-              <NavLink
-                to="/dashboard"
-                className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
-                aria-label="Dashboard"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="20" x2="18" y2="10"></line>
-                  <line x1="12" y1="20" x2="12" y2="4"></line>
-                  <line x1="6" y1="20" x2="6" y2="14"></line>
-                </svg>
-              </NavLink>
-            </>
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
+              aria-label="Dashboard"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+              </svg>
+            </NavLink>
           ) : (
             <>
               <NavLink
