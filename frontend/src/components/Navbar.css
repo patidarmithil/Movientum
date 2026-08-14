@@ -703,6 +703,10 @@
 }
 
 @media (max-width: 768px) {
+  /* A single frosted capsule floating over the page, in the same material as the
+     navbar and the intro page. The radius is a full pill rather than a rounded
+     rectangle: at this height the bar reads as one object, and the pill shape is
+     what separates it from the content scrolling underneath it. */
   .navbar__mobile-tabbar {
     display: flex;
     align-items: center;
@@ -711,26 +715,76 @@
     left: 10px;
     right: 10px;
     bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    height: 56px;
-    background: rgba(20, 20, 30, 0.55);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
+    height: 60px;
+    /* Inner padding keeps the active pill from touching the bar's own edge — the
+       gap is what makes the highlight read as sitting inside the glass. */
+    padding: 6px;
+    box-sizing: border-box;
+    /* The glass tint (--glass-bg, ~5% white) sits on a dark base rather than
+       alone: this bar floats over posters and artwork, and without the base the
+       icons lose contrast wherever a bright still scrolls under it. The base
+       also keeps the bar readable where backdrop-filter is unsupported. */
+    background:
+      linear-gradient(var(--glass-bg), var(--glass-bg)),
+      rgba(14, 14, 16, 0.62);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.45),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      0 10px 36px rgba(0, 0, 0, 0.5),
+      /* Top hairline + bottom shade: the pair is what gives flat translucency the
+         thickness of a real pane rather than a printed rectangle. */
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35);
     z-index: 1500;
+    /* Slides up out of the safe area on first paint so the bar arrives rather
+       than being simply present. */
+    animation: tabbarRise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes tabbarRise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   .navbar__mobile-tab {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     flex: 1;
     height: 100%;
+    border-radius: 999px;
     color: var(--text-muted);
-    transition: color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      color 220ms ease,
+      transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  /* The selected pill is a pseudo-element so it can scale in from the icon's
+     centre instead of popping. It sits behind the icon; the tab itself keeps no
+     background of its own. */
+  .navbar__mobile-tab::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    opacity: 0;
+    transform: scale(0.72);
+    transition:
+      opacity 240ms ease,
+      transform 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
+    pointer-events: none;
+  }
+
+  .navbar__mobile-tab--active::before {
+    opacity: 1;
+    transform: scale(1);
   }
 
   .navbar__mobile-tab:hover,
@@ -738,8 +792,38 @@
     color: var(--text-primary);
   }
 
+  /* Touch feedback: the whole tab dips, and the pill dips slightly further, so
+     the press lands on the glass rather than on the icon. */
+  .navbar__mobile-tab:active {
+    transform: scale(0.9);
+  }
+
+  .navbar__mobile-tab svg {
+    position: relative;
+    transition: transform 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  .navbar__mobile-tab--active svg {
+    transform: scale(1.08);
+  }
+
+  .navbar__mobile-tab:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.85);
+    outline-offset: -2px;
+  }
+
   body {
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .navbar__mobile-tabbar { animation: none; }
+    .navbar__mobile-tab,
+    .navbar__mobile-tab::before,
+    .navbar__mobile-tab svg {
+      transition-duration: 1ms;
+    }
+    .navbar__mobile-tab:active { transform: none; }
   }
 }
 
@@ -1009,3 +1093,67 @@
 }
 
 
+
+/* ── Landing-route action buttons (/intro, /about, signed-out /) ── */
+
+/* Replaces the per-button inline margins these used to carry. */
+.navbar__intro-btn {
+  margin-right: 8px;
+}
+
+.navbar__intro-btn svg {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* Login and Sign Up appear here only on narrow screens — on desktop the same
+   two actions render as labelled buttons in .navbar__auth-desktop-buttons. */
+.navbar__intro-btn--mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Icon-only on mobile. Five labelled pills do not fit on a 360px bar, and
+     truncating them reads worse than dropping the words: each action keeps its
+     accessible name through aria-label, so nothing is lost to screen readers. */
+  /* Five circles plus the logo and the hamburger only clear a 360px bar if the
+     spacing is tightened and the wordmark drops to the mark alone. */
+  .navbar--intro .navbar__right-group {
+    gap: 4px;
+  }
+
+  .navbar--intro .navbar__logo-text,
+  .navbar--intro .navbar__logo-beta {
+    display: none;
+  }
+
+  .navbar--intro .navbar__intro-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    margin-right: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .navbar--intro .navbar__intro-btn svg {
+    margin-right: 0;
+  }
+
+  .navbar--intro .navbar__intro-btn span {
+    display: none;
+  }
+
+  .navbar--intro .navbar__intro-btn--mobile-only {
+    display: inline-flex;
+  }
+
+  /* The guest avatar dropdown exists to reach Login and Sign Up. Those are now
+     first-class buttons on this route, so the dropdown is redundant here. */
+  .navbar--intro .navbar__user--mobile-only {
+    display: none;
+  }
+}

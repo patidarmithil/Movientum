@@ -393,13 +393,22 @@ export default function Navbar() {
     ? (user.username || user.name || user.email || '?').charAt(0).toUpperCase()
     : '?'
 
+  // The landing routes swap the whole right-hand group for a marketing set
+  // (docs, source, guest/login/sign-up). Hoisted out of the JSX because the
+  // <nav> needs it as a class too — the mobile icon-only treatment is scoped to
+  // these routes and nowhere else.
+  const isIntroRoute =
+    location.pathname === '/intro' ||
+    location.pathname === '/about' ||
+    (location.pathname === '/' && !isLoggedIn)
+
   const avatarUrl = user?.avatar_url
     ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar_url}`)
     : null
 
   return (
     <nav
-      className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}
+      className={`navbar ${scrolled ? 'navbar--scrolled' : ''}${isIntroRoute ? ' navbar--intro' : ''}`}
       role="navigation"
       aria-label="Main navigation"
     >
@@ -425,27 +434,67 @@ export default function Navbar() {
         {/* ── Right-Aligned Navigation Icons Group ── */}
         <div className="navbar__right-group">
           
-          {(location.pathname === '/intro' || location.pathname === '/about' || (location.pathname === '/' && !isLoggedIn)) ? (
+          {isIntroRoute ? (
             <>
-              <a href="https://drive.google.com/file/d/1PcqTQEhuijVDgiO9vu-e9unlm5KCt1qx/view?usp=sharing" target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm" style={{ marginRight: '8px' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              {/* Labels are wrapped so the mobile rules can drop the text and
+                  leave a row of round icon buttons — at 360px the five actions
+                  below do not fit as labelled pills. */}
+              <a href="https://drive.google.com/file/d/1PcqTQEhuijVDgiO9vu-e9unlm5KCt1qx/view?usp=sharing" target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm navbar__intro-btn" aria-label="Documentation">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
                   <line x1="16" y1="13" x2="8" y2="13"></line>
                   <line x1="16" y1="17" x2="8" y2="17"></line>
                   <polyline points="10 9 9 9 8 9"></polyline>
                 </svg>
-                Documentation
+                <span>Documentation</span>
               </a>
-              <a href="https://github.com/patidarmithil/Movientum" target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm" style={{ marginRight: '8px' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              <a href="https://github.com/patidarmithil/Movientum" target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm navbar__intro-btn" aria-label="Source code">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
                 </svg>
-                Source Code
+                <span>Source Code</span>
               </a>
-              <Link to="/home" className="btn btn--secondary btn--sm" style={{ marginRight: '8px' }}>
-                {isLoggedIn ? 'Home Page' : 'Use as Guest'}
+              <Link to="/home" className="btn btn--secondary btn--sm navbar__intro-btn" aria-label={isLoggedIn ? 'Home page' : 'Continue as guest'}>
+                {isLoggedIn ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+                  </svg>
+                ) : (
+                  /* Guest: a person outline with no fill — the same figure the
+                     signed-in avatar occupies, deliberately left empty. */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                )}
+                <span>{isLoggedIn ? 'Home Page' : 'Use as Guest'}</span>
               </Link>
+
+              {/* Login and Sign Up are icon-only and mobile-only here: on wider
+                  screens the same two actions already render as labelled buttons
+                  in .navbar__auth-desktop-buttons below. */}
+              {!isLoggedIn && (
+                <>
+                  <Link to="/login" className="btn btn--ghost btn--sm navbar__intro-btn navbar__intro-btn--mobile-only" aria-label="Login">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <polyline points="10 17 15 12 10 7" />
+                      <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                    <span>Login</span>
+                  </Link>
+                  <Link to="/signup" className="btn btn--primary btn--sm navbar__intro-btn navbar__intro-btn--mobile-only" aria-label="Sign up">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="8.5" cy="7" r="4" />
+                      <line x1="20" y1="8" x2="20" y2="14" />
+                      <line x1="23" y1="11" x2="17" y2="11" />
+                    </svg>
+                    <span>Sign Up</span>
+                  </Link>
+                </>
+              )}
             </>
           ) : (
             <>
