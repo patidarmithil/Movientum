@@ -13,6 +13,7 @@
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { pageService } from '../services/pageService'
+import { movieService } from '../services/movieService'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
 import { watchingTrackerService } from '../services/watchingTrackerService'
@@ -27,6 +28,7 @@ import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import ProductionTags from '../components/ProductionTags'
 import { pageCache } from '../utils/pageCache'
+import { resolveOttLink } from '../utils/ottLinks'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import { tempTrackerService } from '../services/tempTrackerService'
@@ -34,6 +36,7 @@ import { fireBurst } from '../utils/burstEffect'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
 import AIRecommendations from '../components/AIRecommendations'
+import LazyMount from '../components/LazyMount'
 import './MovieDetail.css'   // reuse same layout CSS
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -317,6 +320,7 @@ export default function TVDetail() {
   const [similarLoading, setSimilarLoading] = useState(!cachedData?.similar)
   // Credits come down inside the page bundle and are handed to <CastCrew>.
   const [credits, setCredits] = useState(cachedData?.credits || null)
+  const [providers, setProviders] = useState(cachedData?.providers || null)
 
   const [watchStatus,   setWatchStatus]   = useState(cachedData?.watchStatus || { watched: false, watchlisted: false })
   const [trackingStatus, setTrackingStatus] = useState(cachedData?.trackingStatus || false)
@@ -371,13 +375,19 @@ export default function TVDetail() {
         if (cancelled) return
 
         const detail = data?.detail || null
-        const sim = data?.similar?.movies || []
         const creditsData = data?.credits || null
+
+        // `similar: null` means the backend had no cached similar items and
+        // declined to block the page while it recomputed them. The row stays in
+        // its skeleton and is fetched separately below.
+        const similarPending = data?.similar == null
+        const sim = data?.similar?.movies || []
 
         if (detail) setShow(detail)
         setVideosData(data?.videos || null)
         setCredits(creditsData)
-        setSimilar(sim)
+        setProviders(data?.providers?.available ? data.providers : null)
+        if (!similarPending) setSimilar(sim)
 
         if (data?.watch_status) setWatchStatus(data.watch_status)
         if (data?.collections) {
@@ -395,21 +405,36 @@ export default function TVDetail() {
           show: detail,
           videosData: data?.videos || null,
           credits: creditsData,
-          similar: sim,
+          providers: data?.providers?.available ? data.providers : null,
+          ...(similarPending ? {} : { similar: sim }),
           watchStatus: data?.watch_status || undefined,
           trackingStatus: data?.tracker
             ? Boolean(data.tracker.tracked || data.tracker.in_temp_tracker)
             : undefined,
         })
+
+        setLoading(false)
+
+        if (!similarPending) {
+          setSimilarLoading(false)
+          return
+        }
+
+        movieService.getSimilar(tvId, 'tv')
+          .then((res) => {
+            if (cancelled) return
+            const rows = res?.movies || []
+            setSimilar(rows)
+            pageCache.set(cacheKey, { ...(pageCache.get(cacheKey) || {}), similar: rows })
+          })
+          .catch(() => { if (!cancelled) setSimilar([]) })
+          .finally(() => { if (!cancelled) setSimilarLoading(false) })
       })
       .catch(() => {
         if (cancelled) return
         if (!show || !show.overview) setError('Failed to load TV show')
         setSimilar([])
         setCredits({ cast: [], crew: [] })
-      })
-      .finally(() => {
-        if (cancelled) return
         setLoading(false)
         setSimilarLoading(false)
       })
@@ -691,7 +716,7 @@ export default function TVDetail() {
           </div>
 
           {/* Info column */}
-          <div className="movie-detail__info animate-fade-lift">
+          <div className="movie-detail__info-col animate-fade-lift">
             {/* Title */}
             <h1 className="movie-detail__title">{show.title}</h1>
 
@@ -787,7 +812,7 @@ export default function TVDetail() {
                 <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: 4 }} />
               </div>
             ) : show.overview && (
-              <>
+              <div className="movie-detail__overview-block">
                 <p className={`movie-detail__overview ${!overviewExpanded && show.overview.length > 260 ? 'movie-detail__overview--clamped' : ''}`}>
                   {show.overview}
                 </p>
@@ -800,7 +825,7 @@ export default function TVDetail() {
                     {overviewExpanded ? 'Show Less' : 'Read More'}
                   </button>
                 )}
-              </>
+              </div>
             )}
 
             {/* Actions */}
@@ -873,6 +898,53 @@ export default function TVDetail() {
                 </>
               )}
             </div>
+
+            {/* Where to Watch (OTT) */}
+            {providers && providers.providers.length > 0 && (
+              <div className="movie-detail__ott">
+                <div className="movie-detail__ott-header">
+                  <h4>Watch Online</h4>
+                </div>
+                <div className="movie-detail__ott-list">
+                  {providers.providers.map((p) => {
+                    // Same resolution as the movie page: the platform's own
+                    // search with this show's title, TMDB link as the fallback.
+                    const showTitle = show.name || show.title
+                    const { url, direct } = resolveOttLink(p, {
+                      title: showTitle,
+                      year: show.release_year || (show.first_air_date || '').slice(0, 4),
+                      region: providers.region,
+                      mediaType: 'tv',
+                      fallback: providers.link,
+                    })
+                    return (
+                    <a
+                      key={p.id}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="movie-detail__ott-row"
+                      aria-label={
+                        direct
+                          ? `Find ${showTitle} on ${p.name} (opens in a new tab)`
+                          : `Where to watch ${showTitle} (opens in a new tab)`
+                      }
+                    >
+                      <img className="movie-detail__ott-logo" src={p.logo_path} alt="" loading="lazy" />
+                      <span className="movie-detail__ott-meta">
+                        <span className="movie-detail__ott-name">{p.name}</span>
+                        <span className="movie-detail__ott-category">{p.category}</span>
+                      </span>
+                      <svg className="movie-detail__ott-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="7" y1="17" x2="17" y2="7"></line>
+                        <polyline points="7 7 17 7 17 17"></polyline>
+                      </svg>
+                    </a>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Toast */}
             {watchMsg && (
@@ -960,7 +1032,10 @@ export default function TVDetail() {
         {credits && <CastCrew movieId={tvId} isTV credits={credits} />}
 
         {/* ── In The News ── */}
-        <NewsArticlesSection itemId={tvId} mediaType="tv" />
+        {/* Deferred: fetches its own feed on mount, well below the fold. */}
+        <LazyMount minHeight={160}>
+          <NewsArticlesSection itemId={tvId} mediaType="tv" />
+        </LazyMount>
 
         {/* ── Production Companies & Countries ── */}
         <ProductionTags
@@ -984,13 +1059,15 @@ export default function TVDetail() {
 
         {/* ── AI Recommendations ── */}
         {show && (
-          <div className="movie-detail__ai-recs">
-            <AIRecommendations
-              seedTmdbId={show.id}
-              seedMediaType="tv"
-              seedTitle={show.title}
-            />
-          </div>
+          <LazyMount minHeight={200}>
+            <div className="movie-detail__ai-recs">
+              <AIRecommendations
+                seedTmdbId={show.id}
+                seedMediaType="tv"
+                seedTitle={show.title}
+              />
+            </div>
+          </LazyMount>
         )}
       </div>
 

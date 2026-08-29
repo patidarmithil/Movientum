@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import BorderGlow from './BorderGlow'
+import { observeOnce } from '../utils/sharedObserver'
 import './MovieCard.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -36,12 +37,7 @@ export default function TrailerCard({ item, onPlayTrailer }) {
     if (!parentEl) return
     const targetEl = parentEl.querySelector('.movie-card')
     if (!targetEl) return
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); obs.disconnect() } },
-      { threshold: 0.1, rootMargin: '0px 0px 100px 0px' }
-    )
-    obs.observe(targetEl)
-    return () => obs.disconnect()
+    return observeOnce(targetEl, () => setIsVisible(true))
   }, [])
 
   const handleClick = useCallback(() => onPlayTrailer(item), [item, onPlayTrailer])
@@ -68,7 +64,10 @@ export default function TrailerCard({ item, onPlayTrailer }) {
               src={posterUrl}
               alt={`${item.title} poster`}
               className={`movie-card__poster poster-progressive ${imageLoaded ? 'poster-progressive--loaded' : ''}`}
+              width={342}
+              height={513}
               loading="lazy"
+              decoding="async"
               onLoad={() => setImageLoaded(true)}
               onError={() => setHasError(true)}
             />

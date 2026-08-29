@@ -262,6 +262,11 @@
   font-weight: 600;
 }
 
+.movie-detail__overview-block {
+  display: flex;
+  flex-direction: column;
+}
+
 .movie-detail__overview {
   font-size: var(--text-base);
   color: rgba(255, 255, 255, 0.75);
@@ -315,6 +320,99 @@
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.4);
   color: #10B981;
+}
+
+/* ── Where to Watch (OTT) ── */
+.movie-detail__ott {
+  margin-top: var(--space-5, 20px);
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.movie-detail__ott-header {
+  padding: 14px 16px 10px;
+}
+
+.movie-detail__ott-header h4 {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 700;
+  color: var(--text-primary, #fff);
+  letter-spacing: 0.01em;
+}
+
+.movie-detail__ott-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.movie-detail__ott-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  transition: background-color var(--ease-hover, 0.15s ease);
+}
+
+.movie-detail__ott-row:hover,
+.movie-detail__ott-row:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 1;
+}
+
+.movie-detail__ott-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.movie-detail__ott-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.movie-detail__ott-name {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movie-detail__ott-category {
+  font-size: 11px;
+  color: var(--text-muted, #9CA3AF);
+}
+
+.movie-detail__ott-go {
+  flex-shrink: 0;
+  color: var(--text-muted, #9CA3AF);
+  transition: color var(--ease-hover, 0.15s ease), transform var(--ease-hover, 0.15s ease);
+}
+
+.movie-detail__ott-row:hover .movie-detail__ott-go {
+  color: var(--accent, #B048FF);
+  transform: translate(1px, -1px);
+}
+
+@media (max-width: 500px) {
+  .movie-detail__ott {
+    max-width: 100%;
+  }
 }
 
 /* ── Toast notification ── */

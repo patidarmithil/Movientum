@@ -105,11 +105,13 @@ function TabContent({ tab, data, loading, error }) {
 
   if (tab === 'watchlist') {
     return (
-      <div className="watchlist-grid">
-        {data.map((collection) => (
-          <WatchlistCollectionCard key={collection.id} collection={collection} />
+      <StaggerContainer className="watchlist-grid" instant={true}>
+        {data.map((collection, index) => (
+          <StaggerItem key={collection.id} index={index}>
+            <WatchlistCollectionCard collection={collection} />
+          </StaggerItem>
         ))}
-      </div>
+      </StaggerContainer>
     )
   }
 

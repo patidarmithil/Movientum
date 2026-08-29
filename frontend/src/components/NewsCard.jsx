@@ -6,7 +6,7 @@
  *
  * Props:
  *   article: { id, title, description, url, image_url, source_name, published_at, genre_tags }
- *   variant?: 'standard' | 'compact'   (default: 'standard')
+ *   variant?: 'standard' | 'compact' | 'rail'   (default: 'standard')
  */
 import { useEffect, useRef, useState } from 'react'
 import { newsService } from '../services/newsService'
@@ -33,6 +33,10 @@ function recordViewOnce(articleId) {
 
 export default function NewsCard({ article, variant = 'standard' }) {
   const [imgError, setImgError] = useState(false)
+  // Same progressive reveal the poster art uses on movie cards: the thumbnail
+  // starts blurred and dimmed and sharpens once it has decoded, so a row of
+  // cards fills in smoothly instead of popping in one image at a time.
+  const [imgLoaded, setImgLoaded] = useState(false)
   const cardRef = useRef(null)
 
   // Fire a view once the card has been >=50% visible for >=2s.
@@ -87,8 +91,9 @@ export default function NewsCard({ article, variant = 'standard' }) {
           <img
             src={article.image_url}
             alt=""
-            className="news-card__thumb"
+            className={`news-card__thumb poster-progressive ${imgLoaded ? 'poster-progressive--loaded' : ''}`}
             loading="lazy"
+            onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
           />
         {/* Hover overlay */}
@@ -100,26 +105,50 @@ export default function NewsCard({ article, variant = 'standard' }) {
       {/* Content */}
       <div className="news-card__body">
         {/* Genre tags */}
-        {article.genre_tags?.length > 0 && (
-          <div className="news-card__tags">
-            {article.genre_tags.slice(0, 2).map((t) => (
-              <span key={t} className="news-card__tag">{t}</span>
-            ))}
-          </div>
+        {variant === 'rail' ? (
+          article.genre_tags?.length > 0 && (
+            <div className="news-card__tags">
+              <span className="news-card__tag">{article.genre_tags[0]}</span>
+            </div>
+          )
+        ) : (
+          article.genre_tags?.length > 0 && (
+            <div className="news-card__tags">
+              {article.genre_tags.slice(0, 2).map((t) => (
+                <span key={t} className="news-card__tag">{t}</span>
+              ))}
+            </div>
+          )
         )}
 
+        {/* The rail's "…more" cue sits outside the clamped heading on purpose:
+            -webkit-line-clamp drops any content past the third line, so a span
+            inside the <h3> would be hidden on exactly the cards that truncate. */}
         <h3 className="news-card__title">{article.title}</h3>
+        {variant === 'rail' && (
+          <span className="news-card__more" aria-hidden="true">&hellip;more</span>
+        )}
 
         {variant === 'standard' && article.description && (
           <p className="news-card__desc">{article.description}</p>
         )}
 
-        <div className="news-card__meta">
-          {article.source_name && (
-            <span className="news-card__source">{article.source_name}</span>
-          )}
-          {ago && <span className="news-card__time">{ago}</span>}
-        </div>
+        {variant === 'rail' ? (
+          <div className="news-card__meta">
+            <span className="news-card__source">
+              {article.source_name && `By ${article.source_name}`}
+              {article.source_name && ago && ' • '}
+              {ago}
+            </span>
+          </div>
+        ) : (
+          <div className="news-card__meta">
+            {article.source_name && (
+              <span className="news-card__source">{article.source_name}</span>
+            )}
+            {ago && <span className="news-card__time">{ago}</span>}
+          </div>
+        )}
       </div>
       </div>
     </BorderGlow>

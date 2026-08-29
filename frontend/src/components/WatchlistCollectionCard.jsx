@@ -1,5 +1,20 @@
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import './WatchlistCollectionCard.css'
+
+function FanPoster({ src, alt = '', className = '', onError }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`${className} poster-progressive ${loaded ? 'poster-progressive--loaded' : ''}`.trim()}
+      loading="lazy"
+      onLoad={() => setLoaded(true)}
+      onError={onError}
+    />
+  )
+}
 
 // Fan-stack geometry for 2-4 posters: offset (%), rotation (deg), z-index per slot.
 const FAN_LAYOUTS = {
@@ -57,11 +72,10 @@ export default function WatchlistCollectionCard({ collection }) {
 
     if (count === 1) {
       return (
-        <img
+        <FanPoster
           src={getTMDBUrl(safePosters[0])}
           alt={collection.name}
           className="collection-card__img"
-          loading="lazy"
           onError={(e) => { e.target.style.display = 'none' }}
         />
       )
@@ -84,10 +98,8 @@ export default function WatchlistCollectionCard({ collection }) {
               zIndex: layout[idx].z,
             }}
           >
-            <img
+            <FanPoster
               src={getTMDBUrl(poster)}
-              alt=""
-              loading="lazy"
               onError={(e) => { e.target.style.display = 'none' }}
             />
           </div>

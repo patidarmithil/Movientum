@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
 import BorderGlow from './BorderGlow'
 import { recFeedback } from '../services/feedbackService'
+import { observeOnce } from '../utils/sharedObserver'
 import './MovieCard.css'
 
 const MOCTALE_COLORS = {
@@ -70,18 +71,7 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     const targetEl = parentEl.querySelector('.movie-card')
     if (!targetEl) return
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.1, rootMargin: '0px 0px 100px 0px' }
-    )
-
-    observer.observe(targetEl)
-    return () => observer.disconnect()
+    return observeOnce(targetEl, () => setIsVisible(true))
   }, [])
 
   const sendExplicit = useCallback((signalType, e) => {
@@ -138,7 +128,10 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
                 src={posterUrl}
                 alt={`${movie.title} poster`}
                 className={`movie-card__poster poster-progressive ${imageLoaded ? 'poster-progressive--loaded' : ''}`}
+                width={342}
+                height={513}
                 loading="lazy"
+                decoding="async"
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setHasError(true)}
               />

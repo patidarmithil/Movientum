@@ -10,7 +10,7 @@
  * 'mv:logout' custom event from api.js interceptor clears auth state.
  */
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { AnimatePresence } from 'motion/react'
 import PageTransition from './components/PageTransition'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -19,40 +19,51 @@ import InstallPrompt from './components/InstallPrompt'
 import InfoBanner from './components/InfoBanner'
 import { Analytics } from '@vercel/analytics/react'
 import ProtectedRoute from './components/ProtectedRoute'
+
+// ── Route splitting ──────────────────────────────────────────────
+// Every page used to sit in one JS chunk, so opening a movie meant downloading,
+// parsing and executing the admin dashboard, the settings tree and the analysis
+// page first — and only then could the page fire its first API request.
+//
+// The four pages below stay eager on purpose: they are the entry points almost
+// every session starts from, and lazy-loading them would insert a chunk round
+// trip *before* the page can even ask the backend for its data — the opposite of
+// what this change is for. Everything else loads on navigation.
 import Home from './pages/Home'
-import MovieList from './pages/MovieList'
 import MovieDetail from './pages/MovieDetail'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Recommendations from './pages/Recommendations'
-import RecommendationsContent from './pages/RecommendationsContent'
-import Search from './pages/Search'
-import PersonPage from './pages/PersonPage'
-import Explore from './pages/Explore'
-import Analysis from './pages/Analysis'
 import TVDetail from './pages/TVDetail'
-import News from './pages/News'
-import CompanyPage from './pages/CompanyPage'
-import CountryPage from './pages/CountryPage'
-import MostInterested from './pages/MostInterested'
-import Help from './pages/Help'
-import Privacy from './pages/Privacy'
-import TermsOfService from './pages/TermsOfService'
 import Intro from './pages/Intro'
-import Feedback from './pages/Feedback'
-import AdminDashboard from './pages/AdminDashboard'
-import WatchlistDetail from './pages/WatchlistDetail'
-import Settings from './pages/settings/Settings'
-import SettingsProfile from './pages/settings/SettingsProfile'
-import SettingsPassword from './pages/settings/SettingsPassword'
-import SettingsDeleteAccount from './pages/settings/SettingsDeleteAccount'
-import SettingsFeedback from './pages/settings/SettingsFeedback'
-import SettingsMyIssues from './pages/settings/SettingsMyIssues'
-import SettingsPrivacy from './pages/settings/SettingsPrivacy'
-import SettingsTerms from './pages/settings/SettingsTerms'
-import SettingsHelp from './pages/settings/SettingsHelp'
-import SettingsImport from './pages/settings/SettingsImport'
+
+const MovieList = lazy(() => import('./pages/MovieList'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Recommendations = lazy(() => import('./pages/Recommendations'))
+const RecommendationsContent = lazy(() => import('./pages/RecommendationsContent'))
+const Search = lazy(() => import('./pages/Search'))
+const PersonPage = lazy(() => import('./pages/PersonPage'))
+const Explore = lazy(() => import('./pages/Explore'))
+const Analysis = lazy(() => import('./pages/Analysis'))
+const News = lazy(() => import('./pages/News'))
+const CompanyPage = lazy(() => import('./pages/CompanyPage'))
+const CountryPage = lazy(() => import('./pages/CountryPage'))
+const MostInterested = lazy(() => import('./pages/MostInterested'))
+const Help = lazy(() => import('./pages/Help'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const TermsOfService = lazy(() => import('./pages/TermsOfService'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const WatchlistDetail = lazy(() => import('./pages/WatchlistDetail'))
+const Settings = lazy(() => import('./pages/settings/Settings'))
+const SettingsProfile = lazy(() => import('./pages/settings/SettingsProfile'))
+const SettingsPassword = lazy(() => import('./pages/settings/SettingsPassword'))
+const SettingsDeleteAccount = lazy(() => import('./pages/settings/SettingsDeleteAccount'))
+const SettingsFeedback = lazy(() => import('./pages/settings/SettingsFeedback'))
+const SettingsMyIssues = lazy(() => import('./pages/settings/SettingsMyIssues'))
+const SettingsPrivacy = lazy(() => import('./pages/settings/SettingsPrivacy'))
+const SettingsTerms = lazy(() => import('./pages/settings/SettingsTerms'))
+const SettingsHelp = lazy(() => import('./pages/settings/SettingsHelp'))
+const SettingsImport = lazy(() => import('./pages/settings/SettingsImport'))
+
 import ScrollRestore from './components/ScrollRestore'
 import ErrorBoundary from './components/ErrorBoundary'
 import ErrorPage from './pages/ErrorPage'
@@ -208,6 +219,13 @@ function AppRoutes() {
       <Navbar />
       <InstallPrompt />
       <InfoBanner />
+      {/* Suspense sits OUTSIDE AnimatePresence on purpose: AnimatePresence only
+          tracks its direct child, so slotting a wrapper between it and the keyed
+          <Routes> would break the page exit transitions.
+          The fallback is deliberately empty — a lazy chunk resolves in tens of
+          milliseconds on a warm connection, and flashing a spinner for that long
+          reads as slower than showing nothing. */}
+      <Suspense fallback={null}>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public */}
@@ -339,6 +357,7 @@ function AppRoutes() {
           <Route path="*" element={<PageTransition><ErrorPage type="404" /></PageTransition>} />
         </Routes>
       </AnimatePresence>
+      </Suspense>
     </>
   )
 }

@@ -96,7 +96,8 @@ export function AuthProvider({ children }) {
 
       // Optimistically restore from storage
       try {
-        const parsedUser = JSON.parse(storedUser)
+        let parsedUser = null
+        try { parsedUser = storedUser ? JSON.parse(storedUser) : null } catch { parsedUser = null }
         setAccessToken(storedAccess)
         setUser(parsedUser)
         setIsLoggedIn(true)
@@ -104,11 +105,27 @@ export function AuthProvider({ children }) {
 
         // Validate token with backend in background
         const freshUser = await authService.getMe()
-        setUser(freshUser)
-        storage.setItem(KEYS.user, JSON.stringify(freshUser))
-      } catch {
-        // Access token expired AND interceptor failed to refresh it
-        // Or backend is down. Try device session fallback.
+        if (freshUser) {
+          setUser(freshUser)
+          storage.setItem(KEYS.user, JSON.stringify(freshUser))
+        }
+      } catch (err) {
+        // Only a real auth rejection (401/403) means the session is dead.
+        // Network failures, timeouts and 5xx (Azure cold start, DB pool
+        // exhaustion) must NOT log the user out — otherwise a fresh page
+        // load during a cold backend wipes a perfectly valid session and
+        // the user has to reload two or three times to get back in.
+        const status = err?.response?.status
+        const isAuthFailure = status === 401 || status === 403
+
+        if (!isAuthFailure) {
+          // Keep the optimistically restored session as-is and retry later.
+          setIsLoading(false)
+          return
+        }
+
+        // Access token expired AND interceptor failed to refresh it.
+        // Try device session fallback before giving up.
         const deviceId = getDeviceId()
         if (deviceId) {
           try {

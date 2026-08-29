@@ -13,14 +13,33 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
 
+  const [contacts, setContacts] = useState([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
+  const [contactError, setContactError] = useState('');
+
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
-  
-  const [activeTab, setActiveTab] = useState('business'); // 'system', 'business', 'infrastructure', 'ml', 'feedback'
+
+  const initialTab = new URLSearchParams(window.location.search).get('tab');
+  const VALID_TABS = ['business', 'system', 'infrastructure', 'ml', 'messages', 'users'];
+  const [activeTab, setActiveTab] = useState(VALID_TABS.includes(initialTab) ? initialTab : 'business');
 
   const [subTabBusiness, setSubTabBusiness] = useState('db'); // 'db', 'kpis', 'behaviour'
   const [subTabInfra, setSubTabInfra] = useState('api'); // 'api', 'infra'
   const [subTabML, setSubTabML] = useState('recs'); // 'recs', 'graph', 'retrain'
+  const [subTabMessages, setSubTabMessages] = useState('contact'); // 'contact', 'feedback'
+
+  // Users tab state
+  const [users, setUsers] = useState([]);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
+  const USER_PAGE_SIZE = 25;
+  const [messageTarget, setMessageTarget] = useState(null); // user object or null
+  const [messageText, setMessageText] = useState('');
+  const [messageSending, setMessageSending] = useState(false);
 
   const [taskStatuses, setTaskStatuses] = useState({});
   const [activeInterval, setActiveInterval] = useState(null);
@@ -75,12 +94,74 @@ export default function AdminDashboard() {
     };
     fetchFeedbacks();
 
+    // Load Contact Messages
+    adminService.getContactMessages()
+      .then(setContacts)
+      .catch((err) => {
+        console.error('Failed to fetch contact messages:', err);
+        setContactError('Could not load contact messages. Make sure you are an admin.');
+      })
+      .finally(() => setContactsLoading(false));
+
     // Load Stats
     adminService.getAdminStats()
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoadingStats(false));
   }, []);
+
+  // Load Users (tab-triggered, re-fetches on search/page change)
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    setUsersLoading(true);
+    setUsersError('');
+    adminService.getUsers({ search: userSearch, page: userPage, pageSize: USER_PAGE_SIZE })
+      .then((data) => {
+        setUsers(data.users || []);
+        setUsersTotal(data.total || 0);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch users:', err);
+        setUsersError('Could not load users. Make sure you are an admin.');
+      })
+      .finally(() => setUsersLoading(false));
+  }, [activeTab, userSearch, userPage]);
+
+  async function handleDeleteUser(user) {
+    if (!window.confirm(`Delete account "${user.username}" (${user.email})? This cannot be undone.`)) return;
+    try {
+      await adminService.deleteUser(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setUsersTotal((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      alert(err?.response?.data?.detail || 'Failed to delete user.');
+    }
+  }
+
+  async function handleToggleRole(user) {
+    const newRole = user.role === 'admin' ? 'user' : 'admin';
+    try {
+      const updated = await adminService.setUserRole(user.id, newRole);
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? updated : u)));
+    } catch (err) {
+      alert(err?.response?.data?.detail || 'Failed to update role.');
+    }
+  }
+
+  async function handleSendMessage(e) {
+    e.preventDefault();
+    if (!messageTarget || !messageText.trim()) return;
+    setMessageSending(true);
+    try {
+      await adminService.messageUser(messageTarget.id, messageText.trim());
+      setMessageTarget(null);
+      setMessageText('');
+    } catch (err) {
+      alert(err?.response?.data?.detail || 'Failed to send message.');
+    } finally {
+      setMessageSending(false);
+    }
+  }
 
   useEffect(() => {
     // Poll active tasks
@@ -111,7 +192,7 @@ export default function AdminDashboard() {
   async function handleTriggerTask(taskKey) {
     setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 5, status: "Starting..." }}));
     try {
-      await api.post(`/internal/trigger/${taskKey}?token=super-secret-cron-token-change-me`);
+      await api.post(`/internal/trigger/${taskKey}`);
     } catch (err) {
       setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 0, status: "FAILURE", error: err.message }}));
     }
@@ -119,7 +200,7 @@ export default function AdminDashboard() {
 
   async function handleCancelTask(taskKey) {
     try {
-      await api.post(`/internal/cancel/${taskKey}?token=super-secret-cron-token-change-me`);
+      await api.post(`/internal/cancel/${taskKey}`);
       setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 0, status: "CANCELLED" }}));
     } catch (err) {
       console.error("Failed to cancel task:", err);
@@ -177,7 +258,8 @@ export default function AdminDashboard() {
           <button className={`admin-tab ${activeTab === 'system' ? 'active' : ''}`} onClick={() => setActiveTab('system')}>System Tasks</button>
           <button className={`admin-tab ${activeTab === 'infrastructure' ? 'active' : ''}`} onClick={() => setActiveTab('infrastructure')}>API & Infra</button>
           <button className={`admin-tab ${activeTab === 'ml' ? 'active' : ''}`} onClick={() => setActiveTab('ml')}>Machine Learning</button>
-          <button className={`admin-tab ${activeTab === 'feedback' ? 'active' : ''}`} onClick={() => setActiveTab('feedback')}>User Feedback</button>
+          <button className={`admin-tab ${activeTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveTab('messages')}>Messages</button>
+          <button className={`admin-tab ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>Users</button>
         </div>
 
         {error && <div className="admin-error">{error}</div>}
@@ -407,63 +489,209 @@ export default function AdminDashboard() {
           </section>
         )}
 
-        {/* ── User Feedback ── */}
-        {activeTab === 'feedback' && (
+        {/* ── Messages (Contact form + User Feedback) ── */}
+        {activeTab === 'messages' && (
           <section className="admin-tasks-section fade-in">
-            <h2>User Feedback</h2>
-            {loading ? (
+            <div className="admin-subtabs">
+              <button className={`admin-subtab ${subTabMessages === 'contact' ? 'active' : ''}`} onClick={() => setSubTabMessages('contact')}>Contact Form</button>
+              <button className={`admin-subtab ${subTabMessages === 'feedback' ? 'active' : ''}`} onClick={() => setSubTabMessages('feedback')}>User Feedback</button>
+            </div>
+
+            {subTabMessages === 'contact' && (
+              contactError ? (
+                <div className="admin-error">{contactError}</div>
+              ) : contactsLoading ? (
+                <div className="loading-spinner"></div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="feedback-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Email (reply here)</th>
+                        <th>Message</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contacts.length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="empty-state">No contact messages found.</td>
+                        </tr>
+                      )}
+                      {contacts.map((c) => (
+                        <tr key={c.id}>
+                          <td className="nowrap">{new Date(c.created_at).toLocaleDateString()}</td>
+                          <td>{c.name}</td>
+                          <td><a href={`mailto:${c.email}`}>{c.email}</a></td>
+                          <td className="content-cell">{c.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+
+            {subTabMessages === 'feedback' && (
+              loading ? (
+                <div className="loading-spinner"></div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="feedback-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>User ID</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Screenshot</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedbacks.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="empty-state">No feedback found.</td>
+                        </tr>
+                      )}
+                      {feedbacks.map((fb) => (
+                        <tr key={fb.id}>
+                          <td className="nowrap">
+                            {new Date(fb.created_at).toLocaleDateString()}
+                          </td>
+                          <td>{fb.user_id ? fb.user_id.split('-')[0] : 'Anonymous'}</td>
+                          <td>
+                            <span className={`badge ${getCategoryBadgeClass(fb.category)}`}>
+                              {fb.category}
+                            </span>
+                          </td>
+                          <td className="content-cell">{fb.content}</td>
+                          <td>
+                            {fb.image_url ? (
+                              <button
+                                className="view-btn"
+                                onClick={() => setSelectedImage(`${api.defaults.baseURL}${fb.image_url}`)}
+                              >
+                                View Image
+                              </button>
+                            ) : (
+                              <span className="no-image">None</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+          </section>
+        )}
+
+        {/* ── Users ── */}
+        {activeTab === 'users' && (
+          <section className="admin-tasks-section fade-in">
+            <h2>Users ({usersTotal})</h2>
+            <input
+              type="text"
+              placeholder="Search by username or email..."
+              value={userSearch}
+              onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
+              style={{ width: '100%', maxWidth: '360px', padding: '0.6rem 0.9rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+            />
+            {usersError ? (
+              <div className="admin-error">{usersError}</div>
+            ) : usersLoading ? (
               <div className="loading-spinner"></div>
             ) : (
-              <div className="table-responsive">
-                <table className="feedback-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>User ID</th>
-                      <th>Category</th>
-                      <th>Description</th>
-                      <th>Screenshot</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {feedbacks.length === 0 && (
+              <>
+                <div className="table-responsive">
+                  <table className="feedback-table">
+                    <thead>
                       <tr>
-                        <td colSpan="5" className="empty-state">No feedback found.</td>
+                        <th>Joined</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Active</th>
+                        <th>Actions</th>
                       </tr>
-                    )}
-                    {feedbacks.map((fb) => (
-                      <tr key={fb.id}>
-                        <td className="nowrap">
-                          {new Date(fb.created_at).toLocaleDateString()}
-                        </td>
-                        <td>{fb.user_id ? fb.user_id.split('-')[0] : 'Anonymous'}</td>
-                        <td>
-                          <span className={`badge ${getCategoryBadgeClass(fb.category)}`}>
-                            {fb.category}
-                          </span>
-                        </td>
-                        <td className="content-cell">{fb.content}</td>
-                        <td>
-                          {fb.image_url ? (
-                            <button 
-                              className="view-btn" 
-                              onClick={() => setSelectedImage(`${api.defaults.baseURL}${fb.image_url}`)}
-                            >
-                              View Image
-                            </button>
-                          ) : (
-                            <span className="no-image">None</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {users.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="empty-state">No users found.</td>
+                        </tr>
+                      )}
+                      {users.map((u) => (
+                        <tr key={u.id}>
+                          <td className="nowrap">{new Date(u.created_at).toLocaleDateString()}</td>
+                          <td>{u.username}</td>
+                          <td>{u.email}</td>
+                          <td>
+                            <span className={`badge ${u.role === 'admin' ? 'badge-improvement' : 'badge-other'}`}>{u.role}</span>
+                          </td>
+                          <td>{u.is_active ? 'Yes' : 'No'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              <button className="btn btn--sm" onClick={() => handleToggleRole(u)}>
+                                {u.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                              </button>
+                              <button className="btn btn--sm" onClick={() => { setMessageTarget(u); setMessageText(''); }}>
+                                Message
+                              </button>
+                              <button
+                                className="btn btn--sm btn--danger"
+                                style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444' }}
+                                onClick={() => handleDeleteUser(u)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {usersTotal > USER_PAGE_SIZE && (
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '1rem' }}>
+                    <button className="btn btn--sm" disabled={userPage <= 1} onClick={() => setUserPage((p) => p - 1)}>Prev</button>
+                    <span>Page {userPage} of {Math.ceil(usersTotal / USER_PAGE_SIZE)}</span>
+                    <button className="btn btn--sm" disabled={userPage >= Math.ceil(usersTotal / USER_PAGE_SIZE)} onClick={() => setUserPage((p) => p + 1)}>Next</button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}
       </div>
+
+      {messageTarget && (
+        <div className="image-modal-overlay" onClick={() => setMessageTarget(null)}>
+          <div className="image-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '1.75rem', background: '#141414', borderRadius: '12px' }}>
+            <button className="close-btn" onClick={() => setMessageTarget(null)}>×</button>
+            <h3 style={{ marginBottom: '0.25rem' }}>Message {messageTarget.username}</h3>
+            <p style={{ color: 'var(--text-secondary, #9CA3AF)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              Delivered to their notification panel.
+            </p>
+            <form onSubmit={handleSendMessage}>
+              <textarea
+                rows="4"
+                required
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Your message..."
+                style={{ width: '100%', padding: '0.7rem 0.9rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', resize: 'vertical', marginBottom: '1rem' }}
+              />
+              <button type="submit" className="btn btn--primary" disabled={messageSending} style={{ width: '100%' }}>
+                {messageSending ? 'Sending...' : 'Send Message'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {selectedImage && (
         <div className="image-modal-overlay" onClick={() => setSelectedImage(null)}>

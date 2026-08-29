@@ -328,7 +328,10 @@ export default function News() {
             </p>
           </div>
         ) : (
-          <StaggerContainer className="news-grid" instant={true}>
+          // `instant={false}` matches Explore, Recommendations and the detail
+          // pages' rows: the cards reveal when the grid scrolls into view rather
+          // than all animating at mount.
+          <StaggerContainer className="news-grid" instant={false}>
             {articles.map((article, index) => (
               <StaggerItem key={article.id} index={index}>
                 <NewsCard article={article} variant="standard" />

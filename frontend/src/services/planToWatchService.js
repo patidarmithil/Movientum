@@ -2,6 +2,19 @@ import api from '../utils/api'
 import { watchlistService } from './watchlistService'
 
 export const planToWatchService = {
+  // Single cached call for the home page rail — replaces getOrCreate() +
+  // getItemsWithDetails() (2-3 requests) + one detail fetch per item (up to
+  // 100 more) with the pre-filtered, server-side-cached "what's coming up"
+  // list. Read-only: never creates the "Plan to Watch" collection.
+  getHomeStrip: async () => {
+    try {
+      const r = await api.get('/api/v1/watchlists/home-strip')
+      return r.data || { items: [], collection_id: null }
+    } catch {
+      return { items: [], collection_id: null }
+    }
+  },
+
   getOrCreate: async () => {
     const data = await watchlistService.getCollections()
     const collections = data.collections || data.watchlists || data

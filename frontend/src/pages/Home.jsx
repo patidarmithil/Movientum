@@ -31,6 +31,7 @@ import TrailerRow from '../components/TrailerRow'
 import TrailerModal from '../components/TrailerModal'
 import WatchlistSection from '../components/WatchlistSection'
 import { getHomeTrailers } from '../services/trailerService'
+import { contactService } from '../services/contactService'
 import { AnimatePresence } from 'motion/react'
 import ColdStartLoader from '../components/ColdStartLoader'
 import ErrorPage from './ErrorPage'
@@ -68,6 +69,8 @@ export default function Home() {
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
   const [hasError, setHasError] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [contactStatus, setContactStatus] = useState('idle') // idle | sending | sent | error
 
   // Main columns states
   const [trending, setTrending] = useSessionState('home_trending', [])
@@ -126,9 +129,13 @@ export default function Home() {
   const [guestRecs, setGuestRecs] = useSessionState('home_guestRecs', [])
   const [guestRecsLoad, setGuestRecsLoad] = useState(!isLoggedIn && guestRecs.length === 0)
 
-  // Trailers state (not cached in session — region changes need fresh data)
-  const [trailers, setTrailers] = useState([])
-  const [trailersLoad, setTrailersLoad] = useState(true)
+  // Trailers state — session-cached (stale-while-revalidate): a returning
+  // visit paints the last-known rail instantly, then the bundle effect below
+  // refreshes it in the background and swaps in the fresh result silently.
+  // A region-pill change (effect further down) still clears and refetches for
+  // real, since that's a genuine user-initiated change, not a repeat visit.
+  const [trailers, setTrailers] = useSessionState('home_trailers', [])
+  const [trailersLoad, setTrailersLoad] = useState(trailers.length === 0)
   
   // Trailer Modal state
   const [trailerModalOpen, setTrailerModalOpen] = useState(false)
@@ -174,20 +181,21 @@ export default function Home() {
   // initial paint goes through the bundle.
   useEffect(() => {
     const haveLists = trending.length > 0 && topRated.length > 0 && upcoming.length > 0
+    const haveTrailers = trailers.length > 0
 
     if (haveLists) {
-      // Restored from session state — only the trailer rail (never session-cached)
-      // still needs the network.
+      // Restored from session state — paint instantly, no skeleton.
       setTrendLoad(false); setTopRatedLoad(false); setUpcomingLoad(false)
-      setTrailersLoad(true)
+      setTrailersLoad(!haveTrailers)
       getHomeTrailers(trailerRegion)
         .then((data) => setTrailers(data?.data || []))
-        .catch(() => setTrailers([]))
+        .catch(() => { if (!haveTrailers) setTrailers([]) })
         .finally(() => setTrailersLoad(false))
       return
     }
 
-    setTrendLoad(true); setTopRatedLoad(true); setUpcomingLoad(true); setTrailersLoad(true)
+    setTrendLoad(true); setTopRatedLoad(true); setUpcomingLoad(true)
+    setTrailersLoad(!haveTrailers)
     pageService.getHome({
       upcomingFilter,
       region: trailerRegion === 'All' ? null : trailerRegion,
@@ -201,7 +209,8 @@ export default function Home() {
         setTrailers(data?.trailers?.data || [])
       })
       .catch(() => {
-        setTrending([]); setTopRated([]); setUpcoming([]); setTrailers([])
+        setTrending([]); setTopRated([]); setUpcoming([])
+        if (!haveTrailers) setTrailers([])
         setHasError(true)
       })
       .finally(() => {
@@ -297,6 +306,7 @@ export default function Home() {
         setTrailers([])
       })
       .finally(() => setTrailersLoad(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, trailerRegion])
 
 
@@ -571,7 +581,7 @@ export default function Home() {
                       
                       <div className="sidebar-card-poster-wrap">
                         {posterUrl ? (
-                          <img src={posterUrl} alt={item.title} className="sidebar-card-poster" loading="lazy" />
+                          <img src={posterUrl} alt={item.title} className="sidebar-card-poster" width={185} height={278} loading="lazy" decoding="async" />
                         ) : (
                           <div className="sidebar-card-poster-fallback">🎬</div>
                         )}
@@ -608,6 +618,26 @@ export default function Home() {
         </ScrollReveal>
 
       </div>
+
+      {/* ── Footer ── */}
+      <footer className="home-footer">
+        <div className="home-footer__love">
+          Made with <span className="home-footer__heart">❤️</span> in India
+        </div>
+        <div className="home-footer__bottom">
+          <span className="home-footer__copyright">
+            &copy; {new Date().getFullYear()} Movientum, Inc. · BETA · Always improving
+          </span>
+          <div className="home-footer__links">
+            <a href="https://patidarmithil-portfolio.netlify.app/" target="_blank" rel="noopener noreferrer">Portfolio</a>
+            <a href="https://github.com/patidarmithil" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <Link to="/feedback">Feedback</Link>
+            <button type="button" onClick={() => setShowContactModal(true)}>Contact Me</button>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/terms">Terms of Service</Link>
+          </div>
+        </div>
+      </footer>
     </main>
     {trailerModalOpen && trailerModalData && (
       <TrailerModal
@@ -617,6 +647,54 @@ export default function Home() {
         contentId={trailerModalData.id}
         mediaType={trailerModalData.media_type}
       />
+    )}
+    {showContactModal && (
+      <div className="intro-contact-modal-overlay" onClick={() => { setShowContactModal(false); setContactStatus('idle') }}>
+        <div className="intro-contact-modal" onClick={(e) => e.stopPropagation()}>
+          <button className="intro-contact-modal__close" onClick={() => { setShowContactModal(false); setContactStatus('idle') }}>&times;</button>
+          <h3>Get in Touch</h3>
+          <p className="intro-contact-modal__subtitle">
+            Send a message and we'll reply to the email you give below, or reach out directly at{' '}
+            <a href="mailto:mithilpatidar80@gmail.com">mithilpatidar80@gmail.com</a>.
+          </p>
+          {contactStatus === 'sent' ? (
+            <p style={{ color: '#4ADE80', fontWeight: 600 }}>Message sent — thanks! We'll get back to you soon.</p>
+          ) : (
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              const name = e.target.name.value
+              const email = e.target.email.value
+              const message = e.target.message.value
+              setContactStatus('sending')
+              try {
+                await contactService.submit({ name, email, message })
+                setContactStatus('sent')
+              } catch {
+                setContactStatus('error')
+              }
+            }}>
+              <div className="form-group" style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                <label htmlFor="home-contact-name" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Name</label>
+                <input id="home-contact-name" name="name" type="text" placeholder="Your Name" required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                <label htmlFor="home-contact-email" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Email</label>
+                <input id="home-contact-email" name="email" type="email" placeholder="yourname@example.com" required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                <label htmlFor="home-contact-message" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Message</label>
+                <textarea id="home-contact-message" name="message" rows="4" placeholder="Your Message..." required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem', resize: 'vertical' }}></textarea>
+              </div>
+              {contactStatus === 'error' && (
+                <p style={{ color: '#F87171', marginBottom: '1rem' }}>Failed to send — please try again or email us directly.</p>
+              )}
+              <button type="submit" className="btn btn--primary" disabled={contactStatus === 'sending'} style={{ width: '100%', padding: '1rem', fontWeight: '600' }}>
+                {contactStatus === 'sending' ? 'Sending...' : 'Send Message'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
     )}
     </>
   )

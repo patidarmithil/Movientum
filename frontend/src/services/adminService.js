@@ -28,5 +28,30 @@ export const adminService = {
   async getAdminAnalytics() {
     const { data } = await api.get(`${BASE}/analytics`)
     return data
+  },
+
+  async getContactMessages() {
+    const { data } = await api.get('/api/v1/contact/')
+    return data
+  },
+
+  async getUsers({ search = '', page = 1, pageSize = 25 } = {}) {
+    const { data } = await api.get(`${BASE}/users`, { params: { search, page, page_size: pageSize } })
+    return data
+  },
+
+  async deleteUser(userId) {
+    const { data } = await api.delete(`${BASE}/users/${userId}`)
+    return data
+  },
+
+  async setUserRole(userId, role) {
+    const { data } = await api.patch(`${BASE}/users/${userId}/role`, { role })
+    return data
+  },
+
+  async messageUser(userId, message) {
+    const { data } = await api.post(`${BASE}/users/${userId}/message`, { message })
+    return data
   }
 }

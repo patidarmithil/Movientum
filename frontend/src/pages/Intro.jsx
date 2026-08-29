@@ -12,6 +12,7 @@ import {
   POSTER_WALL,
 } from '../data/introSections'
 import { prefersReducedMotion } from '../hooks/useRatioObserver'
+import { contactService } from '../services/contactService'
 import './Intro.css'
 
 const THRESHOLDS = Array.from({ length: 101 }, (_, i) => i / 100)
@@ -19,6 +20,7 @@ const THRESHOLDS = Array.from({ length: 101 }, (_, i) => i / 100)
 export default function Intro() {
   const { isLoggedIn } = useAuth()
   const [showContactModal, setShowContactModal] = useState(false)
+  const [contactStatus, setContactStatus] = useState('idle') // idle | sending | sent | error
   const [activeSection, setActiveSection] = useState('intro-start')
 
   const heroPlaceholderRef = useRef(null)
@@ -28,6 +30,19 @@ export default function Intro() {
   useEffect(() => {
     document.title = 'About - Movientum'
   }, [])
+
+  // Non-logged-in visitor on the zero-backend landing page — fire a stray
+  // ping to wake whichever backend (primary/secondary) is cold, picked at
+  // random so both stay warm. Result ignored either way.
+  useEffect(() => {
+    if (isLoggedIn) return
+    const urls = [
+      import.meta.env.VITE_API_URL || 'https://movientum.azurewebsites.net',
+      import.meta.env.VITE_API_URL_SECONDARY || 'https://movientum-backend-secondary.onrender.com',
+    ]
+    const target = urls[Math.floor(Math.random() * urls.length)]
+    fetch(`${target}/api/health`).catch(() => {})
+  }, [isLoggedIn])
 
   // Drive the jump from JS rather than relying on the href alone. The rail used
   // to need two clicks: it auto-hid on a timer, and `visibility: hidden` makes an
@@ -411,35 +426,50 @@ export default function Intro() {
       </footer>
 
       {showContactModal && (
-        <div className="intro-contact-modal-overlay" onClick={() => setShowContactModal(false)}>
+        <div className="intro-contact-modal-overlay" onClick={() => { setShowContactModal(false); setContactStatus('idle') }}>
           <div className="intro-contact-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="intro-contact-modal__close" onClick={() => setShowContactModal(false)}>&times;</button>
+            <button className="intro-contact-modal__close" onClick={() => { setShowContactModal(false); setContactStatus('idle') }}>&times;</button>
             <h3>Get in Touch</h3>
             <p className="intro-contact-modal__subtitle">
-              Feel free to reach out directly at{' '}
-              <a href="mailto:mithilpatidar80@gmail.com">mithilpatidar80@gmail.com</a> or use the form below.
+              Send a message and we'll reply to the email you give below, or reach out directly at{' '}
+              <a href="mailto:mithilpatidar80@gmail.com">mithilpatidar80@gmail.com</a>.
             </p>
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              const name = e.target.name.value
-              const email = e.target.email.value
-              const msg = e.target.message.value
-              window.location.href = `mailto:mithilpatidar80@gmail.com?subject=Contact from Movientum by ${name}&body=${encodeURIComponent(msg)}%0D%0A%0D%0AReply to: ${email}`
-            }}>
-              <div className="form-group" style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
-                <label htmlFor="contact-name" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Name</label>
-                <input id="contact-name" name="name" type="text" placeholder="Your Name" required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
-                <label htmlFor="contact-email" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Email</label>
-                <input id="contact-email" name="email" type="email" placeholder="yourname@example.com" required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: '1.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
-                <label htmlFor="contact-message" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Message</label>
-                <textarea id="contact-message" name="message" rows="4" placeholder="Your Message..." required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem', resize: 'vertical' }}></textarea>
-              </div>
-              <button type="submit" className="btn btn--primary" style={{ width: '100%', padding: '1rem', fontWeight: '600' }}>Send Message</button>
-            </form>
+            {contactStatus === 'sent' ? (
+              <p style={{ color: '#4ADE80', fontWeight: 600 }}>Message sent — thanks! We'll get back to you soon.</p>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                const name = e.target.name.value
+                const email = e.target.email.value
+                const message = e.target.message.value
+                setContactStatus('sending')
+                try {
+                  await contactService.submit({ name, email, message })
+                  setContactStatus('sent')
+                } catch {
+                  setContactStatus('error')
+                }
+              }}>
+                <div className="form-group" style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                  <label htmlFor="contact-name" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Name</label>
+                  <input id="contact-name" name="name" type="text" placeholder="Your Name" required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                  <label htmlFor="contact-email" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Email</label>
+                  <input id="contact-email" name="email" type="email" placeholder="yourname@example.com" required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }} />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                  <label htmlFor="contact-message" style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>Message</label>
+                  <textarea id="contact-message" name="message" rows="4" placeholder="Your Message..." required style={{ width: '100%', padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.95rem', resize: 'vertical' }}></textarea>
+                </div>
+                {contactStatus === 'error' && (
+                  <p style={{ color: '#F87171', marginBottom: '1rem' }}>Failed to send — please try again or email us directly.</p>
+                )}
+                <button type="submit" className="btn btn--primary" disabled={contactStatus === 'sending'} style={{ width: '100%', padding: '1rem', fontWeight: '600' }}>
+                  {contactStatus === 'sending' ? 'Sending...' : 'Send Message'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

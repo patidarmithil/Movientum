@@ -567,7 +567,9 @@ button {
 .movie-grid > .stagger-item-wrap,
 .explore-grid > .stagger-item-wrap,
 .search-results-grid > .stagger-item-wrap,
-.person-page__film-grid > .stagger-item-wrap {
+.person-page__film-grid > .stagger-item-wrap,
+.news-grid > .stagger-item-wrap,
+.watchlist-grid > .stagger-item-wrap {
   width: 100%;
 }
 

@@ -27,11 +27,11 @@ export const authService = {
   logout: () =>
     api.post(`${BASE}/logout`).then((r) => r.data.data),
 
+  // Backend expects the refresh token in the JSON body (RefreshRequest.refresh_token).
+  // Sending it only as a Bearer header produced a 422 and looked like an expired session.
   refreshToken: (refreshToken) =>
     api
-      .post(`${BASE}/refresh`, {}, {
-        headers: { Authorization: `Bearer ${refreshToken}` },
-      })
+      .post(`${BASE}/refresh`, { refresh_token: refreshToken })
       .then((r) => r.data.data),
 
   getMe: () =>

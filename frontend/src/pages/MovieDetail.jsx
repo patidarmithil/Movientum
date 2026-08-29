@@ -11,6 +11,7 @@
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { pageService } from '../services/pageService'
+import { movieService } from '../services/movieService'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
 import { useAuth } from '../context/AuthContext'
@@ -24,10 +25,12 @@ import ProductionTags from '../components/ProductionTags'
 import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import { pageCache } from '../utils/pageCache'
+import { resolveOttLink } from '../utils/ottLinks'
 import { fireBurst } from '../utils/burstEffect'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
+import LazyMount from '../components/LazyMount'
 import MovieRow from '../components/MovieRow'
 import AIRecommendations from '../components/AIRecommendations'
 import './MovieDetail.css'
@@ -196,6 +199,7 @@ export default function MovieDetail() {
   const trailerKey = videosData?.trailer_key || null
 
   const [collection, setCollection] = useState(null)
+  const [providers, setProviders] = useState(cachedData?.providers || null)
   // Credits ride along in the page bundle and are handed to <CastCrew> as a prop
   // so it doesn't fire its own request.
   const [credits, setCredits] = useState(cachedData?.credits || null)
@@ -469,13 +473,20 @@ export default function MovieDetail() {
         if (cancelled) return
 
         const detail = data?.detail || null
-        const similarData = data?.similar?.movies || []
         const creditsData = data?.credits || null
+
+        // `similar: null` is the backend saying "this section was not cached and
+        // I refused to block the page on recomputing it". Everything above the
+        // fold paints now; the row keeps its skeleton and is fetched on its own
+        // just below. An empty `{movies: []}` is a real answer and is honoured.
+        const similarPending = data?.similar == null
+        const similarData = data?.similar?.movies || []
 
         if (detail) setMovie(detail)
         setVideosData(data?.videos || null)
         setCredits(creditsData)
-        setSimilar(similarData)
+        setProviders(data?.providers?.available ? data.providers : null)
+        if (!similarPending) setSimilar(similarData)
 
         // Franchise strip: drop the movie being viewed, then label each remaining
         // part relative to its release date.
@@ -511,18 +522,36 @@ export default function MovieDetail() {
           movie: detail,
           videosData: data?.videos || null,
           credits: creditsData,
-          similar: similarData,
+          providers: data?.providers?.available ? data.providers : null,
+          ...(similarPending ? {} : { similar: similarData }),
           watchStatus: data?.watch_status || undefined,
         })
+
+        // Everything above the fold is on screen at this point.
+        setLoading(false)
+
+        if (!similarPending) {
+          setSimilarLoading(false)
+          return
+        }
+
+        // Second request, only on a cold title: same endpoint the row always
+        // used, so the results are exactly what the bundle would have carried.
+        movieService.getSimilar(movieId, 'movie')
+          .then((res) => {
+            if (cancelled) return
+            const rows = res?.movies || []
+            setSimilar(rows)
+            pageCache.set(cacheKey, { ...(pageCache.get(cacheKey) || {}), similar: rows })
+          })
+          .catch(() => { if (!cancelled) setSimilar([]) })
+          .finally(() => { if (!cancelled) setSimilarLoading(false) })
       })
       .catch(() => {
         if (cancelled) return
         if (!movie || !movie.overview) setError('Failed to load movie')
         setSimilar([])
         setCredits({ cast: [], crew: [] })
-      })
-      .finally(() => {
-        if (cancelled) return
         setLoading(false)
         setSimilarLoading(false)
       })
@@ -817,7 +846,7 @@ export default function MovieDetail() {
                 <div className="skeleton" style={{ height: 16, width: '60%', borderRadius: 4 }} />
               </div>
             ) : movie.overview && (
-              <>
+              <div className="movie-detail__overview-block">
                 <p className={`movie-detail__overview ${!overviewExpanded && movie.overview.length > 260 ? 'movie-detail__overview--clamped' : ''}`}>
                   {movie.overview}
                 </p>
@@ -830,7 +859,7 @@ export default function MovieDetail() {
                     {overviewExpanded ? 'Show Less' : 'Read More'}
                   </button>
                 )}
-              </>
+              </div>
             )}
 
             {/* Actions & Financials Container */}
@@ -894,6 +923,53 @@ export default function MovieDetail() {
                 )}
               </div>
             </div>
+
+            {/* Where to Watch (OTT) */}
+            {providers && providers.providers.length > 0 && (
+              <div className="movie-detail__ott">
+                <div className="movie-detail__ott-header">
+                  <h4>Watch Online</h4>
+                </div>
+                <div className="movie-detail__ott-list">
+                  {providers.providers.map((p) => {
+                    // Each row goes to that platform with the title already
+                    // searched, instead of every logo pointing at the same TMDB
+                    // redirect page. Unmapped providers keep the TMDB link.
+                    const { url, direct } = resolveOttLink(p, {
+                      title: movie.title,
+                      year: movie.release_year || (movie.release_date || '').slice(0, 4),
+                      region: providers.region,
+                      mediaType: 'movie',
+                      fallback: providers.link,
+                    })
+                    return (
+                    <a
+                      key={p.id}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="movie-detail__ott-row"
+                      aria-label={
+                        direct
+                          ? `Find ${movie.title} on ${p.name} (opens in a new tab)`
+                          : `Where to watch ${movie.title} (opens in a new tab)`
+                      }
+                    >
+                      <img className="movie-detail__ott-logo" src={p.logo_path} alt="" loading="lazy" />
+                      <span className="movie-detail__ott-meta">
+                        <span className="movie-detail__ott-name">{p.name}</span>
+                        <span className="movie-detail__ott-category">{p.category}</span>
+                      </span>
+                      <svg className="movie-detail__ott-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="7" y1="17" x2="17" y2="7"></line>
+                        <polyline points="7 7 17 7 17 17"></polyline>
+                      </svg>
+                    </a>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Toast */}
             {watchMsg && (
@@ -975,7 +1051,11 @@ export default function MovieDetail() {
         {credits && <CastCrew movieId={movieId} credits={credits} />}
 
         {/* ── In The News ── */}
-        <NewsArticlesSection itemId={movieId} mediaType="movie" />
+        {/* Deferred: this section fetches its own feed on mount, and that
+            request used to leave the gate alongside the page bundle. */}
+        <LazyMount minHeight={160}>
+          <NewsArticlesSection itemId={movieId} mediaType="movie" />
+        </LazyMount>
 
         {/* ── Production Companies & Countries ── */}
         <ProductionTags
@@ -999,13 +1079,15 @@ export default function MovieDetail() {
 
         {/* ── AI Recommendations ── */}
         {movie && (
-          <div className="movie-detail__ai-recs">
-            <AIRecommendations
-              seedTmdbId={movie.id}
-              seedMediaType="movie"
-              seedTitle={movie.title}
-            />
-          </div>
+          <LazyMount minHeight={200}>
+            <div className="movie-detail__ai-recs">
+              <AIRecommendations
+                seedTmdbId={movie.id}
+                seedMediaType="movie"
+                seedTitle={movie.title}
+              />
+            </div>
+          </LazyMount>
         )}
       </div>
 

@@ -47,6 +47,15 @@
     <title>Movientum — Your Movies, Your Way</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Warm the TCP + TLS handshakes for the origins every page needs, so the
+         first API call and the first poster do not pay for them. The API origin
+         is the deployed backend; a local dev build overrides it via VITE_API_URL
+         and simply never uses this hint. -->
+    <link rel="preconnect" href="https://movientum.azurewebsites.net" crossorigin />
+    <link rel="preconnect" href="https://image.tmdb.org" />
+    <link rel="dns-prefetch" href="https://image.tmdb.org" />
+    <!-- The backdrop trailer player, loaded only when a trailer exists. -->
+    <link rel="dns-prefetch" href="https://www.youtube.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
     <meta name="google-site-verification" content="AUDJ78xhzpQJzefgpwCcNUWJyXzRvjLF6J3KTHJDJkc" />
 

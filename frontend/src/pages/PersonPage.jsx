@@ -22,6 +22,19 @@ function initials(name = '') {
   return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 }
 
+function FilmPoster({ src, alt }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`film-card__poster poster-progressive ${loaded ? 'poster-progressive--loaded' : ''}`}
+      loading="lazy"
+      onLoad={() => setLoaded(true)}
+    />
+  )
+}
+
 export default function PersonPage() {
   const { id } = useParams()
   const personId = Number(id)
@@ -322,12 +335,7 @@ export default function PersonPage() {
                               {...cardProps}
                             >
                               <div className="film-card__poster-wrap">
-                                <img
-                                  src={w.poster_path}
-                                  alt={w.title}
-                                  className="film-card__poster"
-                                  loading="lazy"
-                                />
+                                <FilmPoster src={w.poster_path} alt={w.title} />
                                 {w.media_type === 'tv' && (
                                   <span className="film-card__badge">TV</span>
                                 )}

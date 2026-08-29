@@ -11,6 +11,20 @@ import { useLocation, useNavigationType } from 'react-router-dom'
 // the wheel, which reads as the page sticking on one section.
 const NO_SCROLL_RESTORE = new Set(['/intro', '/about'])
 
+// Restoration used to log on every debounced save and on every element it
+// recovered. Those calls run while the reader is scrolling, and serialising a
+// state object into the console on each one is real work in a production build.
+// Kept for debugging, silent in production.
+const log = (...args) => {
+  if (import.meta.env.DEV) console.log('[ScrollRestore]', ...args)
+}
+
+// Events a script cannot synthesise, so any of them means the reader has taken
+// over and every pending scroll correction must be abandoned. Deliberately not
+// 'scroll': the restore loop's own `window.scrollTo` fires that, which would
+// make the loop cancel itself on its first frame.
+const USER_INPUT_EVENTS = ['wheel', 'touchstart', 'keydown', 'mousedown']
+
 export default function ScrollRestore() {
   const location = useLocation()
   const navigationType = useNavigationType() // 'PUSH', 'POP', or 'REPLACE'
@@ -42,46 +56,66 @@ export default function ScrollRestore() {
       }
     } catch (e) {}
 
-    const handleScroll = (e) => {
-      const isWindow = 
-        e.target === document || 
-        e.target === window || 
-        e.target === document.documentElement || 
-        e.target === document.body
+    // Cache element -> identifier so a dragged/auto-scrolled element (many
+    // 'scroll' events per second) is never re-scanned via getElementsByClassName.
+    const identifierCache = new WeakMap()
 
-      if (isWindow) {
-        scrollState.window = window.scrollY
-      } else {
-        const element = e.target
-        
-        // Generate a unique selector/identifier for the scrolled element
-        let identifier = element.id ? `#${element.id}` : ''
-        if (!identifier && element.className) {
-          const firstClass = element.className.split(' ').filter(Boolean)[0]
-          if (firstClass) {
-            const elements = Array.from(document.getElementsByClassName(firstClass))
-            const index = elements.indexOf(element)
-            if (index !== -1) {
-              identifier = `.${firstClass}[${index}]`
-            }
-          }
-        }
-        if (!identifier) {
-          const tagName = element.tagName.toLowerCase()
-          const elements = Array.from(document.getElementsByTagName(tagName))
+    const getIdentifier = (element) => {
+      if (identifierCache.has(element)) return identifierCache.get(element)
+
+      let identifier = element.id ? `#${element.id}` : ''
+      if (!identifier && element.className) {
+        const firstClass = element.className.split(' ').filter(Boolean)[0]
+        if (firstClass) {
+          const elements = Array.from(document.getElementsByClassName(firstClass))
           const index = elements.indexOf(element)
           if (index !== -1) {
-            identifier = `${tagName}[${index}]`
-          }
-        }
-
-        if (identifier) {
-          scrollState.elements[identifier] = {
-            scrollLeft: element.scrollLeft,
-            scrollTop: element.scrollTop
+            identifier = `.${firstClass}[${index}]`
           }
         }
       }
+      if (!identifier) {
+        const tagName = element.tagName.toLowerCase()
+        const elements = Array.from(document.getElementsByTagName(tagName))
+        const index = elements.indexOf(element)
+        if (index !== -1) {
+          identifier = `${tagName}[${index}]`
+        }
+      }
+
+      identifierCache.set(element, identifier)
+      return identifier
+    }
+
+    // rAF-throttle: a dragged/auto-scrolled row can fire dozens of 'scroll'
+    // events per second, and running the full handler on each one is what
+    // caused the visible stutter/lag while scrolling. One update per frame
+    // is plenty for a position save.
+    let rafId = null
+    let pendingTargets = new Set()
+
+    const flush = () => {
+      rafId = null
+      pendingTargets.forEach((target) => {
+        const isWindow =
+          target === document ||
+          target === window ||
+          target === document.documentElement ||
+          target === document.body
+
+        if (isWindow) {
+          scrollState.window = window.scrollY
+        } else {
+          const identifier = getIdentifier(target)
+          if (identifier) {
+            scrollState.elements[identifier] = {
+              scrollLeft: target.scrollLeft,
+              scrollTop: target.scrollTop
+            }
+          }
+        }
+      })
+      pendingTargets.clear()
 
       // Debounce writing to sessionStorage to avoid performance overhead
       clearTimeout(timeoutId)
@@ -89,9 +123,16 @@ export default function ScrollRestore() {
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify(scrollState))
           scrollRegistry.current[cacheKey] = scrollState
-          console.log(`[ScrollRestore] Saved scroll state for ${location.pathname}${location.search}:`, scrollState)
+          log(`saved ${location.pathname}${location.search}`, scrollState)
         } catch (err) {}
       }, 100)
+    }
+
+    const handleScroll = (e) => {
+      pendingTargets.add(e.target)
+      if (rafId === null) {
+        rafId = requestAnimationFrame(flush)
+      }
     }
 
     // Use capture phase to catch scroll events from individual sub-elements (scroll does not bubble)
@@ -100,6 +141,7 @@ export default function ScrollRestore() {
     return () => {
       window.removeEventListener('scroll', handleScroll, { capture: true })
       clearTimeout(timeoutId)
+      if (rafId !== null) cancelAnimationFrame(rafId)
     }
   }, [location, skip])
 
@@ -130,21 +172,43 @@ export default function ScrollRestore() {
       const targetWindowScroll = savedData.window ?? 0
       const targetElementScrolls = savedData.elements ?? {}
       
-      console.log(`[ScrollRestore] POP navigation to ${location.pathname}${location.search}. Restoring window to ${targetWindowScroll} and sub-elements:`, targetElementScrolls)
+      log(`POP to ${location.pathname}${location.search}: window -> ${targetWindowScroll}`, targetElementScrolls)
 
       let active = true
       let attempts = 0
       const maxAttempts = 300 // Try for ~5 seconds (300 frames at 60fps) to let async data fetch and render
       const restoredElements = new Set()
+      // ~1.3 s at 60fps. Long enough for a row to mount and lay out, short
+      // enough that a selector which will never resolve stops costing frames.
+      const ELEMENT_CHASE_FRAMES = 80
+      let windowDone = targetWindowScroll <= 20
+
+      // The reader always outranks the restore loop.
+      //
+      // These are input events a script cannot produce, so seeing one means the
+      // person has taken over — at which point continuing to call
+      // `window.scrollTo(0, target)` every frame yanks them back and reads as the
+      // page refusing to scroll. That was the bug: when the saved position could
+      // not be reached (content still loading, or a saved sub-element no longer
+      // in the DOM) the loop never satisfied its exit condition and kept
+      // re-scrolling for the full five seconds while the reader fought it.
+      const stop = () => {
+        if (!active) return
+        active = false
+        for (const evt of USER_INPUT_EVENTS) {
+          window.removeEventListener(evt, stop, { capture: true })
+        }
+      }
+      for (const evt of USER_INPUT_EVENTS) {
+        window.addEventListener(evt, stop, { capture: true, passive: true })
+      }
 
       const restore = () => {
         if (!active) return
 
-        // A. Restore window scroll position
-        if (targetWindowScroll > 20) {
-          const currentHeight = document.documentElement.scrollHeight
-          const maxScrollable = currentHeight - window.innerHeight
-          
+        // A. Restore window scroll position — but only until it lands. Re-issuing
+        // the call after that is what fought the reader.
+        if (!windowDone) {
           window.scrollTo(0, targetWindowScroll)
         }
 
@@ -190,7 +254,7 @@ export default function ScrollRestore() {
 
             if (checkLeft && checkTop) {
               restoredElements.add(selector)
-              console.log(`[ScrollRestore] Successfully restored element ${selector} to left=${element.scrollLeft}, top=${element.scrollTop}`)
+              log(`restored ${selector} -> left=${element.scrollLeft} top=${element.scrollTop}`)
             } else {
               allElementsRestored = false
             }
@@ -201,11 +265,25 @@ export default function ScrollRestore() {
 
         // Check if both window scroll and element scrolls are complete
         const isAtBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 5
-        const windowRestored = targetWindowScroll <= 20 || Math.abs(window.scrollY - targetWindowScroll) < 10 || isAtBottom
-        const allRestored = windowRestored && allElementsRestored
+        if (!windowDone &&
+            (Math.abs(window.scrollY - targetWindowScroll) < 10 || isAtBottom)) {
+          windowDone = true
+        }
+        const allRestored = windowDone && allElementsRestored
 
         if (allRestored) {
-          console.log(`[ScrollRestore] Full restoration complete for window and elements on attempt ${attempts + 1}`)
+          log(`complete on attempt ${attempts + 1}`)
+          stop()
+          return
+        }
+
+        // A saved sub-element that no longer exists — a row that was removed, or
+        // an index that now points at a different node — can never be restored,
+        // so element chasing gets its own short budget. Without it the loop ran
+        // the full five seconds on every such page.
+        if (windowDone && attempts >= ELEMENT_CHASE_FRAMES) {
+          log(`giving up on unrestored elements after ${attempts} frames`)
+          stop()
           return
         }
 
@@ -213,7 +291,8 @@ export default function ScrollRestore() {
           attempts++
           requestAnimationFrame(restore)
         } else {
-          console.warn(`[ScrollRestore] Restoration loop finished after ${maxAttempts} attempts. Restored elements:`, Array.from(restoredElements))
+          log(`loop finished after ${maxAttempts} attempts`, Array.from(restoredElements))
+          stop()
         }
       }
 
@@ -223,20 +302,43 @@ export default function ScrollRestore() {
       }, 50)
 
       return () => {
-        active = false
+        stop()
         clearTimeout(startTimeout)
       }
     } else {
       // PUSH/REPLACE navigation or no saved data -> reset to top ONLY if push or path changed
       if (navigationType === 'PUSH' || pathChanged) {
-        console.log(`[ScrollRestore] ${navigationType} navigation to ${location.pathname}${location.search} (path changed: ${pathChanged}). Scrolling to top.`)
+        log(`${navigationType} to ${location.pathname}${location.search}: scrolling to top`)
         window.scrollTo(0, 0)
-        requestAnimationFrame(() => {
+        // Two follow-ups, because content mounting after the first frame can
+        // shift the document. Both are cancelled if the reader scrolls first —
+        // otherwise a fast scroll right after landing gets snapped back to top.
+        let cancelled = false
+        const cancel = () => {
+          cancelled = true
+          for (const evt of USER_INPUT_EVENTS) {
+            window.removeEventListener(evt, cancel, { capture: true })
+          }
+        }
+        for (const evt of USER_INPUT_EVENTS) {
+          window.addEventListener(evt, cancel, { capture: true, passive: true })
+        }
+        const raf = requestAnimationFrame(() => {
+          if (cancelled) return
           window.scrollTo(0, 0)
-          setTimeout(() => window.scrollTo(0, 0), 50)
         })
+        const t = setTimeout(() => {
+          if (!cancelled) window.scrollTo(0, 0)
+          cancel()
+        }, 50)
+
+        return () => {
+          cancel()
+          cancelAnimationFrame(raf)
+          clearTimeout(t)
+        }
       } else {
-        console.log(`[ScrollRestore] ${navigationType} navigation to ${location.pathname}${location.search} (path changed: ${pathChanged}). Keeping scroll position.`)
+        log(`${navigationType} to ${location.pathname}${location.search}: keeping position`)
       }
     }
   }, [location, navigationType, skip])

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
+import { notificationService } from '../services/notificationService'
 import SearchOverlay from './SearchOverlay'
 import TrailerModal from './TrailerModal'
 import api from '../utils/api'
@@ -26,6 +27,10 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef(null)
+
+  // Server-side notifications (admin messages, contact/feedback alerts) — persisted
+  // via /api/v1/notifications, separate from the client-computed watchlist notifs above.
+  const [serverNotifs, setServerNotifs] = useState([])
   
   const [trailerModalOpen, setTrailerModalOpen] = useState(false)
   const [trailerModalData, setTrailerModalData] = useState(null)
@@ -267,6 +272,13 @@ export default function Navbar() {
     }
   }, [isLoggedIn])
 
+  useEffect(() => {
+    if (!isLoggedIn) { setServerNotifs([]); return }
+    notificationService.getNotifications()
+      .then((data) => setServerNotifs(Array.isArray(data) ? data : []))
+      .catch(() => setServerNotifs([]))
+  }, [isLoggedIn])
+
   const safeNotifications = Array.isArray(notifications) ? notifications : []
   const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
 
@@ -277,6 +289,9 @@ export default function Navbar() {
     const nDate = new Date(n.created_at)
     return !n.seen && n.category === 'released' && nDate >= thirtyDaysAgo
   }).length
+
+  const serverUnreadCount = serverNotifs.filter(n => !n.seen).length
+  const totalUnreadCount = unreadCount + serverUnreadCount
 
   const handleNotifClick = () => {
     setNotifOpen(!notifOpen)
@@ -293,6 +308,16 @@ export default function Navbar() {
       localStorage.setItem('wl_notifs_seen', JSON.stringify(savedSeen))
       setNotifications(safeNotifications.map(n => ({...n, seen: savedSeen[n.id] || false})))
     }
+    if (!notifOpen && serverUnreadCount > 0) {
+      notificationService.markAllSeen()
+        .then(() => setServerNotifs(prev => prev.map(n => ({ ...n, seen: true }))))
+        .catch(() => {})
+    }
+  }
+
+  const handleServerNotifClick = (n) => {
+    setNotifOpen(false)
+    if (n.link) navigate(n.link)
   }
 
   const handleClearNotifs = () => {
@@ -651,8 +676,8 @@ export default function Navbar() {
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                   </svg>
-                  {unreadCount > 0 && (
-                    <span className="navbar__notif-badge">{unreadCount}</span>
+                  {totalUnreadCount > 0 && (
+                    <span className="navbar__notif-badge">{totalUnreadCount}</span>
                   )}
                 </button>
                 {notifOpen && (
@@ -673,9 +698,30 @@ export default function Navbar() {
                     <div className="navbar__notif-tabs">
                       <button className={`navbar__notif-tab ${activeNotifTab === 'released' ? 'active' : ''}`} onClick={() => setActiveNotifTab('released')}>Released</button>
                       <button className={`navbar__notif-tab ${activeNotifTab === 'upcoming' ? 'active' : ''}`} onClick={() => setActiveNotifTab('upcoming')}>Upcoming</button>
+                      <button className={`navbar__notif-tab ${activeNotifTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveNotifTab('messages')}>
+                        Messages{serverUnreadCount > 0 ? ` (${serverUnreadCount})` : ''}
+                      </button>
                     </div>
                     <div className="navbar__notif-list">
-                      {filteredNotifs.length === 0 ? (
+                      {activeNotifTab === 'messages' ? (
+                        serverNotifs.length === 0 ? (
+                          <div className="navbar__notif-empty">No notifications</div>
+                        ) : (
+                          serverNotifs.map((n) => (
+                            <div
+                              key={n.id}
+                              className="navbar__notif-item"
+                              style={{ cursor: n.link ? 'pointer' : 'default' }}
+                              onClick={() => handleServerNotifClick(n)}
+                            >
+                              <div className="navbar__notif-content">
+                                <span className="navbar__notif-message">{n.message}</span>
+                                <span className="navbar__notif-date">{formatDayMonth(n.created_at)}</span>
+                              </div>
+                            </div>
+                          ))
+                        )
+                      ) : filteredNotifs.length === 0 ? (
                         <div className="navbar__notif-empty">
                           No notifications
                         </div>

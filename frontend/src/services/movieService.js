@@ -47,10 +47,16 @@ export const movieService = {
     api.get('/api/v1/movies', { params: { genre, page, sort, limit } }).then((r) => r.data),
 
   /**
-   * GET /api/v1/recommendations/similar/{id} → top 10 similar movies
+   * GET /api/v1/recommendations/similar/{id} → blended similar items
+   *
+   * The detail-page bundle carries this section only when it is already cached
+   * server-side; on a cold title it returns `similar: null` and the page falls
+   * back to this call so the rest of the page can paint immediately.
    */
-  getSimilar: (id) =>
-    api.get(`/api/v1/recommendations/similar/${id}`).then((r) => r.data),
+  getSimilar: (id, mediaType = 'movie') =>
+    api
+      .get(`/api/v1/recommendations/similar/${id}`, { params: { media_type: mediaType } })
+      .then((r) => r.data),
 
   /**
    * GET /api/v1/movies/genres → list of genre strings

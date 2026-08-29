@@ -9,7 +9,10 @@ import { newsService } from '../services/newsService'
 import { useAuth } from '../context/AuthContext'
 import NewsCard from './NewsCard'
 import ShinyText from './ShinyText'
+import { observeOnce } from '../utils/sharedObserver'
 import './HomeNewsStrip.css'
+
+const REVEAL_OBSERVER_OPTIONS = { threshold: 0.05, rootMargin: '0px 100px 0px 100px' }
 
 function ViewportRevealNewsItem({ article, index }) {
   const [isVisible, setIsVisible] = useState(false)
@@ -18,19 +21,7 @@ function ViewportRevealNewsItem({ article, index }) {
   useEffect(() => {
     const el = itemRef.current
     if (!el) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.05, rootMargin: '0px 100px 0px 100px' }
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
+    return observeOnce(el, () => setIsVisible(true), REVEAL_OBSERVER_OPTIONS)
   }, [])
 
   const delay = isVisible ? `${(index % 8) * 40}ms` : '0ms'
