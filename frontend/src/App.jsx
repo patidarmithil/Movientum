@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import InstallPrompt from './components/InstallPrompt'
 import InfoBanner from './components/InfoBanner'
+import DbOverloadBanner from './components/DbOverloadBanner'
 import { Analytics } from '@vercel/analytics/react'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -43,6 +44,8 @@ const RecommendationsContent = lazy(() => import('./pages/RecommendationsContent
 const Search = lazy(() => import('./pages/Search'))
 const PersonPage = lazy(() => import('./pages/PersonPage'))
 const Explore = lazy(() => import('./pages/Explore'))
+const TierList = lazy(() => import('./pages/TierList'))
+const TierBoard = lazy(() => import('./pages/TierBoard'))
 const Analysis = lazy(() => import('./pages/Analysis'))
 const News = lazy(() => import('./pages/News'))
 const CompanyPage = lazy(() => import('./pages/CompanyPage'))
@@ -184,6 +187,10 @@ function AppRoutes() {
       title = "Person - Movientum";
     } else if (path === "/explore") {
       title = "Explore - Movientum";
+    } else if (path === "/tierlist") {
+      title = "Tier Lists - Movientum";
+    } else if (path.startsWith("/tierlist/")) {
+      title = "Tier List Maker - Movientum";
     } else if (path === "/most-interested") {
       title = "Most Interested - Movientum";
     } else if (path === "/help") {
@@ -219,6 +226,7 @@ function AppRoutes() {
       <Navbar />
       <InstallPrompt />
       <InfoBanner />
+      <DbOverloadBanner />
       {/* Suspense sits OUTSIDE AnimatePresence on purpose: AnimatePresence only
           tracks its direct child, so slotting a wrapper between it and the keyed
           <Routes> would break the page exit transitions.
@@ -286,6 +294,18 @@ function AppRoutes() {
 
           {/* Improvement 1.6 — Explore */}
           <Route path="/explore" element={<PageTransition><Explore /></PageTransition>} />
+
+          {/* Tier lists — browse, build, and open a shared board */}
+          <Route path="/tierlist" element={<PageTransition><TierList /></PageTransition>} />
+          <Route path="/tierlist/new" element={<PageTransition><TierBoard mode="blank" /></PageTransition>} />
+          <Route path="/tierlist/t/:slug" element={<PageTransition><TierBoard mode="template" /></PageTransition>} />
+          <Route path="/tierlist/s/:shareId" element={<PageTransition><TierBoard mode="share" /></PageTransition>} />
+          <Route path="/tierlist/my/:id" element={
+            <ProtectedRoute><PageTransition><TierBoard mode="saved" /></PageTransition></ProtectedRoute>
+          } />
+          {/* React Router matches case-sensitively, so the camelCase spelling
+              people are likely to type by hand needs its own redirect. */}
+          <Route path="/tierList" element={<Navigate to="/tierlist" replace />} />
 
           {/* Most Interested Full List */}
           <Route path="/most-interested" element={<PageTransition><MostInterested /></PageTransition>} />

@@ -59,6 +59,31 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+// ── DB overload detector ──────────────────────────────────────
+// Both primary and secondary backends failing with a network/5xx error is
+// treated as the DB (Supabase egress cap) being down, not a one-off blip.
+// Throttled so one bad page load doesn't fire the banner a dozen times.
+let lastDbOverloadDispatch = 0
+const DB_OVERLOAD_THROTTLE_MS = 30000
+
+const maybeSignalDbOverload = (error, original) => {
+  const isServerOrNetworkError =
+    !error.response ||
+    error.code === 'ECONNABORTED' ||
+    (error.response.status >= 500 && error.response.status <= 599)
+
+  const exhaustedFallback = !SECONDARY_URL || original?._secondaryRetry
+  if (!isServerOrNetworkError || !exhaustedFallback) return
+
+  const now = Date.now()
+  if (now - lastDbOverloadDispatch < DB_OVERLOAD_THROTTLE_MS) return
+  lastDbOverloadDispatch = now
+
+  window.dispatchEvent(new CustomEvent('mv:db-overload', {
+    detail: { message: error.message, status: error.response?.status ?? null }
+  }))
+}
+
 // ── Response interceptor — 401 → refresh → retry ─────────────
 let isRefreshing = false
 let failedQueue = []           // queue requests while refreshing
@@ -134,6 +159,10 @@ api.interceptors.response.use(
         return api(original);
       }
     }
+
+    // Both backends exhausted (or no fallback configured) and still a server/network
+    // error — signal the DB-overload banner before falling through to normal handling.
+    maybeSignalDbOverload(error, original)
 
     // Skip retry for auth endpoints where 401 means invalid credentials, not an expired access token
     if (original?.url?.includes('/auth/refresh')) {

@@ -41,7 +41,15 @@ export const searchService = {
   instantSearch: (query, search_type = 'content', signal) =>
     api
       .get(`${BASE}/instant`, { params: { q: query, type: search_type }, signal })
-      .then((r) => r.data.data),
+      .then((r) => {
+        // The endpoint wraps its rows: { data: { results, query, total } }.
+        // Normalise here so every caller gets a plain array and nobody has to
+        // remember the wrapper (the tier list "Add titles" modal did not, and
+        // silently showed "nothing matched" for every query).
+        const payload = r.data?.data
+        if (Array.isArray(payload)) return payload
+        return payload?.results ?? []
+      }),
 
   /**
    * Browse by genre (no text query).

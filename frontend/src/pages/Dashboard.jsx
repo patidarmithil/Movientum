@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { pageService } from '../services/pageService'
+import { tierListService } from '../services/tierListService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import WatchlistCollectionCard from '../components/WatchlistCollectionCard'
@@ -26,6 +27,7 @@ import './Dashboard.css'
 const TABS = [
   { key: 'watchlist', label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> My Watchlists</> },
   { key: 'history',   label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><polyline points="20 6 9 17 4 12"></polyline></svg> Watched</> },
+  { key: 'tierlists', label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> My Tier Lists</> },
   { key: 'ratings',   label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg> My Ratings</> },
 ]
 
@@ -65,7 +67,41 @@ function RatingCard({ item }) {
   )
 }
 
-function TabContent({ tab, data, loading, error }) {
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
+
+/**
+ * One saved tier list. The covers are the four posters the board API already
+ * returns, so the card is made of what was ranked rather than a generic tile.
+ */
+function TierListCard({ board, onDelete }) {
+  return (
+    <div className="dashboard-tier-card">
+      <Link to={`/tierlist/my/${board.id}`} className="dashboard-tier-card__link">
+        <span className="dashboard-tier-card__covers">
+          {(board.covers || []).slice(0, 4).map((c, i) => (
+            <img key={c + i} src={`${TMDB_IMAGE_BASE}/w92${c}`} alt="" loading="lazy" />
+          ))}
+        </span>
+        <span className="dashboard-tier-card__body">
+          <span className="dashboard-tier-card__title">{board.title}</span>
+          <span className="dashboard-tier-card__meta">
+            {board.ranked_count} of {board.item_count} ranked
+          </span>
+        </span>
+      </Link>
+      <button
+        type="button"
+        className="dashboard-tier-card__delete"
+        onClick={() => onDelete(board)}
+        aria-label={`Delete ${board.title}`}
+      >
+        Delete
+      </button>
+    </div>
+  )
+}
+
+function TabContent({ tab, data, loading, error, onDeleteBoard }) {
   if (loading) {
     return (
       <div className="movie-grid">
@@ -87,8 +123,21 @@ function TabContent({ tab, data, loading, error }) {
       history:   'No watch history yet. Start watching movies!',
       watchlist: 'You do not have any watchlists yet. Create one to get started!',
       ratings:   "You haven't rated any movies yet.",
+      tierlists: 'No saved tier lists yet. Rank something on the Tier Lists page.',
     }
     return <EmptyTab message={EMPTY_MSGS[tab]} />
+  }
+
+  if (tab === 'tierlists') {
+    return (
+      <StaggerContainer className="dashboard-tier-grid" instant={true}>
+        {data.map((board, index) => (
+          <StaggerItem key={board.id} index={index}>
+            <TierListCard board={board} onDelete={onDeleteBoard} />
+          </StaggerItem>
+        ))}
+      </StaggerContainer>
+    )
   }
 
   if (tab === 'ratings') {
@@ -137,14 +186,17 @@ export default function Dashboard() {
   const [history,   setHistory]   = useState([])
   const [watchlist, setWatchlist] = useState([])
   const [ratings,   setRatings]   = useState([])
+  const [tierlists, setTierlists] = useState([])
 
   const [loadH, setLoadH] = useState(false)
   const [loadW, setLoadW] = useState(false)
   const [loadR, setLoadR] = useState(false)
+  const [loadT, setLoadT] = useState(false)
 
   const [errH, setErrH] = useState(null)
   const [errW, setErrW] = useState(null)
   const [errR, setErrR] = useState(null)
+  const [errT, setErrT] = useState(null)
 
   // One request, one Redis read, all three lists. The bundle is cached 48 h and
   // busted server-side the moment the user rates / watches / plans / edits a
@@ -166,13 +218,33 @@ export default function Dashboard() {
       .finally(() => { setLoadH(false); setLoadW(false); setLoadR(false) })
   }, [])
 
+  // Boards are not part of the dashboard bundle — they live behind their own
+  // endpoint and change whenever somebody saves a board, so they are fetched on
+  // their own rather than lengthening a 48 h cached payload.
+  const fetchBoards = useCallback(() => {
+    setLoadT(true)
+    setErrT(null)
+    tierListService.getMine()
+      .then((d) => setTierlists(d?.lists || []))
+      .catch(() => setErrT('Failed to load your tier lists'))
+      .finally(() => setLoadT(false))
+  }, [])
+
+  const deleteBoard = useCallback((board) => {
+    if (!window.confirm(`Delete "${board.title}"? This cannot be undone.`)) return
+    tierListService.remove(board.id)
+      .then(() => setTierlists((prev) => prev.filter((b) => b.id !== board.id)))
+      .catch(() => setErrT('Could not delete that tier list. Try again in a moment.'))
+  }, [])
+
   useEffect(() => {
     fetchAll()
-  }, [fetchAll])
+    fetchBoards()
+  }, [fetchAll, fetchBoards])
 
-  const tabData    = { history, watchlist, ratings }
-  const tabLoading = { history: loadH, watchlist: loadW, ratings: loadR }
-  const tabError   = { history: errH,  watchlist: errW,  ratings: errR  }
+  const tabData    = { history, watchlist, ratings, tierlists }
+  const tabLoading = { history: loadH, watchlist: loadW, ratings: loadR, tierlists: loadT }
+  const tabError   = { history: errH,  watchlist: errW,  ratings: errR,  tierlists: errT }
 
   const initials = (user?.username || user?.email || '?').charAt(0).toUpperCase()
   const avatarUrl = user?.avatar_url
@@ -266,6 +338,7 @@ export default function Dashboard() {
             data={tabData[activeTab]}
             loading={tabLoading[activeTab]}
             error={tabError[activeTab]}
+            onDeleteBoard={deleteBoard}
           />
         </div>
 

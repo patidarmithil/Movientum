@@ -1,0 +1,87 @@
+/* DbOverloadBanner.css */
+
+.db-overload-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9997; /* below InfoBanner/PWA prompt so it never blocks either */
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 380px;
+  width: calc(100% - 40px);
+  background: rgba(20, 18, 20, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  pointer-events: auto;
+  animation: dbOverloadSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dbOverloadSlideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.db-overload-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.db-overload-text {
+  flex: 1;
+  padding-right: 8px;
+}
+
+.db-overload-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #d1d5db;
+}
+
+.db-overload-desc strong {
+  color: #fff;
+}
+
+.db-overload-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.db-overload-close:hover {
+  color: #fff;
+}
+
+@media (max-width: 480px) {
+  .db-overload-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-width: none;
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+}

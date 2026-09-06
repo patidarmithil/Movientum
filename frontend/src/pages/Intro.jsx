@@ -430,10 +430,12 @@ export default function Intro() {
           <div className="intro-contact-modal" onClick={(e) => e.stopPropagation()}>
             <button className="intro-contact-modal__close" onClick={() => { setShowContactModal(false); setContactStatus('idle') }}>&times;</button>
             <h3>Get in Touch</h3>
-            <p className="intro-contact-modal__subtitle">
-              Send a message and we'll reply to the email you give below, or reach out directly at{' '}
-              <a href="mailto:mithilpatidar80@gmail.com">mithilpatidar80@gmail.com</a>.
-            </p>
+            {contactStatus !== 'sent' && (
+              <p className="intro-contact-modal__subtitle">
+                Send a message and we'll reply to the email you give below, or reach out directly at{' '}
+                <a href="mailto:mithilpatidar80@gmail.com">mithilpatidar80@gmail.com</a>.
+              </p>
+            )}
             {contactStatus === 'sent' ? (
               <p style={{ color: '#4ADE80', fontWeight: 600 }}>Message sent — thanks! We'll get back to you soon.</p>
             ) : (

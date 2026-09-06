@@ -24,6 +24,7 @@ import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RatingMeter from '../components/RatingMeter'
 import TrailerModal from '../components/TrailerModal'
+import ImageLightbox from '../components/ImageLightbox'
 import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import ProductionTags from '../components/ProductionTags'
@@ -1071,20 +1072,15 @@ export default function TVDetail() {
         )}
       </div>
 
-      {/* Full screen modal */}
+      {/* The poster opens in the shared lightbox — same gesture, same chrome and
+          the same Escape-to-close as the person page and the tier board. */}
       {isModalOpen && posterUrl && (
-        <div 
-          className="person-page-image-modal" 
-          onClick={() => setIsModalOpen(false)}
-        >
-          <button className="person-page-image-modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
-          <img 
-            src={show.poster_path ? `${TMDB_IMAGE_BASE}/w780${show.poster_path}` : posterUrl} 
-            alt={show.title} 
-            className="person-page-image-modal-img"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
+        <ImageLightbox
+          src={show.poster_path ? `${TMDB_IMAGE_BASE}/original${show.poster_path}` : posterUrl}
+          alt={show.title}
+          caption={show.title}
+          onClose={() => setIsModalOpen(false)}
+        />
       )}
 
       {/* Trailer Modal */}

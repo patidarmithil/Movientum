@@ -279,6 +279,22 @@ export default function Navbar() {
       .catch(() => setServerNotifs([]))
   }, [isLoggedIn])
 
+  // Client-side entry for the DB-overload banner (see api.js / DbOverloadBanner.jsx) —
+  // not persisted server-side since it's about the DB itself being unreachable.
+  useEffect(() => {
+    const handler = () => {
+      setServerNotifs(prev => [{
+        id: `db-overload-${Date.now()}`,
+        message: "Our database is temporarily overloaded — we're fixing this, please try again in a few hours.",
+        created_at: new Date().toISOString(),
+        seen: false,
+        link: null
+      }, ...prev])
+    }
+    window.addEventListener('mv:db-overload', handler)
+    return () => window.removeEventListener('mv:db-overload', handler)
+  }, [])
+
   const safeNotifications = Array.isArray(notifications) ? notifications : []
   const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
 
@@ -581,6 +597,20 @@ export default function Navbar() {
                   <path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/>
                 </svg>
                 <span>Recommendations</span>
+              </NavLink>
+
+              <NavLink
+                to="/tierlist"
+                className={({ isActive }) =>
+                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}`
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                  <rect x="3" y="4" width="18" height="4.5" rx="1"/>
+                  <rect x="3" y="10" width="13" height="4.5" rx="1"/>
+                  <rect x="3" y="16" width="8" height="4.5" rx="1"/>
+                </svg>
+                <span>Tier Lists</span>
               </NavLink>
 
 
@@ -1247,6 +1277,17 @@ export default function Navbar() {
                   <path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5Z"/>
                   <path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/>
                 </svg> Recommendations
+              </NavLink>
+              <NavLink 
+                to="/tierlist" 
+                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
+                  <rect x="3" y="4" width="18" height="4.5" rx="1"/>
+                  <rect x="3" y="10" width="13" height="4.5" rx="1"/>
+                  <rect x="3" y="16" width="8" height="4.5" rx="1"/>
+                </svg> Tier Lists
               </NavLink>
               
               {isLoggedIn && (

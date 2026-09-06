@@ -1,0 +1,685 @@
+/* ═══════════════════════════════════════════════════════
+   Tier board
+
+   The design problem here is that a finished board is a wall of movie posters,
+   and posters are already the loudest thing on any screen. So every piece of
+   chrome is greyscale, and the only colour is one muted block per row — enough
+   to tell S from A at a glance, not enough to fight forty pieces of artwork.
+
+   Radius carries hierarchy rather than being one value everywhere:
+   tiles 4px, rows 6px, panels 12px.
+   ═══════════════════════════════════════════════════════ */
+
+.tierboard-page {
+  --tl-board:    #0C0C0E;
+  --tl-row:      #121216;
+  --tl-row-over: #1B1B24;
+  --tl-rule:     rgba(255, 255, 255, 0.07);
+  --tl-bin:      #0A0A0C;
+  --tl-label-w:  clamp(56px, 9vw, 88px);
+  --tl-tile-w:   clamp(50px, 6.5vw, 74px);
+  --tl-gap:      6px;
+
+  min-height: 100vh;
+  padding-bottom: var(--space-20);
+}
+
+.tierboard-page__inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) 0;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+
+.tierboard-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.tierboard-head__title {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.tierboard-head__title h1,
+.tierboard-head__input {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+/* The title is editable in place; it should read as a heading until you touch it. */
+.tierboard-head__input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 0 0 4px;
+  border-radius: 0;
+}
+
+.tierboard-head__input:hover { border-bottom-color: var(--tl-rule); }
+
+.tierboard-head__input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.tierboard-head__meta {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.tierboard-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tierboard-preset {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.tierboard-preset select {
+  background: var(--surface-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+/* ── Buttons ────────────────────────────────────────── */
+
+.tier-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--ease-hover), border-color var(--ease-hover);
+}
+
+.tier-btn:hover { background: var(--surface-input); border-color: #3A3A44; }
+.tier-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.tier-btn--quiet { background: transparent; }
+.tier-btn--quiet:hover { background: var(--surface-card); }
+
+.tier-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0C0C0E;
+}
+
+.tier-btn--primary:hover { background: #C169FF; border-color: #C169FF; }
+
+/* Destructive, and it looks it only once you are near it — a permanent red
+   button in the header would outshout Save on every visit. */
+.tier-btn--danger {
+  background: transparent;
+  border-color: rgba(255, 77, 109, 0.4);
+  color: #FF7D95;
+}
+
+.tier-btn--danger:hover {
+  background: rgba(255, 77, 109, 0.14);
+  border-color: #FF4D6D;
+  color: #FF4D6D;
+}
+
+.tierboard-notice {
+  margin-bottom: var(--space-4);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ── The board ──────────────────────────────────────── */
+
+.tier-board {
+  background: var(--tl-board);
+  border: 1px solid var(--tl-rule);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.tier-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--tl-rule);
+}
+
+.tier-row:last-child { border-bottom: none; }
+
+/* The label block: solid colour, near-black letter on top. Dark-on-colour reads
+   harder than the white-on-pastel these tools usually use, and it makes the block
+   feel like a physical spine label rather than a highlighter stripe. */
+.tier-row__label {
+  flex: 0 0 var(--tl-label-w);
+  display: grid;
+  place-items: center;
+  padding: var(--space-3) 6px;
+  min-height: calc(var(--tl-tile-w) * 1.5 + var(--tl-gap) * 2);
+  color: #0C0C0E;
+  text-align: center;
+  overflow: hidden;
+}
+
+.tier-row__label span {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  word-break: break-word;
+}
+
+.tier-row__label[data-len='short'] span { font-size: clamp(24px, 4.6vw, 40px); }
+.tier-row__label[data-len='mid']   span { font-size: clamp(15px, 2.6vw, 24px); }
+.tier-row__label[data-len='long']  span { font-size: clamp(11px, 1.7vw, 15px); }
+
+.tier-row__zone {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  gap: var(--tl-gap);
+  padding: var(--tl-gap);
+  background: var(--tl-row);
+  transition: background var(--ease-hover);
+}
+
+.tier-row__zone.is-over { background: var(--tl-row-over); }
+
+/* The hint has to come out of the flex flow to sit in the middle of an empty row:
+   in a wrapping container `align-content` places the line at the top and neither
+   `align-self` nor a stretch can pull a single item down from there. */
+.tier-row__hint,
+.tier-bin__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: #4E4E58;
+  padding: var(--space-3);
+  pointer-events: none;
+}
+
+.tier-row__controls {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--tl-board);
+}
+
+.tier-row__btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6C6C78;
+  cursor: pointer;
+  transition: color var(--ease-hover), background var(--ease-hover);
+}
+
+.tier-row__btn:hover:not(:disabled) { color: var(--text-primary); background: #1E1E26; }
+.tier-row__btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Tiles ──────────────────────────────────────────── */
+
+.tier-tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--tl-tile-w);
+  aspect-ratio: 2 / 3;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #1E1E26;
+  overflow: hidden;
+  cursor: grab;
+  /* Without this the browser scrolls the page instead of letting us drag. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform var(--ease-hover), box-shadow var(--ease-hover);
+}
+
+.tier-tile[data-tile='still'] {
+  width: calc(var(--tl-tile-w) * 1.78);
+  aspect-ratio: 16 / 9;
+}
+
+.tier-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.tier-tile__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* The name only exists for screen readers and the hover tooltip; showing it on
+   every tile would bury the artwork the board is made of. */
+.tier-tile__name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tier-tile:hover:not(:disabled) { transform: translateY(-2px); }
+.tier-tile:disabled { cursor: default; }
+
+.tier-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tier-tile--dragging { opacity: 0.25; }
+
+.tier-tile--held {
+  box-shadow: 0 0 0 2px var(--accent);
+  transform: translateY(-3px);
+}
+
+/* Where the tile will land. A real element in the flow, so the row parts around it. */
+.tier-drop-marker {
+  flex: 0 0 auto;
+  width: 3px;
+  align-self: stretch;
+  min-height: calc(var(--tl-tile-w) * 1.5);
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* The tile that follows the pointer. */
+.tier-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1200;
+  border-radius: 4px;
+  overflow: hidden;
+  pointer-events: none;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  opacity: 0.92;
+}
+
+.tier-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+body.tier-dragging { cursor: grabbing; }
+body.tier-dragging .tier-tile { cursor: grabbing; }
+
+/* ── Row settings popover ───────────────────────────── */
+
+/* Fixed, not absolute: it is portalled to <body> and positioned from the gear's
+   own screen rect, which is the only way past the board's clipped overflow. */
+.tier-rowset {
+  position: fixed;
+  z-index: 1150;
+  width: 232px;
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: rgba(16, 16, 22, 0.97);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.tier-rowset__field {
+  display: block;
+  margin-bottom: var(--space-3);
+}
+
+.tier-rowset__field span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.tier-rowset__field input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.tier-rowset__field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tier-rowset__swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+
+.tier-rowset__swatch {
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tier-rowset__swatch.is-active { border-color: var(--text-primary); }
+.tier-rowset__swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tier-rowset__actions {
+  display: grid;
+  gap: 2px;
+}
+
+.tier-rowset__actions button {
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tier-rowset__actions button:hover:not(:disabled) { background: var(--surface-input); }
+.tier-rowset__actions button:disabled { opacity: 0.35; cursor: not-allowed; }
+.tier-rowset__danger { color: var(--error) !important; }
+
+/* ── Board + bin, side by side ───────────────────────
+   A drag goes from the bin to a row, so the two live in one grid: rows on the
+   left, the unranked pile on the right where the cursor can reach it without
+   scrolling the page mid-gesture. The bin sticks to the viewport and scrolls
+   inside itself, which is what makes a 60-title template workable. */
+
+.tierboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 24vw, 360px);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* The rows scroll inside the column the same way the bin does, so a long board
+   is worked from one fixed viewport instead of scrolling the whole page between
+   picking a tile up and finding the row it belongs in. */
+.tierboard-layout .tier-board {
+  max-height: calc(100vh - var(--navbar-h) - var(--space-10));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.tierboard-layout .tier-board::-webkit-scrollbar { width: 8px; }
+.tierboard-layout .tier-board::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.tierboard-layout .tier-bin {
+  margin-top: 0;
+  position: sticky;
+  top: calc(var(--navbar-h) + var(--space-4));
+  max-height: calc(100vh - var(--navbar-h) - var(--space-10));
+  display: flex;
+  flex-direction: column;
+}
+
+/* A fixed-width tile in a narrow column leaves a dead strip down the right side
+   once three of them have wrapped. In the column the pile is a grid instead: the
+   same three-across reading, but the tiles take the width that is actually
+   there. */
+.tierboard-layout .tier-bin__zone {
+  /* Three posters to a row, each a third of the column.
+     An auto-fill track list sized off the tile width does not work here: the
+     tracks come out wider than the tile they were measured from, and the
+     implicit rows get sized before the tiles' aspect ratio resolves, so every
+     poster ends up cropped to a short band. Fixed columns plus max-content rows
+     removes both guesses — the track sets the width, the 2/3 ratio sets the
+     height. */
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  align-items: start;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  /* Stop the page from taking over once the pile hits its end. */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.tierboard-layout .tier-bin__zone .tier-tile {
+  width: 100%;
+  height: auto;
+}
+
+/* In grid flow the insertion marker would claim a whole cell; keep it a hairline
+   by letting it sit inside one at full height. */
+.tierboard-layout .tier-bin__zone .tier-drop-marker {
+  width: 3px;
+  height: 100%;
+  justify-self: center;
+}
+
+.tierboard-layout .tier-bin__zone::-webkit-scrollbar { width: 8px; }
+.tierboard-layout .tier-bin__zone::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+/* Below this the two columns would both be too narrow to drop into, so the
+   board goes back to full width with the bin beneath it. */
+@media (max-width: 1024px) {
+  .tierboard-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+
+  .tierboard-layout .tier-bin {
+    position: static;
+    max-height: none;
+    display: block;
+  }
+
+  .tierboard-layout .tier-board {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .tierboard-layout .tier-bin__zone {
+    display: flex;
+    overflow-y: visible;
+  }
+
+  .tierboard-layout .tier-bin__zone .tier-tile { width: var(--tl-tile-w); }
+}
+
+/* ── The bin ────────────────────────────────────────── */
+
+.tier-bin {
+  margin-top: var(--space-5);
+  border: 1px solid var(--tl-rule);
+  border-radius: var(--radius-md);
+  background: var(--tl-bin);
+  overflow: hidden;
+}
+
+.tier-bin__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--tl-rule);
+}
+
+.tier-bin__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.tier-bin__count {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.tier-bin__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tier-bin__zone {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--tl-gap);
+  padding: var(--space-3);
+  min-height: calc(var(--tl-tile-w) * 1.5 + var(--space-6));
+  transition: background var(--ease-hover);
+}
+
+.tier-bin__zone.is-over { background: var(--tl-row-over); }
+
+.tierboard-hint {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: #5C5C68;
+  max-width: 62ch;
+}
+
+.tierboard-error-actions { margin-top: var(--space-4); }
+
+.tier-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* ── Loading ────────────────────────────────────────── */
+
+.tierboard-skeleton {
+  border: 1px solid var(--tl-rule);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.tierboard-skeleton__row {
+  height: 88px;
+  border-bottom: 1px solid var(--tl-rule);
+  border-radius: 0;
+}
+
+.tierboard-skeleton__row:last-child { border-bottom: none; }
+
+/* ── Small screens ──────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .tierboard-page__inner { padding: var(--space-4) var(--space-3) 0; }
+
+  /* A renamed row like "Masterpiece" breaks mid-word in a 64px block. The extra
+     twelve pixels are enough to hold the longest label anyone reasonably types. */
+  .tierboard-page { --tl-label-w: 76px; }
+  .tierboard-head { align-items: flex-start; }
+  .tierboard-head__actions { width: 100%; }
+  .tierboard-head__actions .tier-btn { flex: 1 1 auto; justify-content: center; }
+  .tierboard-preset { width: 100%; justify-content: space-between; }
+
+  /* There is no room beside a narrow row, so the popover becomes a sheet pinned to
+     the bottom of the screen. !important overrides the inline position the portal
+     computes for the desktop placement. */
+  .tier-rowset {
+    top: auto !important;
+    left: var(--space-3) !important;
+    right: var(--space-3);
+    bottom: var(--space-3);
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tier-tile,
+  .tier-row__zone,
+  .tier-bin__zone,
+  .tier-btn { transition: none; }
+  .tier-tile:hover:not(:disabled) { transform: none; }
+}
