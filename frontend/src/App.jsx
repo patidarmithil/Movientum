@@ -17,7 +17,6 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import InstallPrompt from './components/InstallPrompt'
 import InfoBanner from './components/InfoBanner'
-import DbOverloadBanner from './components/DbOverloadBanner'
 import { Analytics } from '@vercel/analytics/react'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -226,7 +225,6 @@ function AppRoutes() {
       <Navbar />
       <InstallPrompt />
       <InfoBanner />
-      <DbOverloadBanner />
       {/* Suspense sits OUTSIDE AnimatePresence on purpose: AnimatePresence only
           tracks its direct child, so slotting a wrapper between it and the keyed
           <Routes> would break the page exit transitions.

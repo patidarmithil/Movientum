@@ -81,10 +81,26 @@
   width: 100%;
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-  color: rgba(255, 255, 255, 0.2);
+  align-items: flex-end;
+  padding: var(--space-4);
+  background:
+    radial-gradient(120% 90% at 0% 100%, color-mix(in srgb, var(--fallback-hue, #B048FF) 38%, transparent) 0%, transparent 70%),
+    linear-gradient(160deg, #1f1f24 0%, #141417 100%);
+  overflow: hidden;
+}
+
+/* The outlet's name set as a masthead: large, tight, and cropped by the frame. */
+.news-card__fallback-source {
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: color-mix(in srgb, var(--fallback-hue, #B048FF) 55%, #fff);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 /* Hover overlay */
@@ -133,10 +149,8 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 600;
   background: var(--glass-bg-hover);
   color: rgba(255, 255, 255, 0.75);
   border: 1px solid var(--glass-border);

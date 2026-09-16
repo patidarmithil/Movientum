@@ -109,10 +109,37 @@
 }
 
 /* ── Grid ── */
+/* Four per row, same card as the home-page news strip.
+   The column breakpoints are mirrored in News.jsx (GRID_BREAKPOINTS), which holds
+   back leftover cards so rows are never half-empty — keep the two in sync. */
 .news-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
+}
+
+/* Grid items stretch to their row, and the card fills its wrapper, so every card
+   in a row shares one height without a fixed pixel value clipping long titles. */
+.news-grid > .stagger-item-wrap {
+  display: flex;
+  min-width: 0;
+}
+
+.news-grid > .stagger-item-wrap > * {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .news-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .news-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Skeleton ── */
@@ -233,10 +260,6 @@
     font-size: var(--text-2xl);
   }
 
-  .news-grid {
-    grid-template-columns: 1fr;
-  }
-
   .news-tabs {
     overflow-x: auto;
     scrollbar-width: none;
@@ -244,11 +267,7 @@
   .news-tabs::-webkit-scrollbar { display: none; }
 }
 
-@media (max-width: 480px) {
-  .news-grid {
-    grid-template-columns: 1fr;
-  }
-}
+
 
 /* ── Infinite Scroll Sentinel ── */
 .news-scroll-sentinel {

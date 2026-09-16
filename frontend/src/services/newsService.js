@@ -13,10 +13,11 @@ export const newsService = {
   /**
    * GET /feed — unified feed. tab ∈ 'latest' | 'for-you' | 'editorial' | 'trending'.
    * Pass `category` to filter by a taxonomy category regardless of tab.
+   * `seed` (one per page visit) lightly reshuffles personalized orders.
    */
-  async getFeed({ tab = 'latest', category, page = 1, pageSize = 12 } = {}) {
+  async getFeed({ tab = 'latest', category, page = 1, pageSize = 12, seed } = {}) {
     const { data } = await api.get(`${BASE}/feed`, {
-      params: { tab, category, page, page_size: pageSize },
+      params: { tab, category, page, page_size: pageSize, seed },
     })
     return data
   },

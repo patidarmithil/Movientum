@@ -6,6 +6,10 @@
  * viewing-mode pills (All / For You / Trending / Editorial) map to `tab`; every
  * other pill is a real taxonomy category and maps to `category` (which the
  * backend honours regardless of `tab`).
+ *
+ * For You and category pills send a per-visit `seed`, so each visit sees a lightly
+ * reshuffled personal order while its pages stay consistent. The grid never shows
+ * a half-empty row mid-feed: leftover cards wait for the next page.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
@@ -17,8 +21,33 @@ import Aurora from '../components/Aurora'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './News.css'
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 12   // divisible by every column count below
 const WARMING_RETRY_CAP = 1
+
+// Mirrors the .news-grid breakpoints in News.css — keep the two in sync.
+const GRID_BREAKPOINTS = [
+  { query: '(max-width: 560px)', cols: 1 },
+  { query: '(max-width: 900px)', cols: 2 },
+  { query: '(max-width: 1200px)', cols: 3 },
+]
+
+function readGridColumns() {
+  if (typeof window === 'undefined' || !window.matchMedia) return 4
+  const hit = GRID_BREAKPOINTS.find((b) => window.matchMedia(b.query).matches)
+  return hit ? hit.cols : 4
+}
+
+function useGridColumns() {
+  const [cols, setCols] = useState(readGridColumns)
+  useEffect(() => {
+    if (!window.matchMedia) return
+    const update = () => setCols(readGridColumns())
+    const lists = GRID_BREAKPOINTS.map((b) => window.matchMedia(b.query))
+    lists.forEach((l) => l.addEventListener('change', update))
+    return () => lists.forEach((l) => l.removeEventListener('change', update))
+  }, [])
+  return cols
+}
 
 function NewsSkeleton() {
   return (
@@ -113,7 +142,12 @@ export default function News() {
   const [personalized, setPersonalized] = useState(true)
   const [warming, setWarming] = useState(null)   // { label, retryAfter } | null
 
+  const cols = useGridColumns()
+  // New per mount, so every visit gets a fresh For You order.
+  const [seed] = useState(() => Math.floor(Math.random() * 1e9))
+
   const fetchRef = useRef(null)
+  const isFetchingRef = useRef(false)   // prevent double-fetch of the next page
   const retryCountRef = useRef(0)
 
   const [activePill, setActivePill] = useState('for-you')
@@ -136,9 +170,11 @@ export default function News() {
     try {
       // Map 'all' tab to 'latest' for backend compatibility
       const tabValue = pillId === 'all' ? 'latest' : pillId
-      const params = TAB_IDS.has(pillId)
-        ? { tab: tabValue, page: pg, pageSize: PAGE_SIZE }
-        : { tab: 'latest', category: pillId, page: pg, pageSize: PAGE_SIZE }
+      const params = !TAB_IDS.has(pillId)
+        ? { tab: 'latest', category: pillId, page: pg, pageSize: PAGE_SIZE, seed }
+        : pillId === 'for-you'
+          ? { tab: tabValue, page: pg, pageSize: PAGE_SIZE, seed }
+          : { tab: tabValue, page: pg, pageSize: PAGE_SIZE }
 
       const data = await newsService.getFeed(params)
       if (fetchRef.current !== id) return
@@ -169,13 +205,14 @@ export default function News() {
         setLoadMore(false)
       }
     }
-  }, [])
+  }, [seed])
 
   async function handlePillChange(pillId) {
     if (activePill === pillId) return
     setActivePill(pillId)
     setPage(1)
     setArticles([])
+    isFetchingRef.current = false   // an append for the old pill must not block this one
     retryCountRef.current = 0
     fetchNews(1, pillId, false)
   }
@@ -183,6 +220,7 @@ export default function News() {
   useEffect(() => {
     setPage(1)
     setArticles([])
+    isFetchingRef.current = false   // an append for the old pill must not block this one
     retryCountRef.current = 0
     fetchNews(1, activePill, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,33 +235,50 @@ export default function News() {
     return () => clearTimeout(timer)
   }, [warming, activePill, fetchNews])
 
-  const observerRef = useRef(null)      // sentinel div ref
-  const isFetchingRef = useRef(false)   // prevent double-fetch
+  // The sentinel is tracked as state (callback ref), not a plain ref: it unmounts
+  // while a new pill loads, and the observer must re-attach once it mounts again.
+  // A plain ref never triggered that re-run, so scrolling stopped after a switch.
+  const [sentinel, setSentinel] = useState(null)
 
   const hasMore = articles.length < total
+  const remainder = articles.length % cols
+
+  // Rows are always full. While more pages exist, leftover cards wait for the next
+  // page. At the end of a tab feed (All / For You / Trending / Editorial hold every
+  // article, so there is nothing unshown to top up with) the lowest-ranked leftovers
+  // are dropped. A category's last row keeps every article — hiding real matches from
+  // a small category would be worse than a short row.
+  const isCategory = !TAB_IDS.has(activePill)
+  let visibleArticles = articles
+  if (remainder && articles.length > remainder && (hasMore || !isCategory)) {
+    visibleArticles = articles.slice(0, articles.length - remainder)
+  }
 
   // IntersectionObserver setup
   useEffect(() => {
-    if (!observerRef.current) return
+    if (!sentinel) return
 
     const observer = new IntersectionObserver(
       (entries) => {
         const first = entries[0]
         if (first.isIntersecting && hasMore && !isFetchingRef.current) {
-          isFetchingRef.current = true
+          const token = Symbol()
+          isFetchingRef.current = token
           const next = page + 1
           setPage(next)
           fetchNews(next, activePill, true).finally(() => {
-            isFetchingRef.current = false
+            if (isFetchingRef.current === token) isFetchingRef.current = false
           })
         }
       },
-      { threshold: 0.1 }
+      { rootMargin: '600px 0px', threshold: 0 }
     )
 
-    observer.observe(observerRef.current)
+    observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasMore, page, fetchNews, activePill])
+    // `loadMore` re-creates the observer after each append: a sentinel that never
+    // left the viewport fires no new event, so it must be checked again.
+  }, [sentinel, hasMore, page, fetchNews, activePill, loadMore])
 
   const activeLabel = pills.find((p) => p.id === activePill)?.label || activePill
   const isEmpty = !loading && !warming && articles.length === 0
@@ -332,7 +387,7 @@ export default function News() {
           // pages' rows: the cards reveal when the grid scrolls into view rather
           // than all animating at mount.
           <StaggerContainer className="news-grid" instant={false}>
-            {articles.map((article, index) => (
+            {visibleArticles.map((article, index) => (
               <StaggerItem key={article.id} index={index}>
                 <NewsCard article={article} variant="standard" />
               </StaggerItem>
@@ -343,7 +398,7 @@ export default function News() {
         {/* Sentinel — triggers next page load when visible */}
         {!loading && !warming && hasMore && (
           <div
-            ref={observerRef}
+            ref={setSentinel}
             className="news-scroll-sentinel"
             aria-hidden="true"
           />

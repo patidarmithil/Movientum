@@ -11,10 +11,16 @@ const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 /** Stills are 16:9 and need a wider source; posters and headshots are both 2:3. */
 const SIZE_FOR_TILE = { poster: 'w185', profile: 'w185', still: 'w300' }
 
+export function isAbsoluteUrl(path) {
+  return /^https?:\/\//.test(path)
+}
+
 export function tileImageUrl(path, tile) {
   if (!path) return null
   // A locally uploaded picture is stored on the device, not at TMDB.
   if (isUploadRef(path)) return uploadUrl(path)
+  // Baked character art is a full AniList/Fandom URL, not a TMDB path.
+  if (isAbsoluteUrl(path)) return path
   return `${TMDB_IMAGE_BASE}/${SIZE_FOR_TILE[tile] || 'w185'}${path}`
 }
 
@@ -26,5 +32,6 @@ export function tileImageUrl(path, tile) {
 export function fullImageUrl(path) {
   if (!path) return null
   if (isUploadRef(path)) return uploadUrl(path)
+  if (isAbsoluteUrl(path)) return path
   return `${TMDB_IMAGE_BASE}/original${path}`
 }

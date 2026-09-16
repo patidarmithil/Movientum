@@ -279,22 +279,6 @@ export default function Navbar() {
       .catch(() => setServerNotifs([]))
   }, [isLoggedIn])
 
-  // Client-side entry for the DB-overload banner (see api.js / DbOverloadBanner.jsx) —
-  // not persisted server-side since it's about the DB itself being unreachable.
-  useEffect(() => {
-    const handler = () => {
-      setServerNotifs(prev => [{
-        id: `db-overload-${Date.now()}`,
-        message: "Our database is temporarily overloaded — we're fixing this, please try again in a few hours.",
-        created_at: new Date().toISOString(),
-        seen: false,
-        link: null
-      }, ...prev])
-    }
-    window.addEventListener('mv:db-overload', handler)
-    return () => window.removeEventListener('mv:db-overload', handler)
-  }, [])
-
   const safeNotifications = Array.isArray(notifications) ? notifications : []
   const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
 

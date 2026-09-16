@@ -6,11 +6,11 @@ import ImageLightbox from '../components/ImageLightbox'
 import { useAuth } from '../context/AuthContext'
 import { tierListService } from '../services/tierListService'
 import useTierDrag from '../hooks/useTierDrag'
+import { fullImageUrl, tileImageUrl } from '../utils/tierImages'
 // The board, row, tile and button rules are shared with the maker page.
 import './TierBoard.css'
 import './TierList.css'
 
-const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
 /**
  * Coming back from a board should land you where you left, and the global
@@ -91,7 +91,7 @@ function HeroBoard({ posters, onZoom }) {
       onPointerDown={(e) => startDrag(e, path, zone)}
       onClick={() => { if (!justDragged()) onZoom(path) }}
     >
-      <img src={`${TMDB_IMAGE_BASE}/w185${path}`} alt="" draggable="false" loading="lazy" />
+      <img src={tileImageUrl(path)} alt="" draggable="false" loading="lazy" />
     </button>
   )
 
@@ -132,7 +132,7 @@ function HeroBoard({ posters, onZoom }) {
           }}
           aria-hidden="true"
         >
-          <img src={`${TMDB_IMAGE_BASE}/w185${drag.itemKey}`} alt="" draggable="false" />
+          <img src={tileImageUrl(drag.itemKey)} alt="" draggable="false" />
         </div>
       )}
     </div>
@@ -268,7 +268,7 @@ export default function TierList() {
                 <Link key={b.id} to={`/tierlist/my/${b.id}`} className="tierlist-saved">
                   <span className="tierlist-saved__covers">
                     {(b.covers || []).slice(0, 4).map((c, i) => (
-                      <img key={c + i} src={`${TMDB_IMAGE_BASE}/w92${c}`} alt="" loading="lazy" />
+                      <img key={c + i} src={tileImageUrl(c)} alt="" loading="lazy" />
                     ))}
                   </span>
                   <span className="tierlist-saved__body">
@@ -347,7 +347,7 @@ export default function TierList() {
                       {(t.cover || []).slice(0, 3).map((c, i) => (
                         <img
                           key={c + i}
-                          src={`${TMDB_IMAGE_BASE}/w185${c}`}
+                          src={tileImageUrl(c)}
                           alt=""
                           loading="lazy"
                           style={{ '--i': i }}
@@ -367,7 +367,7 @@ export default function TierList() {
       </div>
       {zoomed && (
         <ImageLightbox
-          src={`${TMDB_IMAGE_BASE}/original${zoomed}`}
+          src={fullImageUrl(zoomed)}
           alt="Poster"
           onClose={() => setZoomed(null)}
         />

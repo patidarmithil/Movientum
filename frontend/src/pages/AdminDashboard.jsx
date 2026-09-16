@@ -58,24 +58,18 @@ export default function AdminDashboard() {
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
     },
     { 
-      key: "fetch_news", name: "Fetch Global News", desc: "Fetches global movie and TV news from API partners.",
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8l-4 4v14a2 2 0 0 0 2 2z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
-    },
-    { 
-      key: "fetch_cat_news", name: "Fetch Category News", desc: "Fetches news specific to movie genres and TV.",
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-    },
-    { 
       key: "check_episodes", name: "Check New Episodes", desc: "Checks for new episodes of tracked TV shows.",
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
     },
     {
-      key: "expire_articles", name: "Expire Old Articles", desc: "Archives news articles older than 7 days.",
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-    },
-    {
       key: "refresh_trailers", name: "Refresh Trailers", desc: "Rebuilds the home page trailer index from TMDB's newest releases per region.",
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+    },
+    {
+      key: "news_daily_fetch", name: "News Daily Fetch", desc: "Fetches NewsAPI, Currents and ApiTube, dedupes, and replaces the live news snapshot (~36 API requests).",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><line x1="10" y1="7" x2="18" y2="7"></line><line x1="10" y1="11" x2="18" y2="11"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>,
+      summarize: (r) => `Gen ${r.generation}: ${r.raw} raw → ${r.deduped} deduped → ${r.stored} stored (` +
+        Object.entries(r.per_source || {}).map(([k, v]) => `${k} ${v}`).join(', ') + `)`
     }
   ];
 
@@ -194,7 +188,7 @@ export default function AdminDashboard() {
     try {
       await api.post(`/internal/trigger/${taskKey}`);
     } catch (err) {
-      setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 0, status: "FAILURE", error: err.message }}));
+      setTaskStatuses(prev => ({...prev, [taskKey]: { progress: 0, status: "FAILURE", error: err.response?.data?.detail || err.message }}));
     }
   }
 
@@ -373,6 +367,9 @@ export default function AdminDashboard() {
                                 background: isFailed ? '#ef4444' : isSuccess ? '#10b981' : isCancelled ? '#4b5563' : '#56CFE1',
                               }} />
                             </div>
+                            {isSuccess && task.summarize && state.result?.stored != null && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{task.summarize(state.result)}</div>
+                            )}
                             {isFailed && state.error && (
                               <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '4px' }}>{state.error}</div>
                             )}

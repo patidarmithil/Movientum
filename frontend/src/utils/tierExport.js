@@ -46,7 +46,8 @@ function loadImage(path, size) {
     const stored = uploadUrl(path)
     return stored ? loadLocalImage(stored) : Promise.resolve(null)
   }
-  const url = `${TMDB_IMAGE_BASE}/${size}${path}`
+  // Baked character art is a full AniList/Fandom URL; both CDNs send CORS headers.
+  const url = /^https?:\/\//.test(path) ? path : `${TMDB_IMAGE_BASE}/${size}${path}`
 
   const attempt = (src) =>
     new Promise((resolve, reject) => {
@@ -57,7 +58,8 @@ function loadImage(path, size) {
       img.src = src
     })
 
-  return attempt(`${url}?cors=1`).catch(() => attempt(url)).catch(() => null)
+  const busted = url + (url.includes('?') ? '&' : '?') + 'cors=1'
+  return attempt(busted).catch(() => attempt(url)).catch(() => null)
 }
 
 /**

@@ -25,6 +25,23 @@ function timeAgo(iso) {
 // News page) doesn't double-count a view within one session.
 const recordedViews = new Set()
 
+// Fallback art hues, taken from the category pill palette so a card without a
+// picture still reads as part of the page rather than a grey hole.
+const FALLBACK_HUES = ['#B048FF', '#00E5A0', '#FF4D6D', '#4CC9F0', '#FF9F1C', '#F9C74F']
+
+function hueFor(text) {
+  let h = 0
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0
+  return FALLBACK_HUES[h % FALLBACK_HUES.length]
+}
+
+// Category ids as people read them ("sci-fi" -> "Sci-Fi").
+const TAG_LABELS = { 'k-drama': 'K-Drama', 'sci-fi': 'Sci-Fi', 'web-series': 'Web series' }
+const tagLabel = (t) => TAG_LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1)
+
+// Images narrower than this are tracking pixels or broken placeholders.
+const MIN_IMAGE_WIDTH = 40
+
 function recordViewOnce(articleId) {
   if (recordedViews.has(articleId)) return
   recordedViews.add(articleId)
@@ -38,6 +55,21 @@ export default function NewsCard({ article, variant = 'standard' }) {
   // cards fills in smoothly instead of popping in one image at a time.
   const [imgLoaded, setImgLoaded] = useState(false)
   const cardRef = useRef(null)
+  const imgRef = useRef(null)
+
+  // A cached image can finish decoding before React attaches onLoad; check once
+  // after mount so such a thumbnail doesn't stay blurred.
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img || !img.complete) return
+    if (img.naturalWidth >= MIN_IMAGE_WIDTH) setImgLoaded(true)
+    else setImgError(true)
+  }, [])
+
+  const handleImgLoad = (e) => {
+    if (e.currentTarget.naturalWidth < MIN_IMAGE_WIDTH) setImgError(true)
+    else setImgLoaded(true)
+  }
 
   // Fire a view once the card has been >=50% visible for >=2s.
   useEffect(() => {
@@ -68,7 +100,10 @@ export default function NewsCard({ article, variant = 'standard' }) {
 
   const ago = timeAgo(article.published_at)
 
-  if (imgError || !article.image_url) return null
+  // Never drop the card when its picture fails: an empty grid cell is worse than a
+  // card with fallback art, and hiding it broke the row maths on the /news grid.
+  const showImage = Boolean(article.image_url) && !imgError
+  const source = article.source_name || ''
 
   return (
     <BorderGlow
@@ -88,14 +123,28 @@ export default function NewsCard({ article, variant = 'standard' }) {
       <div className="news-card__content">
         {/* Thumbnail */}
         <div className="news-card__thumb-wrap">
-          <img
-            src={article.image_url}
-            alt=""
-            className={`news-card__thumb poster-progressive ${imgLoaded ? 'poster-progressive--loaded' : ''}`}
-            loading="lazy"
-            onLoad={() => setImgLoaded(true)}
-            onError={() => setImgError(true)}
-          />
+          {showImage ? (
+            <img
+              ref={imgRef}
+              src={article.image_url}
+              alt=""
+              className={`news-card__thumb poster-progressive ${imgLoaded ? 'poster-progressive--loaded' : ''}`}
+              loading="lazy"
+              decoding="async"
+              // Many news CDNs refuse hotlinked images that carry a foreign Referer.
+              referrerPolicy="no-referrer"
+              onLoad={handleImgLoad}
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div
+              className="news-card__thumb-fallback"
+              style={{ '--fallback-hue': hueFor(source || article.title || '') }}
+              aria-hidden="true"
+            >
+              <span className="news-card__fallback-source">{source || 'Movientum News'}</span>
+            </div>
+          )}
         {/* Hover overlay */}
         <div className="news-card__hover-overlay">
           <span className="news-card__read-label">Read Article ↗</span>
@@ -108,14 +157,14 @@ export default function NewsCard({ article, variant = 'standard' }) {
         {variant === 'rail' ? (
           article.genre_tags?.length > 0 && (
             <div className="news-card__tags">
-              <span className="news-card__tag">{article.genre_tags[0]}</span>
+              <span className="news-card__tag">{tagLabel(article.genre_tags[0])}</span>
             </div>
           )
         ) : (
           article.genre_tags?.length > 0 && (
             <div className="news-card__tags">
               {article.genre_tags.slice(0, 2).map((t) => (
-                <span key={t} className="news-card__tag">{t}</span>
+                <span key={t} className="news-card__tag">{tagLabel(t)}</span>
               ))}
             </div>
           )
