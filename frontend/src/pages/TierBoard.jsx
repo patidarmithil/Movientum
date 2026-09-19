@@ -72,6 +72,8 @@ export default function TierBoard({ mode = 'template' }) {
   const [announcement, setAnnouncement] = useState('')
 
   const hydrated = useRef(false)
+  // Titles ("tv:95557") whose characters landed on this board, sent with the save.
+  const characterSources = useRef(new Set())
 
   // ── Load ──────────────────────────────────────────────────────
 
@@ -391,7 +393,11 @@ export default function TierBoard({ mode = 'template' }) {
     setRows((prev) => prev.map((r) => ({ ...r, items: [] })))
   }, [rows])
 
-  const addItems = useCallback((items) => {
+  const addItems = useCallback((items, extra = {}) => {
+    // The shows behind any characters added here ride along to the save, which is what
+    // earns those character lists a week in the shared cache server-side.
+    for (const src of extra.characterSources || []) characterSources.current.add(src)
+
     const nextMeta = { ...meta }
     const fresh = []
     for (const it of items) {
@@ -420,6 +426,7 @@ export default function TierBoard({ mode = 'template' }) {
       bin_items: binKeys,
       item_meta: trimmedMeta,
       is_public: true,
+      character_sources: [...characterSources.current].slice(0, 5),
     }
   }, [rows, binKeys, meta, title, templateSlug, tile])
 

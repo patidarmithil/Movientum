@@ -53,6 +53,10 @@ function loadImage(path, size) {
     new Promise((resolve, reject) => {
       const img = new Image()
       img.crossOrigin = 'anonymous'
+      // Fandom hotlink protection answers 404 whenever a Referer is sent, so the
+      // export has to ask for wiki art without one. CORS still works: the block is
+      // on Referer, not Origin.
+      img.referrerPolicy = 'no-referrer'
       img.onload = () => resolve(img)
       img.onerror = reject
       img.src = src

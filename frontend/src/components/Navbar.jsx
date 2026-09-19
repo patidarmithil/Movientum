@@ -1406,8 +1406,8 @@ export default function Navbar() {
       {/* ── Mobile bottom tab bar (fast nav, portalled to document.body) ── */}
       {createPortal(
         <nav className="navbar__mobile-tabbar" aria-label="Quick navigation">
-          {/* Order is fixed: Home, Explore, News, DNA, Recommendations, then
-              Dashboard when signed in. Tab bars are learned by position, so the
+          {/* Order is fixed: Home, Explore, News, DNA, Recommendations, Tier Lists,
+              then Dashboard when signed in. Tab bars are learned by position, so the
               sequence stays the same regardless of the current route. */}
           <NavLink
             to="/home"
@@ -1460,6 +1460,17 @@ export default function Navbar() {
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/>
               <path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5Z"/>
               <path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/>
+            </svg>
+          </NavLink>
+          <NavLink
+            to="/tierlist"
+            className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
+            aria-label="Tier Lists"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="4.5" rx="1"/>
+              <rect x="3" y="10" width="13" height="4.5" rx="1"/>
+              <rect x="3" y="16" width="8" height="4.5" rx="1"/>
             </svg>
           </NavLink>
           {isLoggedIn ? (

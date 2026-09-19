@@ -32,6 +32,16 @@ export const tierListService = {
   /** GET /api/v1/tierlist/share/{shareId} — public read, no auth. */
   getShared: (shareId) =>
     api.get(`/api/v1/tierlist/share/${encodeURIComponent(shareId)}`).then((r) => r.data),
+
+  /**
+   * GET /api/v1/tierlist/characters/{media}/{tmdbId} — a title's characters as tier items.
+   *
+   * Public. The backend picks the source per show (AniList for anime, the show's Fandom
+   * wiki for other animation, TMDB's own cast for live action) and says which one in
+   * `source`. A live fetch is not cached server-side, so treat it as a real call.
+   */
+  getShowCharacters: (media, tmdbId, signal) =>
+    api.get(`/api/v1/tierlist/characters/${media}/${tmdbId}`, { signal }).then((r) => r.data),
 }
 
 export default tierListService

@@ -35,6 +35,7 @@ export default function ImageLightbox({ src, alt = '', caption, onClose }) {
         src={src}
         alt={alt}
         onClick={(e) => e.stopPropagation()}
+        referrerPolicy="no-referrer"
       />
       {caption && <p className="img-lightbox__caption">{caption}</p>}
     </div>,

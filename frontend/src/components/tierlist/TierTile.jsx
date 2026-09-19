@@ -49,7 +49,11 @@ function TierTile({
         // plain, so requesting these in CORS mode would miss those cache entries
         // and, worse, fail outright against the ones already stored without CORS
         // headers. The PNG export carries that cost instead — see tierExport.js.
-        <img src={src} alt="" draggable="false" loading="lazy" decoding="async" />
+        //
+        // referrerPolicy is not optional: Fandom's CDN answers 404 to any image
+        // request carrying a Referer from another site, so wiki character art only
+        // loads with the referrer suppressed. TMDB ignores the header.
+        <img src={src} alt="" draggable="false" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
       ) : (
         <span className="tier-tile__fallback">{item.name}</span>
       )}
