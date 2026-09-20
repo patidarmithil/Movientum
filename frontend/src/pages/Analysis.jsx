@@ -361,7 +361,7 @@ function RecExplanationPanel({ expData }) {
           {current_seed ? (
             <div className="seed-card">
               {current_seed.poster_path ? (
-                <img src={`https://image.tmdb.org/t/p/w200${current_seed.poster_path}`} alt="seed" className="seed-poster" />
+                <img src={`https://image.tmdb.org/t/p/w200${current_seed.poster_path}`} alt="seed" className="seed-poster" loading="lazy" decoding="async" />
               ) : (
                 <div className="seed-poster placeholder">🎬</div>
               )}
@@ -890,7 +890,7 @@ function HiddenGems({ data }) {
         {data.gems.map(item => (
           <a href={`/movies/${item.id}`} key={item.id} className="rewatch-card">
             {item.poster_path ? (
-              <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} />
+              <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} loading="lazy" decoding="async" />
             ) : (
               <div className="no-poster">🎬</div>
             )}
@@ -1124,7 +1124,7 @@ export default function Analysis() {
             {rewatch_candidates.map(item => (
               <a href={`/${item.media_type}s/${item.id}`} key={item.id} className="rewatch-card">
                 {item.poster_path ? (
-                  <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} />
+                  <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} loading="lazy" decoding="async" />
                 ) : (
                   <div className="no-poster">🎬</div>
                 )}
@@ -1147,7 +1147,7 @@ export default function Analysis() {
             {early_favorites.map(item => (
               <a href={`/${item.media_type}s/${item.id}`} key={item.id} className="rewatch-card">
                 {item.poster_path ? (
-                  <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} />
+                  <img src={`https://image.tmdb.org/t/p/w200${item.poster_path}`} alt={item.title} loading="lazy" decoding="async" />
                 ) : (
                   <div className="no-poster">🎬</div>
                 )}

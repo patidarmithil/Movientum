@@ -3,12 +3,17 @@ import axios from 'axios'
 import api from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 import { useSessionState } from '../hooks/useSessionState'
+import useFeedbackBuffer from '../hooks/useFeedbackBuffer'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
 import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Explore.css' // Reuse Explore styles
+
+// Matches the backend's 15-minute recommendation rotation window
+// (RECS_WINDOW_SECONDS in routers/recommendations.py).
+const REC_MAX_AGE_MS = 15 * 60 * 1000
 
 export default function Recommendations() {
   const { isLoggedIn } = useAuth()
@@ -17,6 +22,7 @@ export default function Recommendations() {
   const [page, setPage] = useSessionState('recommendations_page', 1)
   const [movies, setMovies] = useSessionState('recommendations_movies', [])
   const [hasMore, setHasMore] = useSessionState('recommendations_hasMore', true)
+  const [fetchedAt, setFetchedAt] = useSessionState('recommendations_ts', 0)
 
   const [loading, setLoading] = useState(movies.length === 0)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -29,6 +35,11 @@ export default function Recommendations() {
   const isFetchingRef = useRef(false)
   const abortControllerRef = useRef(null)
   const observerRef = useRef(null)
+
+  // Hide-and-replace. No visibleCount slice here: the grid already loads the
+  // next page on scroll, so a dismissed card just closes the gap and the
+  // existing sentinel tops the grid up as before.
+  const { visible: visibleMovies, isExiting, dismiss } = useFeedbackBuffer(movies)
 
   // ── Fetch ─────────────────────────────────────────────────
   const fetchRecommendations = useCallback(async (p, isInitial = false) => {
@@ -58,6 +69,7 @@ export default function Recommendations() {
 
       if (isInitial) {
         setMovies(newMovies)
+        setFetchedAt(Date.now())
       } else {
         setMovies((prev) => {
           const existingIds = new Set(prev.map(m => m.id))
@@ -89,7 +101,11 @@ export default function Recommendations() {
 
     if (!isMounted.current) {
       isMounted.current = true
-      if (movies.length > 0) {
+      // Only keep the session copy while it is younger than the backend's
+      // rotation window. Once it is stale we restart from page 1 rather than
+      // appending pages of the new pool onto items from the old one.
+      const isFresh = movies.length > 0 && Date.now() - (fetchedAt || 0) < REC_MAX_AGE_MS
+      if (isFresh) {
         console.log('[Recommendations Mount] Cache hit! Keeping cached movies and skipping fetch')
         setLoading(false)
         return
@@ -193,12 +209,18 @@ export default function Recommendations() {
           <div className="error-state">{error}</div>
         )}
 
-        {!error && (movies.length > 0 || loading) && (
+        {!error && (visibleMovies.length > 0 || loading) && (
           <>
             <StaggerContainer className="explore-grid" instant={false}>
-              {movies.map((m, index) => (
+              {visibleMovies.map((m, index) => (
                 <StaggerItem key={`${m.id}-${index}`} index={index}>
-                  <MovieCard movie={m} />
+                  <MovieCard
+                    movie={m}
+                    showFeedback={true}
+                    feedbackSource="recommendations_page"
+                    onDismiss={() => dismiss(m)}
+                    isExiting={isExiting(m)}
+                  />
                 </StaggerItem>
               ))}
               {loading && <MovieCardSkeleton count={20} />}

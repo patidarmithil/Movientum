@@ -38,6 +38,8 @@ function Avatar({ person, size = 72, isCrew = false }) {
         alt={person.name}
         className="cast-avatar__img"
         style={{ width: size, height: size }}
+        loading="lazy"
+        decoding="async"
         onError={() => setImgErr(true)}
       />
     )

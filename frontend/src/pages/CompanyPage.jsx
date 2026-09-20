@@ -180,6 +180,8 @@ export default function CompanyPage() {
                   src={`https://image.tmdb.org/t/p/w92${companyInfo.logoPath}`}
                   alt={companyInfo.name}
                   className="company-page__logo"
+                  loading="lazy"
+                  decoding="async"
                 />
               )}
               <span>{companyInfo.name}</span>

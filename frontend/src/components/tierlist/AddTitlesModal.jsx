@@ -458,7 +458,7 @@ export default function AddTitlesModal({ onClose, onAdd, existing }) {
           <div className="atm-uploads">
             {picked.filter((p) => p.media === 'upload').map((p) => (
               <span key={itemKey(p)} className="atm-uploads__item" title={p.name}>
-                <img src={uploadPreview(p.image)} alt="" />
+                <img src={uploadPreview(p.image)} alt="" loading="lazy" decoding="async" />
                 <button
                   type="button"
                   onClick={() => setPicked((prev) => prev.filter((x) => itemKey(x) !== itemKey(p)))}

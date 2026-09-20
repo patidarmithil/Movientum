@@ -228,6 +228,8 @@ export default function PersonPage() {
                         key={imgUrl}
                         src={imgUrl}
                         alt={person.name}
+                        loading="lazy"
+                        decoding="async"
                         className="person-page__avatar-slide"
                         style={{
                           opacity: idx === currentImgIdx ? 1 : 0,

@@ -25,14 +25,20 @@ import ProtectedRoute from './components/ProtectedRoute'
 // parsing and executing the admin dashboard, the settings tree and the analysis
 // page first — and only then could the page fire its first API request.
 //
-// The four pages below stay eager on purpose: they are the entry points almost
-// every session starts from, and lazy-loading them would insert a chunk round
-// trip *before* the page can even ask the backend for its data — the opposite of
-// what this change is for. Everything else loads on navigation.
+// Home stays eager: it is where a signed-in session starts, and lazy-loading it
+// would insert a chunk round trip *before* the page can ask the backend for its
+// data — the opposite of what this change is for.
+//
+// The detail pages and the intro are lazy but *prefetched on idle* (see
+// PrefetchRoutes below). That keeps their code and their large stylesheets out
+// of the entry bundle — which every visitor downloads and parses before first
+// paint — without paying a round trip when the visitor actually navigates: the
+// chunk is already in the browser cache by then.
 import Home from './pages/Home'
-import MovieDetail from './pages/MovieDetail'
-import TVDetail from './pages/TVDetail'
-import Intro from './pages/Intro'
+
+const MovieDetail = lazy(() => import('./pages/MovieDetail'))
+const TVDetail = lazy(() => import('./pages/TVDetail'))
+const Intro = lazy(() => import('./pages/Intro'))
 
 const MovieList = lazy(() => import('./pages/MovieList'))
 const Login = lazy(() => import('./pages/Login'))
@@ -72,6 +78,42 @@ import ErrorPage from './pages/ErrorPage'
 import AnalyticsLoader from './components/AnalyticsLoader'
 import './index.css'
 import './components/Navbar.css'
+
+/**
+ * Warms the chunks a visitor is most likely to open next, once the browser is
+ * idle and the current page has finished its own work. Nothing renders here.
+ */
+function PrefetchRoutes({ isLoggedIn }) {
+  useEffect(() => {
+    let cancelled = false
+    const run = () => {
+      if (cancelled) return
+      // A signed-in visitor opens a title next; a signed-out one lands on /intro.
+      if (isLoggedIn) {
+        import('./pages/MovieDetail')
+        import('./pages/TVDetail')
+      } else {
+        import('./pages/Intro')
+      }
+    }
+
+    let idleId = null
+    let timerId = null
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(run, { timeout: 4000 })
+    } else {
+      timerId = setTimeout(run, 2000)
+    }
+
+    return () => {
+      cancelled = true
+      if (idleId !== null && 'cancelIdleCallback' in window) window.cancelIdleCallback(idleId)
+      if (timerId !== null) clearTimeout(timerId)
+    }
+  }, [isLoggedIn])
+
+  return null
+}
 
 // Listens for forced-logout event dispatched by api.js interceptor
 function LogoutListener() {
@@ -220,6 +262,7 @@ function AppRoutes() {
   return (
     <>
       <LogoutListener />
+      <PrefetchRoutes isLoggedIn={isLoggedIn} />
       <MobileRefreshDetector />
       <ScrollRestore />
       <Navbar />

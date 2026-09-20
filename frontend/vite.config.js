@@ -21,6 +21,17 @@ export default defineConfig({
           if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
             return 'react-vendor'
           }
+          // The animation library and the WebGL renderer behind the aurora
+          // background are both sizeable, both change far less often than app
+          // code, and neither is needed to render text. Splitting them out
+          // keeps them cached across deploys and lets the browser parse the
+          // app's own entry chunk without them.
+          if (/[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/.test(id)) {
+            return 'motion-vendor'
+          }
+          if (/[\\/]node_modules[\\/]ogl[\\/]/.test(id)) {
+            return 'ogl-vendor'
+          }
         },
       },
     },

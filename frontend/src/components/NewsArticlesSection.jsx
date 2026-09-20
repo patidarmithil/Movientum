@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { newsService } from '../services/newsService'
+import useNewsDismiss from '../hooks/useNewsDismiss'
 import NewsCard from './NewsCard'
 import './NewsArticlesSection.css'
 
@@ -32,6 +33,7 @@ function ChevronRightIcon() {
 }
 
 export default function NewsArticlesSection({ itemId, itemTitle, mediaType = 'movie' }) {
+  const { exitingIds, dismissArticle, filterHidden } = useNewsDismiss()
   const [articles, setArticles] = useState([])
   const [loading, setLoading]   = useState(true)
   const [atStart, setAtStart]   = useState(true)
@@ -144,9 +146,16 @@ export default function NewsArticlesSection({ itemId, itemTitle, mediaType = 'mo
           tabIndex={0}
           aria-label="News articles, scrollable"
         >
-          {articles.map((article) => (
+          {filterHidden(articles).map((article) => (
             <div key={article.id} className="news-rail__item">
-              <NewsCard article={article} variant="rail" />
+              <NewsCard
+                article={article}
+                variant="rail"
+                showFeedback={true}
+                feedbackSource="news_for_title"
+                onDismiss={() => dismissArticle(article.id)}
+                isExiting={exitingIds.has(article.id)}
+              />
             </div>
           ))}
         </div>

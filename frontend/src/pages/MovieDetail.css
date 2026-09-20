@@ -234,12 +234,6 @@
   flex-wrap: wrap;
 }
 
-.movie-detail__genres .genre-tag {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
 .movie-detail__director {
   font-size: var(--text-sm);
   color: var(--text-muted);
@@ -349,6 +343,21 @@
 .movie-detail__ott-list {
   display: flex;
   flex-direction: column;
+  /* ~2.5 rows (61px each): half-visible 3rd row hints that the list scrolls */
+  max-height: 153px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.movie-detail__ott-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.movie-detail__ott-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
 }
 
 .movie-detail__ott-row {

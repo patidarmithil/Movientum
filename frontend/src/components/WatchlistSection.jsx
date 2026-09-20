@@ -21,7 +21,6 @@ export default function WatchlistSection() {
   // up") now happens server-side in one cached call instead of a client-side
   // loop over N per-item detail fetches.
   const [items, setItems] = useSessionState('home_watchlist', [])
-  const [collectionId, setCollectionId] = useSessionState('home_watchlistCollectionId', null)
   const [loading, setLoading] = useState(items.length === 0)
   const fetchedRef = useRef(false)
 
@@ -34,7 +33,6 @@ export default function WatchlistSection() {
       try {
         const data = await planToWatchService.getHomeStrip()
         if (!mounted) return
-        setCollectionId(data.collection_id || null)
         setItems(shuffleArray(data.items || []))
       } catch (err) {
         console.error("Watchlist fetch error:", err)
@@ -56,7 +54,7 @@ export default function WatchlistSection() {
       icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></path></svg>}
       movies={items}
       loading={loading && items.length === 0}
-      seeAllHref={collectionId ? `/watchlists/${collectionId}` : '/watchlists'}
+      seeAllHref="/dashboard"
       premiumScroll={true}
       renderCard={(movie) => (
         <MovieCard

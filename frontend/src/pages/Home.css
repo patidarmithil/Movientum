@@ -324,6 +324,38 @@
   font-size: var(--text-base);
 }
 
+/* Sidebar "See All" — boxed like sidebar cards */
+.sidebar-see-all-wrap {
+  margin-top: var(--space-4);
+  display: flex;
+}
+
+.sidebar-see-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 20px;
+  background: rgba(18, 18, 18, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  color: var(--text-muted, #a1a1aa);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.sidebar-see-all-btn:hover {
+  color: #fff;
+  border-color: rgba(176, 72, 255, 0.5);
+  background: rgba(176, 72, 255, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
 /* Sidebar Skeleton */
 .sidebar-card-skeleton {
   display: flex;

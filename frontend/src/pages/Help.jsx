@@ -25,37 +25,37 @@ export default function Help() {
 
       <section className="help-section">
         <h2>🏠 What is Movientum?</h2>
-        <img src="/help_images/Platform_overview_image.png" alt="Platform overview" className="help-screenshot" />
+        <img src="/help_images/Platform_overview_image.webp" alt="Platform overview" className="help-screenshot" loading="lazy" decoding="async" />
         <p>Discover, rate, track, and get personalized recommendations for all your favorite movies, TV shows, and anime in one place.</p>
       </section>
 
       <section className="help-section">
         <h2>🔍 Searching (Predictive Search)</h2>
-        <img src="/help_images/Search_overlay_screenshot.png" alt="Search overlay" className="help-screenshot" />
+        <img src="/help_images/Search_overlay_screenshot.webp" alt="Search overlay" className="help-screenshot" loading="lazy" decoding="async" />
         <p>Start typing anywhere on the site or use the search icon. Our predictive, typo-tolerant search brings instant results without leaving your current page.</p>
       </section>
 
       <section className="help-section">
         <h2>🎬 Movie & TV Detail Pages</h2>
-        <img src="/help_images/Movie_detail_screenshot.png" alt="Movie detail" className="help-screenshot" />
+        <img src="/help_images/Movie_detail_screenshot.webp" alt="Movie detail" className="help-screenshot" loading="lazy" decoding="async" />
         <p>Get full information including trailers, cast, crew, similar titles, production company links, and our unique Moctale rating meter.</p>
       </section>
 
       <section className="help-section">
         <h2>⭐ Moctale Rating System</h2>
-        <img src="/help_images/Rating_categories_screenshot.png" alt="Rating categories" className="help-screenshot" />
+        <img src="/help_images/Rating_categories_screenshot.webp" alt="Rating categories" className="help-screenshot" loading="lazy" decoding="async" />
         <p>Real audience sentiment is divided into four easy buckets: <strong>Skip</strong>, <strong>Timepass</strong>, <strong>Go For It</strong>, and <strong>Perfection</strong>.</p>
       </section>
 
       <section className="help-section">
         <h2>🔎 Explore & Filters</h2>
-        <img src="/help_images/Explore_page_screenshot.png" alt="Explore page" className="help-screenshot" />
+        <img src="/help_images/Explore_page_screenshot.webp" alt="Explore page" className="help-screenshot" loading="lazy" decoding="async" />
         <p>Use our advanced filters to browse by genre, type (Movies/TV/Anime), year range, minimum rating, and custom sort orders.</p>
       </section>
 
       <section className="help-section">
         <h2>📰 Movie News</h2>
-        <img src="/help_images/News_page_screenshot.png" alt="News page" className="help-screenshot" />
+        <img src="/help_images/News_page_screenshot.webp" alt="News page" className="help-screenshot" loading="lazy" decoding="async" />
         <p>Stay updated with the latest Hollywood and Bollywood news, pulled fresh every 2 hours and personalized based on your watch history.</p>
       </section>
 

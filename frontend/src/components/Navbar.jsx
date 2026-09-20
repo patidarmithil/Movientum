@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
 import { watchlistService } from '../services/watchlistService'
@@ -266,7 +266,21 @@ export default function Navbar() {
         }
       }
 
-      fetchWatchlistNotifications()
+      // Deferred to idle: the notification feed needs one detail request per
+      // watchlist item, and firing that on mount made it race the page's own
+      // data on every route. Nothing here is above the fold — the bell badge
+      // can appear a moment after the page paints.
+      let idleId = null
+      let timerId = null
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        idleId = window.requestIdleCallback(fetchWatchlistNotifications, { timeout: 3000 })
+      } else {
+        timerId = setTimeout(fetchWatchlistNotifications, 1500)
+      }
+      return () => {
+        if (idleId !== null && 'cancelIdleCallback' in window) window.cancelIdleCallback(idleId)
+        if (timerId !== null) clearTimeout(timerId)
+      }
     } else {
       setNotifications([])
     }
@@ -279,18 +293,36 @@ export default function Navbar() {
       .catch(() => setServerNotifs([]))
   }, [isLoggedIn])
 
-  const safeNotifications = Array.isArray(notifications) ? notifications : []
-  const visibleNotifications = safeNotifications.filter(n => !clearedNotifs.includes(n.id))
+  // Navbar is mounted on every route, so these derivations ran on every render
+  // of every page — including a Date construction and two full list scans.
+  const safeNotifications = useMemo(
+    () => (Array.isArray(notifications) ? notifications : []),
+    [notifications]
+  )
+  const clearedKey = clearedNotifs.join(',')
+  const visibleNotifications = useMemo(
+    () => safeNotifications.filter(n => !clearedNotifs.includes(n.id)),
+    // clearedKey stands in for the array identity, which changes on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [safeNotifications, clearedKey]
+  )
 
   // Count only unread released notifications from the last 30 days
-  const now = new Date()
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-  const unreadCount = visibleNotifications.filter(n => {
-    const nDate = new Date(n.created_at)
-    return !n.seen && n.category === 'released' && nDate >= thirtyDaysAgo
-  }).length
+  const { unreadCount, thirtyDaysAgo } = useMemo(() => {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    return {
+      thirtyDaysAgo: cutoff,
+      unreadCount: visibleNotifications.filter(n => {
+        const nDate = new Date(n.created_at)
+        return !n.seen && n.category === 'released' && nDate >= cutoff
+      }).length,
+    }
+  }, [visibleNotifications])
 
-  const serverUnreadCount = serverNotifs.filter(n => !n.seen).length
+  const serverUnreadCount = useMemo(
+    () => serverNotifs.filter(n => !n.seen).length,
+    [serverNotifs]
+  )
   const totalUnreadCount = unreadCount + serverUnreadCount
 
   const handleNotifClick = () => {
@@ -327,7 +359,10 @@ export default function Navbar() {
     localStorage.setItem('wl_notifs_cleared_list', JSON.stringify(newCleared))
   }
 
-  const filteredNotifs = visibleNotifications.filter(n => n.category === activeNotifTab)
+  const filteredNotifs = useMemo(
+    () => visibleNotifications.filter(n => n.category === activeNotifTab),
+    [visibleNotifications, activeNotifTab]
+  )
 
   const handlePlayTrailer = async (e, n) => {
     e.stopPropagation();
@@ -364,6 +399,8 @@ export default function Navbar() {
         <img 
           src={`https://image.tmdb.org/t/p/w92${n.poster_path}`} 
           alt=""
+          loading="lazy"
+          decoding="async"
         />
       )}
       <div className="navbar__notif-content">

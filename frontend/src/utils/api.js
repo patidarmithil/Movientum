@@ -31,21 +31,21 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Helper to check if user agent is a search crawler bot
-const isBotUserAgent = () => {
-  if (typeof window === 'undefined' || !window.navigator || !window.navigator.userAgent) {
-    return false;
-  }
-  const ua = window.navigator.userAgent.toLowerCase();
-  return /googlebot|bingbot|yandexbot|baiduspider|duckduckbot|yahoo! slurp|sogou|exabot|ia_archiver|facebot|facebookexternalhit|twitterbot|pinterest|slackbot|telegrambot|whatsapp/i.test(ua);
-};
+// Whether this user agent is a search crawler. The UA never changes during a
+// session, so it is evaluated once at module load rather than re-running the
+// regex on every outgoing request.
+const BOT_UA_RE = /googlebot|bingbot|yandexbot|baiduspider|duckduckbot|yahoo! slurp|sogou|exabot|ia_archiver|facebot|facebookexternalhit|twitterbot|pinterest|slackbot|telegrambot|whatsapp/i;
+
+const IS_BOT_UA = typeof window !== 'undefined' && !!window.navigator?.userAgent
+  && BOT_UA_RE.test(window.navigator.userAgent.toLowerCase());
 
 // ── Request interceptor — attach Bearer token ──────────────────
 api.interceptors.request.use(
   (config) => {
     // Intercept and prevent crawling bots from hitting the server on any non-landing subpaths
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-    if (isBotUserAgent() && pathname !== '/' && pathname !== '/intro' && pathname !== '/about') {
+    // Path still has to be read per request — it changes on navigation.
+    const pathname = IS_BOT_UA && typeof window !== 'undefined' ? window.location.pathname : '';
+    if (IS_BOT_UA && pathname !== '/' && pathname !== '/intro' && pathname !== '/about') {
       console.warn(`[Bot Block] Prevented crawler request to ${config.url} on path ${pathname}`);
       return Promise.reject({ __isBotBlock: true, config });
     }

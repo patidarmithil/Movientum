@@ -1,10 +1,15 @@
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
 import BorderGlow from './BorderGlow'
+import FeedbackControl from './FeedbackControl'
 import { recFeedback } from '../services/feedbackService'
 import { observeOnce } from '../utils/sharedObserver'
 import './MovieCard.css'
+
+// Stable identity: an inline array here was a new prop value on every render,
+// so BorderGlow re-ran its work for every card in every row.
+const CARD_GLOW_COLORS = ['#B048FF', '#00E5A0', '#FF4D6D']
 
 const MOCTALE_COLORS = {
   perfection: '#A855F7',
@@ -25,22 +30,42 @@ const MOCTALE_SYMBOLS = {
  * Props:
  *   movie:        { id, title, poster_path, release_year, genres, vote_average, media_type? }
  *   variant?:     'standard' | 'compact' | 'featured'  (default: 'standard')
- *   showFeedback?: boolean — render thumbs-up/down overlay and track scroll-ignore
- *                  Pass true only from authenticated recommendation carousels.
- *   feedbackSource?: string — which carousel this is, for interaction_log tagging:
- *                  "more_like_this" | "for_you" | "other" (default). Only matters
- *                  when showFeedback is true.
+ *   showFeedback?: boolean — render the thumbs-up/down control (FeedbackControl).
+ *                  Pass true from any surface showing platform-generated
+ *                  recommendations. Guests see it too and are sent to login on
+ *                  press, so the feature is discoverable before signup.
+ *   feedbackSource?: string — which surface this is, for interaction_log tagging.
+ *                  Must be one of VALID_SOURCES in the backend schema; a new
+ *                  carousel gets its own value rather than reusing "other".
+ *   feedbackValue?: 'up' | 'down' | null — pass to control the thumb state from
+ *                  outside (AIRecommendations drives it from its memoryMap).
+ *   onFeedbackChange?: (next) => void — fired after an optimistic vote.
+ *   onDismiss?:   () => void — called after a thumbs-down. Pass it from a list
+ *                  using useFeedbackBuffer so the card animates out and the next
+ *                  candidate slides in; omit it and the vote only teaches.
+ *   isExiting?:   boolean — applies the dismissal exit animation.
+ *   badge?:       node — extra overlay content (the AI cards' sparkle marker).
  *   dateBadge?:   string — optional text to show in a badge at the top right (e.g. "17 Jul")
  *   hideRating?:  boolean — optional flag to hide the rating
  */
-const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingCategory, showFeedback = false, feedbackSource = 'other', dateBadge = null, hideRating = false }) {
-  const navigate = useNavigate()
+const MovieCard = memo(function MovieCard({
+  movie,
+  variant = 'standard',
+  ratingCategory,
+  showFeedback = false,
+  feedbackSource = 'other',
+  feedbackValue,
+  onFeedbackChange,
+  onDismiss,
+  isExiting = false,
+  badge = null,
+  dateBadge = null,
+  hideRating = false,
+}) {
   const [hasError, setHasError]               = useState(false)
   const [imageLoaded, setImageLoaded]         = useState(false)
-  const [feedbackSent, setFeedbackSent]       = useState(null)  // null | 'up' | 'down'
   const [isVisible, setIsVisible]             = useState(false)
   const cardRef                               = useRef(null)
-  const impressionLogged                      = useRef(false)
   const imageRef                              = useRef(null)
 
   useEffect(() => {
@@ -57,13 +82,6 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
     ? `${TMDB_IMAGE_BASE}/w342${movie.poster_path}`
     : null
 
-  const handleClick = useCallback(() => {
-    if (showFeedback && tmdbId) {
-      recFeedback.click(tmdbId, mediaType, feedbackSource)
-    }
-    navigate(isTV ? `/tv/${movie.id}` : `/movies/${movie.id}`)
-  }, [isTV, movie.id, showFeedback, tmdbId, mediaType, feedbackSource, navigate])
-
   useEffect(() => {
     const parentEl = cardRef.current
     if (!parentEl) return
@@ -73,20 +91,6 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
 
     return observeOnce(targetEl, () => setIsVisible(true))
   }, [])
-
-  const sendExplicit = useCallback((signalType, e) => {
-    e.stopPropagation()
-    e.preventDefault()
-    impressionLogged.current = true
-
-    if (signalType === 'thumbs_up') {
-      recFeedback.thumbsUp(tmdbId, mediaType, feedbackSource)
-      setFeedbackSent('up')
-    } else {
-      recFeedback.thumbsDown(tmdbId, mediaType, feedbackSource)
-      setFeedbackSent('down')
-    }
-  }, [tmdbId, mediaType, feedbackSource])
 
   const handleLinkClick = useCallback(() => {
     if (showFeedback && tmdbId) {
@@ -113,12 +117,12 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
         aria-label={`${movie.title} (${movie.release_year})`}
       >
         <BorderGlow
-          className={`movie-card movie-card--${variant} ${isVisible ? 'visible' : ''}`}
+          className={`movie-card movie-card--${variant} ${isVisible ? 'visible' : ''}${isExiting ? ' is-exiting' : ''}`}
           tabIndex={0}
           borderRadius={12}
           glowRadius={30}
           glowIntensity={0.85}
-          colors={['#B048FF', '#00E5A0', '#FF4D6D']}
+          colors={CARD_GLOW_COLORS}
           backgroundColor="#1B1B1B"
         >
           <div className="movie-card__poster-wrap">
@@ -184,31 +188,18 @@ const MovieCard = memo(function MovieCard({ movie, variant = 'standard', ratingC
               <div className="movie-card__tv-badge">TV</div>
             )}
 
-            {showFeedback && (
-              <div className="movie-card__feedback-overlay" aria-label="Rate this recommendation">
-                <button
-                  id={`thumbs-up-${tmdbId}`}
-                  className={`movie-card__feedback-btn movie-card__feedback-btn--up${feedbackSent === 'up' ? ' is-active' : ''}`}
-                  onClick={(e) => sendExplicit('thumbs_up', e)}
-                  aria-label="Like this recommendation"
-                  title="Like"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-                  </svg>
-                </button>
-                <button
-                  id={`thumbs-down-${tmdbId}`}
-                  className={`movie-card__feedback-btn movie-card__feedback-btn--down${feedbackSent === 'down' ? ' is-active' : ''}`}
-                  onClick={(e) => sendExplicit('thumbs_down', e)}
-                  aria-label="Not for me"
-                  title="Not for me"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm12-3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
-                  </svg>
-                </button>
-              </div>
+            {badge}
+
+            {showFeedback && tmdbId && (
+              <FeedbackControl
+                kind="title"
+                tmdbId={tmdbId}
+                mediaType={mediaType}
+                source={feedbackSource}
+                value={feedbackValue}
+                onChange={onFeedbackChange}
+                onDismiss={onDismiss}
+              />
             )}
           </div>
 

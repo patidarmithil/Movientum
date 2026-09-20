@@ -7,10 +7,19 @@
  * Props:
  *   article: { id, title, description, url, image_url, source_name, published_at, genre_tags }
  *   variant?: 'standard' | 'compact' | 'rail'   (default: 'standard')
+ *   showFeedback?: boolean — render the thumbs control. News feedback is
+ *                  news-scoped: it moves this user's source / category / entity
+ *                  weights for the For-You news ranking and never touches the
+ *                  movie/TV taste profile.
+ *   feedbackSource?: 'news_grid' | 'home_news' | 'news_for_title'
+ *   onDismiss?: () => void — called after a thumbs-down so the list can animate
+ *                  the card out.
+ *   isExiting?: boolean
  */
 import { useEffect, useRef, useState } from 'react'
 import { newsService } from '../services/newsService'
 import BorderGlow from './BorderGlow'
+import FeedbackControl from './FeedbackControl'
 import './NewsCard.css'
 
 function timeAgo(iso) {
@@ -48,7 +57,14 @@ function recordViewOnce(articleId) {
   newsService.recordView(articleId)
 }
 
-export default function NewsCard({ article, variant = 'standard' }) {
+export default function NewsCard({
+  article,
+  variant = 'standard',
+  showFeedback = false,
+  feedbackSource = 'news_grid',
+  onDismiss,
+  isExiting = false,
+}) {
   const [imgError, setImgError] = useState(false)
   // Same progressive reveal the poster art uses on movie cards: the thumbnail
   // starts blurred and dimmed and sharpens once it has decoded, so a row of
@@ -108,7 +124,7 @@ export default function NewsCard({ article, variant = 'standard' }) {
   return (
     <BorderGlow
       ref={cardRef}
-      className={`news-card news-card--${variant}`}
+      className={`news-card news-card--${variant}${isExiting ? ' is-exiting' : ''}`}
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -149,6 +165,15 @@ export default function NewsCard({ article, variant = 'standard' }) {
         <div className="news-card__hover-overlay">
           <span className="news-card__read-label">Read Article ↗</span>
         </div>
+
+        {showFeedback && article.id && (
+          <FeedbackControl
+            kind="news"
+            articleId={article.id}
+            source={feedbackSource}
+            onDismiss={onDismiss}
+          />
+        )}
       </div>
 
       {/* Content */}

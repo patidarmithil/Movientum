@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { newsService } from '../services/newsService'
 import { useAuth } from '../context/AuthContext'
+import useNewsDismiss from '../hooks/useNewsDismiss'
 import NewsCard from '../components/NewsCard'
 import ShinyText from '../components/ShinyText'
 import Aurora from '../components/Aurora'
@@ -133,6 +134,7 @@ export default function News() {
   const { isLoggedIn } = useAuth()
 
   const [categories, setCategories] = useState([])
+  const { exitingIds, dismissArticle, filterHidden } = useNewsDismiss()
   const [articles, setArticles] = useState([])
   const [loading, setLoading]   = useState(true)
   const [page, setPage]         = useState(1)
@@ -249,9 +251,12 @@ export default function News() {
   // are dropped. A category's last row keeps every article — hiding real matches from
   // a small category would be worse than a short row.
   const isCategory = !TAB_IDS.has(activePill)
-  let visibleArticles = articles
-  if (remainder && articles.length > remainder && (hasMore || !isCategory)) {
-    visibleArticles = articles.slice(0, articles.length - remainder)
+  // Thumbed-down articles come out before the row maths, so removing one does
+  // not leave a hole in an otherwise full row.
+  const liveArticles = filterHidden(articles)
+  let visibleArticles = liveArticles
+  if (remainder && liveArticles.length > remainder && (hasMore || !isCategory)) {
+    visibleArticles = liveArticles.slice(0, liveArticles.length - remainder)
   }
 
   // IntersectionObserver setup
@@ -389,7 +394,14 @@ export default function News() {
           <StaggerContainer className="news-grid" instant={false}>
             {visibleArticles.map((article, index) => (
               <StaggerItem key={article.id} index={index}>
-                <NewsCard article={article} variant="standard" />
+                <NewsCard
+                  article={article}
+                  variant="standard"
+                  showFeedback={true}
+                  feedbackSource="news_grid"
+                  onDismiss={() => dismissArticle(article.id)}
+                  isExiting={exitingIds.has(article.id)}
+                />
               </StaggerItem>
             ))}
           </StaggerContainer>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import BorderGlow from './BorderGlow'
+import FeedbackControl from './FeedbackControl'
 import { observeOnce } from '../utils/sharedObserver'
 import './MovieCard.css'
 
@@ -16,7 +17,14 @@ function formatReleaseDate(dateStr) {
   }
 }
 
-export default function TrailerCard({ item, onPlayTrailer }) {
+export default function TrailerCard({
+  item,
+  onPlayTrailer,
+  showFeedback = false,
+  feedbackSource = 'trailers',
+  onDismiss,
+  isExiting = false,
+}) {
   const [hasError, setHasError]     = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [isVisible, setIsVisible]   = useState(false)
@@ -45,7 +53,7 @@ export default function TrailerCard({ item, onPlayTrailer }) {
   return (
     <div ref={cardRef} style={{ display: 'contents' }}>
       <BorderGlow
-        className={`movie-card movie-card--standard ${isVisible ? 'visible' : ''}`}
+        className={`movie-card movie-card--standard ${isVisible ? 'visible' : ''}${isExiting ? ' is-exiting' : ''}`}
         tabIndex={0}
         role="button"
         onClick={handleClick}
@@ -88,6 +96,16 @@ export default function TrailerCard({ item, onPlayTrailer }) {
           }}>
             {item.video_type?.toUpperCase()}
           </div>
+
+          {showFeedback && (item.tmdb_id ?? item.id) && (
+            <FeedbackControl
+              kind="title"
+              tmdbId={item.tmdb_id ?? item.id}
+              mediaType={item.media_type || 'movie'}
+              source={feedbackSource}
+              onDismiss={onDismiss}
+            />
+          )}
 
           {/* Play button overlay */}
           <div style={{

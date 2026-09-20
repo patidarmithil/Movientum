@@ -56,7 +56,22 @@
     <link rel="dns-prefetch" href="https://image.tmdb.org" />
     <!-- The backdrop trailer player, loaded only when a trailer exists. -->
     <link rel="dns-prefetch" href="https://www.youtube.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+    <!-- Logged-out visitors resolve their country here before the guest
+         recommendation rail can be requested, so warm the connection early. -->
+    <link rel="dns-prefetch" href="https://get.geojs.io" />
+    <!-- Non-blocking font load: as a plain stylesheet this sat in the critical
+         path and held up first paint on every visit. It swaps itself to the
+         real media once downloaded; the noscript copy keeps it working with
+         JavaScript disabled. `display=swap` already prevents invisible text. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap"
+      media="print"
+      onload="this.media='all';this.onload=null"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+    </noscript>
     <meta name="google-site-verification" content="AUDJ78xhzpQJzefgpwCcNUWJyXzRvjLF6J3KTHJDJkc" />
 
     <!-- Structured Data (JSON-LD) -->

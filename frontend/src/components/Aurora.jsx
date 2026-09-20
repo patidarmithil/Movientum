@@ -168,7 +168,14 @@ export default function Aurora(props) {
     const mesh = new Mesh(gl, { geometry, program });
     ctn.appendChild(gl.canvas);
 
+    // The colour stops almost never change, so the Color objects are rebuilt
+    // only when the hex list actually differs instead of three allocations on
+    // every one of the ~60 frames per second this loop runs.
+    let lastStopsKey = colorStops.join(',');
+
     let animateId = 0;
+    let running = false;
+
     const update = t => {
       animateId = requestAnimationFrame(update);
       const { time = t * 0.01, speed = 1.0 } = propsRef.current;
@@ -176,18 +183,54 @@ export default function Aurora(props) {
       program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? 1.0;
       program.uniforms.uBlend.value = propsRef.current.blend ?? blend;
       const stops = propsRef.current.colorStops ?? colorStops;
-      program.uniforms.uColorStops.value = stops.map(hex => {
-        const c = new Color(hex);
-        return [c.r, c.g, c.b];
-      });
+      const stopsKey = stops.join(',');
+      if (stopsKey !== lastStopsKey) {
+        lastStopsKey = stopsKey;
+        program.uniforms.uColorStops.value = stops.map(hex => {
+          const c = new Color(hex);
+          return [c.r, c.g, c.b];
+        });
+      }
       renderer.render({ scene: mesh });
     };
-    animateId = requestAnimationFrame(update);
+
+    // This is a decorative background. It used to render continuously whether
+    // or not the canvas was on screen or the tab was even visible, which is a
+    // constant GPU/CPU cost on every page the component appears on.
+    const start = () => {
+      if (running) return;
+      running = true;
+      animateId = requestAnimationFrame(update);
+    };
+    const stop = () => {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(animateId);
+    };
+
+    let onScreen = true;
+    const sync = () => {
+      if (onScreen && !document.hidden) start();
+      else stop();
+    };
+
+    const io = typeof IntersectionObserver !== 'undefined'
+      ? new IntersectionObserver(entries => {
+          onScreen = entries.some(e => e.isIntersecting);
+          sync();
+        }, { rootMargin: '100px' })
+      : null;
+    io?.observe(ctn);
+
+    document.addEventListener('visibilitychange', sync);
+    start();
 
     resize();
 
     return () => {
-      cancelAnimationFrame(animateId);
+      stop();
+      io?.disconnect();
+      document.removeEventListener('visibilitychange', sync);
       window.removeEventListener('resize', resize);
       if (ctn && gl.canvas.parentNode === ctn) {
         ctn.removeChild(gl.canvas);

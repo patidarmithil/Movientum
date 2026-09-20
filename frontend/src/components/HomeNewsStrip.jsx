@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { newsService } from '../services/newsService'
 import { useAuth } from '../context/AuthContext'
+import useNewsDismiss from '../hooks/useNewsDismiss'
 import NewsCard from './NewsCard'
 import ShinyText from './ShinyText'
 import { observeOnce } from '../utils/sharedObserver'
@@ -14,7 +15,7 @@ import './HomeNewsStrip.css'
 
 const REVEAL_OBSERVER_OPTIONS = { threshold: 0.05, rootMargin: '0px 100px 0px 100px' }
 
-function ViewportRevealNewsItem({ article, index }) {
+function ViewportRevealNewsItem({ article, index, onDismiss, isExiting }) {
   const [isVisible, setIsVisible] = useState(false)
   const itemRef = useRef(null)
 
@@ -32,13 +33,21 @@ function ViewportRevealNewsItem({ article, index }) {
       className={`viewport-reveal-card home-news-strip__item ${isVisible ? 'visible' : ''}`}
       style={{ transitionDelay: delay }}
     >
-      <NewsCard article={article} variant="standard" />
+      <NewsCard
+        article={article}
+        variant="standard"
+        showFeedback={true}
+        feedbackSource="home_news"
+        onDismiss={onDismiss}
+        isExiting={isExiting}
+      />
     </div>
   )
 }
 
 export default function HomeNewsStrip() {
   const { isLoggedIn } = useAuth()
+  const { exitingIds, dismissArticle, filterHidden } = useNewsDismiss()
   const [articles, setArticles] = useState([])
   const [loading, setLoading]   = useState(true)
 
@@ -85,8 +94,14 @@ export default function HomeNewsStrip() {
         <div className="scroll-row-container">
           <div className="scroll-row-fade left-fade" />
           <div key={`news-strip-${articles.length}`} className="scroll-row home-news-strip__scroll">
-            {articles.map((article, index) => (
-              <ViewportRevealNewsItem key={article.id} index={index} article={article} />
+            {filterHidden(articles).map((article, index) => (
+              <ViewportRevealNewsItem
+                key={article.id}
+                index={index}
+                article={article}
+                onDismiss={() => dismissArticle(article.id)}
+                isExiting={exitingIds.has(article.id)}
+              />
             ))}
           </div>
           <div className="scroll-row-fade right-fade" />

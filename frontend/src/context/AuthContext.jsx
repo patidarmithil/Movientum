@@ -8,7 +8,7 @@
  * Token storage keys:
  *   sessionStorage: 'mv_access_token', 'mv_refresh_token', 'mv_user'
  */
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { authService } from '../services/authService'
 import { storage } from '../utils/storage'
 import { getOrCreateDeviceId, getDeviceId } from '../utils/deviceId'
@@ -227,7 +227,11 @@ export function AuthProvider({ children }) {
     storage.setItem(KEYS.user, JSON.stringify(newData))
   }, [])
 
-  const value = {
+  // Memoized: every page, the navbar and every movie card reads this context,
+  // so a fresh object literal here re-renders the whole tree on any provider
+  // render. The methods below are already stable via useCallback, so the value
+  // only changes when the auth state itself does.
+  const value = useMemo(() => ({
     user,
     accessToken,
     isLoggedIn,
@@ -238,7 +242,18 @@ export function AuthProvider({ children }) {
     logout,
     refreshToken,
     updateUser,
-  }
+  }), [
+    user,
+    accessToken,
+    isLoggedIn,
+    isLoading,
+    login,
+    googleLogin,
+    register,
+    logout,
+    refreshToken,
+    updateUser,
+  ])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

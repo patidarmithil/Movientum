@@ -281,7 +281,7 @@ export default function Intro() {
             ))}
           </div>
           <div className="intro-ratings__visual">
-            <img src={meterImg} alt="Rating Meter" />
+            <img src={meterImg} alt="Rating Meter" decoding="async" />
           </div>
         </div>
       </section>
@@ -298,7 +298,7 @@ export default function Intro() {
         </div>
         <div className="intro-watchlists__visual">
           <div className="intro-watchlists__image intro-watchlists__image--curved">
-            <img src={watchlistImg} alt="Watchlist Showcase" />
+            <img src={watchlistImg} alt="Watchlist Showcase" decoding="async" />
           </div>
           <span className="intro-watchlists__badge">+ Unlimited lists</span>
         </div>
@@ -364,7 +364,7 @@ export default function Intro() {
           <h2>Meet the Creator</h2>
           <div className="intro-creator__card intro-creator__card--redesigned">
             <div className="intro-creator__image intro-creator__image--curved">
-              <img src={profileImg} alt="Mithil Patidar" />
+              <img src={profileImg} alt="Mithil Patidar" decoding="async" />
             </div>
             <div className="intro-creator__details">
               <h3>Mithil Patidar</h3>

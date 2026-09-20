@@ -12,11 +12,12 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { aiRecsService } from '../services/aiRecsService'
-import { recFeedback } from '../services/feedbackService'
+import useFeedbackBuffer from '../hooks/useFeedbackBuffer'
+import FeedbackControl from './FeedbackControl'
 import ShinyText from './ShinyText'
 import BorderGlow from './BorderGlow'
 import { BsStars } from 'react-icons/bs'
-import { FiThumbsUp, FiThumbsDown, FiRefreshCw, FiAlertTriangle, FiFilm } from 'react-icons/fi'
+import { FiRefreshCw, FiAlertTriangle, FiFilm } from 'react-icons/fi'
 import './AIRecommendations.css'
 import './MovieCard.css'
 import './MovieRow.css'
@@ -36,7 +37,7 @@ const TMDB_GENRES = [
 const STATE = { IDLE: 'IDLE', LOADING: 'LOADING', LOADED: 'LOADED', ERROR: 'ERROR', RERUNNING: 'RERUNNING' }
 
 // ── AI Card ──────────────────────────────────────────────────────
-function AIRecCard({ item, isLoggedIn, memoryMap, onThumb }) {
+function AIRecCard({ item, memoryMap, onThumb, onDismiss, isExiting = false }) {
   const [hasError, setHasError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
@@ -77,7 +78,7 @@ function AIRecCard({ item, isLoggedIn, memoryMap, onThumb }) {
         style={{ textDecoration: 'none', display: 'contents', color: 'inherit' }}
       >
         <BorderGlow
-          className={`movie-card movie-card--standard ${isVisible ? 'visible' : ''}`}
+          className={`movie-card movie-card--standard ${isVisible ? 'visible' : ''}${isExiting ? ' is-exiting' : ''}`}
           tabIndex={0}
           borderRadius={12}
           glowRadius={30}
@@ -113,26 +114,15 @@ function AIRecCard({ item, isLoggedIn, memoryMap, onThumb }) {
               <div className="movie-card__tv-badge">TV</div>
             )}
 
-            {isLoggedIn && (
-              <div className="movie-card__feedback-overlay" onClick={e => e.preventDefault()}>
-                <button
-                  className={`movie-card__feedback-btn movie-card__feedback-btn--up ${signal === 'up' ? 'is-active' : ''}`}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onThumb(item, 'up') }}
-                  title="Like"
-                  aria-label="Thumbs up"
-                >
-                  <FiThumbsUp />
-                </button>
-                <button
-                  className={`movie-card__feedback-btn movie-card__feedback-btn--down ${signal === 'down' ? 'is-active' : ''}`}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onThumb(item, 'down') }}
-                  title="Dislike"
-                  aria-label="Thumbs down"
-                >
-                  <FiThumbsDown />
-                </button>
-              </div>
-            )}
+            <FeedbackControl
+              kind="title"
+              tmdbId={item.tmdb_id}
+              mediaType={item.media_type}
+              source="ai_recommendations"
+              value={signal ?? null}
+              onChange={(next) => onThumb(item, next)}
+              onDismiss={onDismiss}
+            />
           </div>
 
           <div className="movie-card__info">
@@ -158,6 +148,8 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
 
   const [uiState,      setUiState]      = useState(STATE.IDLE)
   const [results,      setResults]      = useState([])
+  // Hide-and-replace on a thumbs-down. Gemini returns a short list, so there is
+  // no buffer to slide in from — the row simply closes the gap.
   const [metadata,     setMetadata]     = useState(null)   // { personalized, resolved, dropped }
   const [memoryMap,    setMemoryMap]    = useState({})     // { "tmdbId:mediaType": 'up'|'down' }
   const [focusGenre,   setFocusGenre]   = useState('')
@@ -166,6 +158,8 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
   const [rerunCount,   setRerunCount]   = useState(0)
   const [errorMessage, setErrorMessage] = useState('AI could not generate results. Please try again.')
   const scrollRef = useRef(null)
+
+  const { visible: visibleResults, isExiting, dismiss } = useFeedbackBuffer(results)
 
   // Build memory map from existing signals on items
   const buildMemoryMap = useCallback((items) => {
@@ -245,35 +239,29 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
     })
   }, [previousIds, results, rerunCount, focusGenre, moreLike, fetchRecs])
 
-  const handleThumb = useCallback(async (item, signal) => {
+  const handleThumb = useCallback(async (item, nextSignal) => {
     const key = `${item.tmdb_id}:${item.media_type}`
-    // Toggle off if same signal
-    const newSignal = memoryMap[key] === signal ? null : signal
-    setMemoryMap(prev => ({ ...prev, [key]: newSignal }))
-    if (!newSignal) return
+    const previous = memoryMap[key]
+
+    // FeedbackControl has already resolved the toggle and updated optimistically,
+    // so `nextSignal` is the final state — null means the user retracted.
+    setMemoryMap(prev => ({ ...prev, [key]: nextSignal }))
+    if (!nextSignal) return
 
     try {
+      // One request, not two. POST /ai-recs/memory writes the ai_rec_memory row
+      // the Gemini prompt reads back *and* hands the same signal to the unified
+      // feedback worker, so an AI thumb moves the taste profile exactly like a
+      // "More Like This" or "For You" thumb does.
       await aiRecsService.recordMemory({
         tmdbId:    item.tmdb_id,
         mediaType: item.media_type,
-        signal:    newSignal,
+        signal:    nextSignal,
         title:     item.title,
         genres:    [],
       })
-    } catch (err) {
-      // Revert on failure
-      setMemoryMap(prev => ({ ...prev, [key]: memoryMap[key] ?? undefined }))
-      return
-    }
-
-    // ai_rec_memory (above) only dedupes future Gemini prompts — it doesn't
-    // touch user_taste_profiles. Also send the standard rec-feedback signal
-    // so AI-recommendation thumbs feed the same graph/ranker taste profile
-    // as "More Like This" and "For You".
-    if (newSignal === 'up') {
-      recFeedback.thumbsUp(item.tmdb_id, item.media_type, 'ai_recommendations')
-    } else {
-      recFeedback.thumbsDown(item.tmdb_id, item.media_type, 'ai_recommendations')
+    } catch {
+      setMemoryMap(prev => ({ ...prev, [key]: previous ?? undefined }))
     }
   }, [memoryMap])
 
@@ -417,13 +405,14 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              {results.map((item) => (
+              {visibleResults.map((item) => (
                 <AIRecCard
                   key={`${item.tmdb_id}:${item.media_type}`}
                   item={item}
-                  isLoggedIn={isLoggedIn}
                   memoryMap={memoryMap}
                   onThumb={handleThumb}
+                  onDismiss={() => dismiss(item)}
+                  isExiting={isExiting(item)}
                 />
               ))}
             </div>

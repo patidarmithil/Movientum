@@ -1,0 +1,167 @@
+/* ── FeedbackControl — thumbs up / down ─────────────────────────────
+ *
+ * These rules used to live in MovieCard.css, which AIRecommendations imported
+ * purely to borrow the class names. They now travel with the component, so every
+ * consumer gets them without importing another card's stylesheet.
+ *
+ * The class names are unchanged (.movie-card__feedback-overlay /
+ * .movie-card__feedback-btn) so nothing that already targets them breaks.
+ *
+ * Desktop: hidden, revealed on card hover/focus at the TOP of the poster.
+ * Touch:   always visible, pinned to the BOTTOM — see the media query below.
+ */
+
+.movie-card__feedback-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 100%);
+  border-top-left-radius: 11px;
+  border-top-right-radius: 11px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 220ms ease, transform 220ms ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.movie-card:hover .movie-card__feedback-overlay,
+.movie-card:focus-within .movie-card__feedback-overlay,
+.news-card:hover .movie-card__feedback-overlay,
+.news-card:focus-within .movie-card__feedback-overlay {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.movie-card__feedback-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: rgba(20, 20, 20, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 150ms ease, color 150ms ease,
+              background 150ms ease, box-shadow 150ms ease;
+  padding: 0;
+  outline: none;
+}
+
+.movie-card__feedback-btn:hover {
+  transform: scale(1.15);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.movie-card__feedback-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-primary, #b048ff);
+}
+
+.movie-card__feedback-btn.is-active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.movie-card__feedback-btn.is-active svg {
+  fill: currentColor;
+}
+
+/* ── News cards ───────────────────────────────────────────────────
+ * A news thumbnail is 16/9, not a 2/3 poster, and the centre of it is already
+ * taken by the "Read Article ↗" hover label. So the control sits top-right and
+ * does not stretch across the full width.
+ */
+.news-card__thumb-wrap .movie-card__feedback-overlay {
+  left: auto;
+  right: 0;
+  width: auto;
+  gap: 8px;
+  padding: 6px;
+  background: none;
+  border-radius: 0 11px 0 11px;
+}
+
+/* ── Touch / mobile: always visible, pinned to the bottom ──────────
+ * Hover does not exist on a touch screen, so the hover-reveal above left the
+ * control permanently unreachable on a phone. `(hover: none)` is the real test —
+ * a 1200px tablet needs this too — and the width query is the fallback for
+ * browsers that do not report it.
+ *
+ * Bottom, not top: the rating chip, the date badge and the TV badge are all
+ * top-anchored on a movie card.
+ */
+@media (hover: none), (max-width: 640px) {
+  .movie-card__feedback-overlay {
+    top: auto;
+    bottom: 0;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    justify-content: center;
+    gap: 16px;
+    padding: 5px 6px 6px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0) 100%);
+    border-radius: 0 0 11px 11px;
+  }
+
+  /* 32px keeps the tap target usable; the icons stay 14px. */
+  .movie-card__feedback-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(20, 20, 20, 0.85);
+  }
+
+  /* No hover on touch, so :hover would stick after a tap. */
+  .movie-card__feedback-btn:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(20, 20, 20, 0.85);
+    color: var(--text-muted);
+  }
+
+  .movie-card__feedback-btn.is-active,
+  .movie-card__feedback-btn.is-active:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+  }
+
+  /* On a compact news card the thumbnail is only ~90px wide, so a pinned bar
+     would cover most of it. Keep it top-right and compact there. */
+  .news-card__thumb-wrap .movie-card__feedback-overlay {
+    top: 0;
+    bottom: auto;
+    left: auto;
+    right: 0;
+    width: auto;
+    gap: 6px;
+    padding: 4px;
+    background: none;
+  }
+
+  .news-card--compact .movie-card__feedback-btn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .movie-card__feedback-overlay,
+  .movie-card__feedback-btn {
+    transition: none;
+  }
+}

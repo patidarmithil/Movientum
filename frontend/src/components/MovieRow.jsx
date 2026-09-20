@@ -1,16 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { Link } from 'react-router-dom'
 import MovieCard from './MovieCard'
 import MovieCardSkeleton from './MovieCardSkeleton'
 import ShinyText from './ShinyText'
 import StaggerContainer, { StaggerItem } from './StaggerContainer'
 import ScrollReveal from './ScrollReveal'
+import useFeedbackBuffer from '../hooks/useFeedbackBuffer'
 import { observeOnce } from '../utils/sharedObserver'
 import './MovieRow.css'
 
 const REVEAL_OBSERVER_OPTIONS = { threshold: 0.05, rootMargin: '0px 100px 0px 100px' }
 
-function ViewportRevealCard({ movie, index, showFeedback, feedbackSource, renderCard }) {
+const ViewportRevealCard = memo(function ViewportRevealCard({ movie, index, showFeedback, feedbackSource, renderCard, onDismiss, isExiting }) {
   const [isVisible, setIsVisible] = useState(false)
   const cardRef = useRef(null)
 
@@ -25,15 +26,25 @@ function ViewportRevealCard({ movie, index, showFeedback, feedbackSource, render
   return (
     <div
       ref={cardRef}
-      className={`viewport-reveal-card ${isVisible ? 'visible' : ''}`}
+      className={`viewport-reveal-card ${isVisible ? 'visible' : ''}${isExiting ? ' is-exiting' : ''}`}
       style={{ transitionDelay: delay }}
     >
-      {renderCard ? renderCard(movie) : <MovieCard movie={movie} showFeedback={showFeedback} feedbackSource={feedbackSource} />}
+      {renderCard
+        ? renderCard(movie, { showFeedback, feedbackSource, onDismiss, isExiting })
+        : (
+          <MovieCard
+            movie={movie}
+            showFeedback={showFeedback}
+            feedbackSource={feedbackSource}
+            onDismiss={onDismiss}
+            isExiting={isExiting}
+          />
+        )}
     </div>
   )
-}
+})
 
-export default function MovieRow({
+function MovieRow({
   title,
   movies = [],
   loading = false,
@@ -46,6 +57,12 @@ export default function MovieRow({
   children,
   icon
 }) {
+  // Hide-and-replace: a thumbs-down animates the card out and the rest of the
+  // row shifts into the gap. A horizontal row already holds far more items than
+  // fit on screen, so the replacement comes from what was fetched — no extra
+  // request, and no visibleCount slice needed.
+  const { visible: rowMovies, isExiting, dismiss } = useFeedbackBuffer(movies)
+
   const scrollRowRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -327,10 +344,10 @@ export default function MovieRow({
           >
             {loading ? (
               <MovieCardSkeleton count={6} />
-            ) : movies.length === 0 ? (
+            ) : rowMovies.length === 0 ? (
               <p className="no-movies-text">{emptyText}</p>
             ) : (
-              movies.map((m, index) => (
+              rowMovies.map((m, index) => (
                 <ViewportRevealCard
                   key={`${m.id}-${m.media_type || 'movie'}`}
                   index={index}
@@ -338,20 +355,37 @@ export default function MovieRow({
                   showFeedback={showFeedback}
                   feedbackSource={feedbackSource}
                   renderCard={renderCard}
+                  onDismiss={showFeedback ? () => dismiss(m) : undefined}
+                  isExiting={isExiting(m)}
                 />
               ))
             )}
           </div>
         ) : (
-          <StaggerContainer key={`${title}-${loading}-${movies.length}`} className="scroll-row">
+          <StaggerContainer key={title} className="scroll-row">
             {loading ? (
               <MovieCardSkeleton count={6} />
-            ) : movies.length === 0 ? (
+            ) : rowMovies.length === 0 ? (
               <p className="no-movies-text">{emptyText}</p>
             ) : (
-              movies.map((m, index) => (
+              rowMovies.map((m, index) => (
                 <StaggerItem key={`${m.id}-${m.media_type || 'movie'}`} index={index}>
-                  {renderCard ? renderCard(m) : <MovieCard movie={m} showFeedback={showFeedback} feedbackSource={feedbackSource} />}
+                  {renderCard
+                    ? renderCard(m, {
+                        showFeedback,
+                        feedbackSource,
+                        onDismiss: showFeedback ? () => dismiss(m) : undefined,
+                        isExiting: isExiting(m),
+                      })
+                    : (
+                      <MovieCard
+                        movie={m}
+                        showFeedback={showFeedback}
+                        feedbackSource={feedbackSource}
+                        onDismiss={showFeedback ? () => dismiss(m) : undefined}
+                        isExiting={isExiting(m)}
+                      />
+                    )}
                 </StaggerItem>
               ))
             )}
@@ -366,3 +400,8 @@ export default function MovieRow({
     </ScrollReveal>
   )
 }
+
+// Rows re-render on any parent state change (a sibling row finishing its
+// fetch, an auth update). Memoized so only the row whose own props changed
+// re-runs its card list.
+export default memo(MovieRow)

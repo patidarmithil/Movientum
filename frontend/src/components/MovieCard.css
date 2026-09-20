@@ -250,72 +250,32 @@
   aspect-ratio: 2 / 3;
 }
 
-/* ── Phase 6: Feedback Overlay (thumbs up / down) ─────────────── */
+/* ── Feedback overlay (thumbs up / down) ──────────────────────────
+ *
+ * Moved to FeedbackControl.css, which ships with the component. It used to live
+ * here, which is why AIRecommendations.jsx imported this file just to borrow the
+ * class names. Nothing else in this stylesheet references them.
+ */
 
-/*
-  Overlay sits at the top of the poster area.
-  Hidden by default; slides in on card hover.
-*/
-.movie-card__feedback-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 8px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
-  border-top-left-radius: 11px;
-  border-top-right-radius: 11px;
+/* ── Dismissal exit animation ─────────────────────────────────────
+ *
+ * Set by useFeedbackBuffer when a thumbs-down removes a card. The duration is
+ * matched in the hook (EXIT_MS) so the splice happens as the card finishes
+ * fading, not before.
+ */
+.movie-card.is-exiting,
+.viewport-reveal-card.is-exiting {
   opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 220ms ease, transform 220ms ease;
+  transform: scale(0.94) translateY(-6px);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
   pointer-events: none;
-  z-index: 10;
 }
 
-.movie-card:hover .movie-card__feedback-overlay,
-.movie-card:focus-within .movie-card__feedback-overlay {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-.movie-card__feedback-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  background: rgba(20, 20, 20, 0.75);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: all 150ms ease;
-  padding: 0;
-  outline: none;
-}
-
-.movie-card__feedback-btn:hover {
-  transform: scale(1.15);
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
-}
-
-.movie-card__feedback-btn.is-active {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.35);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
-  transform: scale(1.05);
-}
-
-.movie-card__feedback-btn.is-active svg {
-  fill: currentColor;
+@media (prefers-reduced-motion: reduce) {
+  .movie-card.is-exiting,
+  .viewport-reveal-card.is-exiting {
+    transition: none;
+  }
 }
 
 @media (max-width: 480px) {

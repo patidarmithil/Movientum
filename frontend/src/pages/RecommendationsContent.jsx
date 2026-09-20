@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { movieService } from '../services/movieService'
 import { searchService } from '../services/searchService'
+import useFeedbackBuffer from '../hooks/useFeedbackBuffer'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
@@ -410,6 +411,10 @@ export default function RecommendationsContent() {
   // client-side re-filtering.
   const filteredMovies = movies
 
+  // Hide-and-replace on a thumbs-down; the existing infinite scroll tops the
+  // grid back up.
+  const { visible: visibleMovies, isExiting, dismiss } = useFeedbackBuffer(filteredMovies)
+
   return (
     <main className="reccontent-page page-content">
       <div className="reccontent-aurora-bg" aria-hidden="true">
@@ -495,7 +500,7 @@ export default function RecommendationsContent() {
               return (
                 <div key={`${b.tmdb_id}-${b.media_type}`} className="reccontent-chip">
                   {posterUrl ? (
-                    <img src={posterUrl} alt="" className="reccontent-chip-poster" />
+                    <img src={posterUrl} alt="" className="reccontent-chip-poster" loading="lazy" decoding="async" />
                   ) : (
                     <div className="reccontent-chip-poster" style={{ background: 'rgba(255,255,255,0.1)' }} />
                   )}
@@ -527,7 +532,7 @@ export default function RecommendationsContent() {
                 return (
                   <div key={`neg-${b.tmdb_id}-${b.media_type}`} className="reccontent-chip" style={{ borderColor: 'rgba(255, 0, 128, 0.3)', background: 'rgba(255, 0, 128, 0.08)' }}>
                     {posterUrl ? (
-                      <img src={posterUrl} alt="" className="reccontent-chip-poster" style={{ filter: 'grayscale(1)', opacity: 0.7 }} />
+                      <img src={posterUrl} alt="" className="reccontent-chip-poster" style={{ filter: 'grayscale(1)', opacity: 0.7 }} loading="lazy" decoding="async" />
                     ) : (
                       <div className="reccontent-chip-poster" style={{ background: 'rgba(255,255,255,0.1)' }} />
                     )}
@@ -761,12 +766,18 @@ export default function RecommendationsContent() {
           <div className="error-state">{error}</div>
         )}
 
-        {!error && (filteredMovies.length > 0 || loading) && (
+        {!error && (visibleMovies.length > 0 || loading) && (
           <>
             <StaggerContainer className="explore-grid" instant={false}>
-              {filteredMovies.map((m, index) => (
+              {visibleMovies.map((m, index) => (
                 <StaggerItem key={`${m.id}-${m.media_type}`} index={index}>
-                  <MovieCard movie={m} />
+                  <MovieCard
+                    movie={m}
+                    showFeedback={true}
+                    feedbackSource="rec_content"
+                    onDismiss={() => dismiss(m)}
+                    isExiting={isExiting(m)}
+                  />
                 </StaggerItem>
               ))}
               {loading && <MovieCardSkeleton count={10} />}

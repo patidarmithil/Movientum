@@ -37,7 +37,29 @@ import ColdStartLoader from '../components/ColdStartLoader'
 import ErrorPage from './ErrorPage'
 import './Home.css'
 
+// Row icons are hoisted to module scope: built inline they were a new React
+// element on every Home render, which defeats MovieRow's memo barrier.
+const ICON_TRENDING = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline><polyline points="16 7 22 7 22 13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline></svg>
+)
+const ICON_TARGET = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle></svg>
+)
+const ICON_STAR = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"></polygon></svg>
+)
+const ICON_LIST = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></path><path d="M2 12h10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path><path d="M2 17h10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path><path d="M2 7h4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path></svg>
+)
+
+// Stable array identity — passed to BorderGlow for every sidebar card.
+const SIDEBAR_GLOW_COLORS = ['#B048FF', '#00E5A0', '#FF4D6D']
+
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
+
+// Matches the backend's 15-minute recommendation rotation window
+// (RECS_WINDOW_SECONDS in routers/recommendations.py).
+const REC_MAX_AGE_MS = 15 * 60 * 1000
 
 const GENRE_OPTIONS = [
   { id: 28, name: 'Action' },
@@ -124,6 +146,7 @@ export default function Home() {
   const [genreLoad, setGenreLoad] = useState(genreMovies.length === 0)
 
   const [forYou, setForYou] = useSessionState('home_forYou', [])
+  const [forYouTs, setForYouTs] = useSessionState('home_forYou_ts', 0)
   const [forYouLoad, setForYouLoad] = useState(isLoggedIn && forYou.length === 0)
 
   const [guestRecs, setGuestRecs] = useSessionState('home_guestRecs', [])
@@ -245,7 +268,12 @@ export default function Home() {
       setForYou([])
       return
     }
-    if (forYou.length > 0) {
+    // The backend rotates this pool every 15 minutes. Without an age check the
+    // sessionStorage copy wins forever inside one tab, so the row was fetched
+    // exactly once per tab and the feed looked frozen no matter what changed
+    // server-side. A brand-new tab has no sessionStorage and fetches anyway.
+    const isFresh = forYou.length > 0 && Date.now() - (forYouTs || 0) < REC_MAX_AGE_MS
+    if (isFresh) {
       setForYouLoad(false)
       return
     }
@@ -253,14 +281,21 @@ export default function Home() {
     api.get('/api/v1/recommendations')
       .then((r) => {
         setForYou(r.data?.movies || r.data || [])
+        setForYouTs(Date.now())
       })
       .catch(() => setForYou([]))
       .finally(() => setForYouLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 
+  // The guest recommendation request can't start until this third-party lookup
+  // answers, so a returning visitor should never pay for it twice. The result
+  // is persisted in localStorage (a visitor's country does not change between
+  // tabs or sessions), with the old sessionStorage entry still honoured so an
+  // in-flight session isn't sent back to the network after this ships.
   async function detectCountryCode() {
-    const stored = sessionStorage.getItem('guest_country_code_v2')
+    const stored = localStorage.getItem('guest_country_code_v2')
+      || sessionStorage.getItem('guest_country_code_v2')
     if (stored) return stored
     try {
       const controller = new AbortController()
@@ -269,6 +304,7 @@ export default function Home() {
       clearTimeout(timer)
       const data = await res.json()
       const code = data.country || 'US'
+      try { localStorage.setItem('guest_country_code_v2', code) } catch { /* private mode */ }
       sessionStorage.setItem('guest_country_code_v2', code)
       return code
     } catch {
@@ -387,22 +423,26 @@ export default function Home() {
           {/* Trending Now */}
           <MovieRow 
             title="Trending Now" 
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline><polyline points="16 7 22 7 22 13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></polyline></svg>}
+            icon={ICON_TRENDING}
             movies={trending} 
             loading={trendLoad} 
             seeAllHref="/explore?sort=popularity" 
             premiumScroll={true}
+            showFeedback={true}
+            feedbackSource="trending"
           />
 
           {!isLoggedIn && (
             <>
               <MovieRow
                 title="Recommendations"
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle></svg>}
+                icon={ICON_TARGET}
                 movies={guestRecs}
                 loading={guestRecsLoad}
                 seeAllHref="/explore?sort=rating"
                 premiumScroll={true}
+                showFeedback={true}
+                feedbackSource="guest_recs"
               />
               <TrailerRow 
                 title="Trailers 🎬" 
@@ -410,6 +450,8 @@ export default function Home() {
                 loading={trailersLoad} 
                 onPlayTrailer={handlePlayTrailer}
                 premiumScroll={true}
+                showFeedback={true}
+                feedbackSource="trailers"
               >
                 <div className="movie-row__pills-container">
                   {TRAILER_REGIONS.map(region => (
@@ -431,7 +473,7 @@ export default function Home() {
             <>
               <MovieRow 
                 title="For You" 
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2.5"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle></svg>}
+                icon={ICON_TARGET}
                 movies={forYou}
                 loading={forYouLoad}
                 seeAllHref="/recommendations"
@@ -445,6 +487,8 @@ export default function Home() {
                 loading={trailersLoad} 
                 onPlayTrailer={handlePlayTrailer}
                 premiumScroll={true}
+                showFeedback={true}
+                feedbackSource="trailers"
               >
                 <div className="movie-row__pills-container">
                   {TRAILER_REGIONS.map(region => (
@@ -465,11 +509,13 @@ export default function Home() {
           {/* Top Rated */}
           <MovieRow 
             title="Top Rated" 
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"></polygon></svg>}
+            icon={ICON_STAR}
             movies={topRated} 
             loading={topRatedLoad} 
             seeAllHref="/explore?sort=rating" 
             premiumScroll={true}
+            showFeedback={true}
+            feedbackSource="top_rated"
           />
 
           {/* News Strip */}
@@ -478,11 +524,13 @@ export default function Home() {
           {/* Top Rated in Genre */}
           <MovieRow 
             title={`Top Rated in ${selectedGenreName}`}
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="flame-icon-svg" xmlns="http://www.w3.org/2000/svg"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></path><path d="M2 12h10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path><path d="M2 17h10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path><path d="M2 7h4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"></path></svg>}
+            icon={ICON_LIST}
             movies={genreMovies} 
             loading={genreLoad} 
             seeAllHref={`/explore?genres=${selectedGenreName}`}
             premiumScroll={true}
+            showFeedback={true}
+            feedbackSource="top_rated_genre"
           >
             <div className="genre-pills">
               {GENRE_OPTIONS.map((g) => (
@@ -536,7 +584,7 @@ export default function Home() {
             </FilterDropdown>
           </div>
 
-          <StaggerContainer key={`upcoming-${upcomingFilter}-${upcomingLoad}-${upcoming.length}`} className="sidebar-list">
+          <StaggerContainer key={`upcoming-${upcomingFilter}`} className="sidebar-list">
             {upcomingLoad ? (
               Array.from({ length: 4 }).map((_, idx) => (
                 <div key={idx} className="sidebar-card-skeleton">
@@ -574,7 +622,7 @@ export default function Home() {
                       glowRadius={25}
                       glowIntensity={0.6}
                       fillOpacity={0.08}
-                      colors={['#B048FF', '#00E5A0', '#FF4D6D']}
+                      colors={SIDEBAR_GLOW_COLORS}
                       backgroundColor="rgba(18, 18, 18, 0.6)"
                     >
                       <div className="sidebar-card-rank">{index + 1}</div>

@@ -60,29 +60,45 @@ export const planToWatchService = {
       const collectionData = await watchlistService.getCollection(existing.id)
       const items = collectionData.items || collectionData.movies || []
 
-      const detailedItems = await Promise.all(items.map(async (item) => {
-        try {
-          const mediaType = item.movie?.media_type || 'movie'
-          const movieId = item.movie_id
-          
-          let details = {}
-          if (mediaType === 'tv') {
-            const r = await api.get(`/api/v1/tv/${movieId}`)
-            details = r.data
-          } else {
-            const r = await api.get(`/api/v1/movies/${movieId}`)
-            details = r.data
+      // One detail request per item, but pooled: a 100-item list used to open
+      // 100 sockets at once and starve whatever the page itself was fetching.
+      // Six at a time keeps the browser's connection budget free for the page
+      // while the total wall time stays close to the all-at-once version.
+      const detailedItems = new Array(items.length)
+      const CONCURRENCY = 6
+      let cursor = 0
+
+      const worker = async () => {
+        while (cursor < items.length) {
+          const idx = cursor++
+          const item = items[idx]
+          try {
+            const mediaType = item.movie?.media_type || 'movie'
+            const movieId = item.movie_id
+
+            let details = {}
+            if (mediaType === 'tv') {
+              const r = await api.get(`/api/v1/tv/${movieId}`)
+              details = r.data
+            } else {
+              const r = await api.get(`/api/v1/movies/${movieId}`)
+              details = r.data
+            }
+
+            detailedItems[idx] = {
+              ...item,
+              movie: { ...item.movie, ...details }
+            }
+          } catch {
+            detailedItems[idx] = item
           }
-          
-          return {
-            ...item,
-            movie: { ...item.movie, ...details }
-          }
-        } catch (e) {
-          return item
         }
-      }))
-      
+      }
+
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, items.length) }, worker)
+      )
+
       return detailedItems
     } catch {
       return []

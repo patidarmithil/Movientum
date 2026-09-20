@@ -4,15 +4,21 @@
 // Images are downloaded once via `node scripts/download-intro-assets.mjs`
 // (frontend/) into src/assets/intro/ and imported statically below — Vite
 // fingerprints and bundles them, no runtime fetches.
+//
+// The .webp files are produced from those downloads by
+// `npm run assets:webp` (scripts/convert-assets.mjs). The originals stay on
+// disk; only the converted copies are imported, because the JPEG sources are
+// several megabytes each and this page is where every logged-out visitor
+// lands. Re-run that script after adding or replacing any image here.
 
-import heroFar from '../assets/intro/hero-far.jpg'
-import cardDiscover from '../assets/intro/card-discover-spiderverse.jpg'
-import cardRate from '../assets/intro/card-rate.jpg'
+import heroFar from '../assets/intro/hero-far.webp'
+import cardDiscover from '../assets/intro/card-discover-spiderverse.webp'
+import cardRate from '../assets/intro/card-rate.webp'
 // Supplied by hand, not fetched from TMDB — download-intro-assets.mjs does not
 // manage this file and must never overwrite it.
-import cardRecs from '../assets/intro/rec.jpg'
+import cardRecs from '../assets/intro/rec.webp'
 
-const posterModules = import.meta.glob('../assets/intro/posters/*.jpg', { eager: true, import: 'default' })
+const posterModules = import.meta.glob('../assets/intro/posters/*.webp', { eager: true, import: 'default' })
 const posterUrls = Object.keys(posterModules)
   .sort()
   .map((key) => posterModules[key])
