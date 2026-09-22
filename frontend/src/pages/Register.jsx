@@ -139,7 +139,7 @@ export default function Register() {
         {/* Logo */}
         <div className="auth-card__logo">
           <Link to="/" className="auth-card__logo" style={{ gap: '8px', textDecoration: 'none' }}>
-            <img src="/favicon.svg" alt="Movientum Logo" className="auth-card__logo-img" />
+            <img src="/logo-128.webp" alt="Movientum Logo" className="auth-card__logo-img" />
             <span className="auth-card__logo-text">
               MOVI
               <span className="brand-name__e" aria-label="E">

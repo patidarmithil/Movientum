@@ -2,125 +2,118 @@ import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import './WatchlistCollectionCard.css'
 
-function FanPoster({ src, alt = '', className = '', onError }) {
+/*
+ * Class names use the `wl-card` prefix on purpose. MovieDetail.css ships a
+ * global `.collection-card` (the "part of a collection" rail, fixed at 120px)
+ * which used to leak onto this card once a movie page had been visited and
+ * shrink every watchlist box on the dashboard.
+ */
+
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
+
+function Poster({ src, className = '' }) {
   const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
   return (
     <img
       src={src}
-      alt={alt}
+      alt=""
       className={`${className} poster-progressive ${loaded ? 'poster-progressive--loaded' : ''}`.trim()}
       loading="lazy"
       onLoad={() => setLoaded(true)}
-      onError={onError}
+      onError={() => setFailed(true)}
     />
   )
 }
 
-// Fan-stack geometry for 2-4 posters: offset (%), rotation (deg), z-index per slot.
+// Fan-stack geometry for 1-4 posters: offset (% of poster width), rotation (deg), z-index per slot.
 const FAN_LAYOUTS = {
+  1: [
+    { x: 0, r: 0, z: 1 },
+  ],
   2: [
-    { x: -13, r: -7, z: 1 },
-    { x: 13, r: 7, z: 2 },
+    { x: -30, r: -6, z: 1 },
+    { x: 30, r: 6, z: 2 },
   ],
   3: [
-    { x: -20, r: -9, z: 1 },
+    { x: -48, r: -8, z: 1 },
     { x: 0, r: 0, z: 3 },
-    { x: 20, r: 9, z: 2 },
+    { x: 48, r: 8, z: 2 },
   ],
   4: [
-    { x: -26, r: -10, z: 1 },
-    { x: -9, r: -3, z: 2 },
-    { x: 9, r: 3, z: 3 },
-    { x: 26, r: 10, z: 4 },
+    { x: -66, r: -9, z: 1 },
+    { x: -22, r: -3, z: 2 },
+    { x: 22, r: 3, z: 3 },
+    { x: 66, r: 9, z: 4 },
   ],
 }
 
+// Accent per collection, picked deterministically from its id so it never changes between visits.
+const THEMES = [
+  'linear-gradient(135deg, #B048FF 0%, #5227FF 100%)',
+  'linear-gradient(135deg, #00E5A0 0%, #008B6B 100%)',
+  'linear-gradient(135deg, #FF4D6D 0%, #C9184A 100%)',
+  'linear-gradient(135deg, #FFC300 0%, #FF8F00 100%)',
+  'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)',
+  'linear-gradient(135deg, #F5576C 0%, #F093FB 100%)',
+]
+
 export default function WatchlistCollectionCard({ collection }) {
   const navigate = useNavigate()
+  const open = () => navigate(`/watchlists/${collection.id}`)
 
-  const handleClick = () => {
-    navigate(`/watchlists/${collection.id}`)
-  }
+  const idHash = collection.id ? Number(collection.id) : (collection.name || '').length
+  const accent = THEMES[(idHash || 0) % THEMES.length]
 
-  // Themed spine gradient per collection (deterministic from id/name).
-  const THEMES = [
-    { bg: 'linear-gradient(135deg, #B048FF 0%, #5227FF 100%)', icon: '#FFFFFF' },
-    { bg: 'linear-gradient(135deg, #00E5A0 0%, #008B6B 100%)', icon: '#FFFFFF' },
-    { bg: 'linear-gradient(135deg, #FF4D6D 0%, #C9184A 100%)', icon: '#FFFFFF' },
-    { bg: 'linear-gradient(135deg, #FFC300 0%, #FF8F00 100%)', icon: '#FFFFFF' },
-    { bg: 'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)', icon: '#FFFFFF' },
-    { bg: 'linear-gradient(135deg, #F5576C 0%, #F093FB 100%)', icon: '#FFFFFF' },
-  ]
-  const idHash = collection.id ? Number(collection.id) : collection.name.length
-  const theme = THEMES[(idHash || 0) % THEMES.length]
-
-  const safePosters = (collection.cover_posters || []).filter(Boolean)
-  const count = safePosters.length
-  const itemCount = collection.item_count ?? count
-  const getTMDBUrl = (path) => (path ? `https://image.tmdb.org/t/p/w342${path}` : '')
-
-  const renderCover = () => {
-    if (itemCount === 0 || count === 0) {
-      return (
-        <div className="collection-card__empty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={theme.icon} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-          </svg>
-        </div>
-      )
-    }
-
-    if (count === 1) {
-      return (
-        <FanPoster
-          src={getTMDBUrl(safePosters[0])}
-          alt={collection.name}
-          className="collection-card__img"
-          onError={(e) => { e.target.style.display = 'none' }}
-        />
-      )
-    }
-
-    // 2-4+ items -> fanned poster stack (visually reads as "a stack of titles")
-    const layoutKey = Math.min(count, 4)
-    const layout = FAN_LAYOUTS[layoutKey]
-    const overflow = itemCount - layoutKey
-
-    return (
-      <div className="poster-fan">
-        {safePosters.slice(0, layoutKey).map((poster, idx) => (
-          <div
-            key={idx}
-            className="poster-fan__item"
-            style={{
-              '--fan-x': `${layout[idx].x}%`,
-              '--fan-r': `${layout[idx].r}deg`,
-              zIndex: layout[idx].z,
-            }}
-          >
-            <FanPoster
-              src={getTMDBUrl(poster)}
-              onError={(e) => { e.target.style.display = 'none' }}
-            />
-          </div>
-        ))}
-        {overflow > 0 && (
-          <span className="poster-fan__overflow" style={{ zIndex: layout[layoutKey - 1].z + 1 }}>
-            +{overflow}
-          </span>
-        )}
-      </div>
-    )
-  }
+  const posters = (collection.cover_posters || []).filter(Boolean)
+  const shown = posters.slice(0, 4)
+  const itemCount = collection.item_count ?? posters.length
+  const overflow = itemCount - shown.length
+  const countLabel = `${itemCount} ${itemCount === 1 ? 'title' : 'titles'}`
+  const layout = FAN_LAYOUTS[shown.length]
 
   return (
-    <div className="collection-card" onClick={handleClick} style={{ '--card-accent': theme.bg }}>
-      <div className="collection-card__cover">
-        {renderCover()}
+    <div
+      className="wl-card"
+      role="link"
+      tabIndex={0}
+      aria-label={`${collection.name}, ${countLabel}`}
+      onClick={open}
+      onKeyDown={(e) => { if (e.key === 'Enter') open() }}
+      style={{ '--wl-accent': accent }}
+    >
+      <div className="wl-card__cover">
+        {shown.length === 0 ? (
+          <div className="wl-card__empty">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>Nothing added yet</span>
+          </div>
+        ) : (
+          <div className="wl-card__fan">
+            {shown.map((path, i) => (
+              <div
+                key={path + i}
+                className="wl-card__poster"
+                style={{
+                  '--fan-x': `${layout[i].x}%`,
+                  '--fan-r': `${layout[i].r}deg`,
+                  zIndex: layout[i].z,
+                }}
+              >
+                <Poster src={`${TMDB_IMAGE_BASE}/w342${path}`} />
+              </div>
+            ))}
+          </div>
+        )}
+        {overflow > 0 && <span className="wl-card__more">+{overflow}</span>}
       </div>
-      <div className="collection-card__info">
-        <h3 className="collection-card__title">{collection.name}</h3>
-        <span className="collection-card__meta">{itemCount} {itemCount === 1 ? 'title' : 'titles'}</span>
+
+      <div className="wl-card__info">
+        <h3 className="wl-card__title">{collection.name}</h3>
+        <span className="wl-card__meta">{countLabel}</span>
       </div>
     </div>
   )

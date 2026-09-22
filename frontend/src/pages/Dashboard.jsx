@@ -18,6 +18,7 @@ import { tierListService } from '../services/tierListService'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import WatchlistCollectionCard from '../components/WatchlistCollectionCard'
+import { tileImageUrl } from '../utils/tierImages'
 import Aurora from '../components/Aurora'
 import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
@@ -67,25 +68,43 @@ function RatingCard({ item }) {
   )
 }
 
-const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
-
 /**
- * One saved tier list. The covers are the four posters the board API already
- * returns, so the card is made of what was ranked rather than a generic tile.
+ * One saved tier list. The covers are the first four images the board API
+ * returns. They can be TMDB paths, full AniList/Fandom URLs (character boards)
+ * or local uploads, so they go through tileImageUrl like the Tier Lists page.
  */
 function TierListCard({ board, onDelete }) {
+  const covers = (board.covers || []).filter(Boolean).slice(0, 4)
+  const total = board.item_count || 0
+  const ranked = board.ranked_count || 0
+  const pct = total > 0 ? Math.round((ranked / total) * 100) : 0
+
   return (
     <div className="dashboard-tier-card">
       <Link to={`/tierlist/my/${board.id}`} className="dashboard-tier-card__link">
+        {/* Four fixed slots so a board with one or two posters keeps the same
+            shape as a full one instead of collapsing into a thin strip. */}
         <span className="dashboard-tier-card__covers">
-          {(board.covers || []).slice(0, 4).map((c, i) => (
-            <img key={c + i} src={`${TMDB_IMAGE_BASE}/w92${c}`} alt="" loading="lazy" />
+          {Array.from({ length: 4 }, (_, i) => (
+            covers[i]
+              ? <img key={i} src={tileImageUrl(covers[i], board.tile)} alt="" loading="lazy" />
+              : <span key={i} className="dashboard-tier-card__slot" aria-hidden="true" />
           ))}
         </span>
         <span className="dashboard-tier-card__body">
           <span className="dashboard-tier-card__title">{board.title}</span>
           <span className="dashboard-tier-card__meta">
-            {board.ranked_count} of {board.item_count} ranked
+            {ranked} of {total} ranked
+          </span>
+          <span
+            className="dashboard-tier-card__progress"
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${pct}% ranked`}
+          >
+            <span style={{ width: `${pct}%` }} />
           </span>
         </span>
       </Link>
@@ -94,8 +113,14 @@ function TierListCard({ board, onDelete }) {
         className="dashboard-tier-card__delete"
         onClick={() => onDelete(board)}
         aria-label={`Delete ${board.title}`}
+        title="Delete tier list"
       >
-        Delete
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <path d="M10 11v6M14 11v6" />
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+        </svg>
       </button>
     </div>
   )

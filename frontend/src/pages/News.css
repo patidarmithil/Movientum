@@ -142,6 +142,93 @@
   .news-grid { grid-template-columns: 1fr; }
 }
 
+/* ── Phone: list rows, not posters ────────────────────────────────
+ * One 16/9 card per row ran ~340px tall, so a phone screen held barely two
+ * headlines. Below 560px the card turns on its side — thumbnail left, text
+ * right, no description or tags — which is ~100px a row and fits six or seven.
+ * Scoped to .news-grid so the home strip and the detail-page rail keep their
+ * own shapes. The skeleton is reshaped the same way so nothing jumps when the
+ * articles land. */
+@media (max-width: 560px) {
+  .news-grid {
+    gap: var(--space-3);
+  }
+
+  .news-grid .news-card__content {
+    flex-direction: row;
+  }
+
+  /* aspect-ratio is dropped so the thumbnail takes the row's height instead of
+     dictating it — the text column is what decides how tall a row is. */
+  .news-grid .news-card__thumb-wrap {
+    width: 38%;
+    max-width: 150px;
+    aspect-ratio: auto;
+    height: auto;
+    min-height: 96px;
+    align-self: stretch;
+  }
+
+  .news-grid .news-card__thumb-fallback {
+    padding: var(--space-2);
+  }
+
+  .news-grid .news-card__fallback-source {
+    font-size: 0.95rem;
+  }
+
+  .news-grid .news-card__body {
+    padding: var(--space-3);
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .news-grid .news-card__tags,
+  .news-grid .news-card__desc {
+    display: none;
+  }
+
+  .news-grid .news-card__title {
+    font-size: 13px;
+    line-height: 1.3;
+    -webkit-line-clamp: 3;
+  }
+
+  .news-grid .news-card__meta {
+    padding-top: 4px;
+    border-top: none;
+  }
+
+  /* The thumbnail is only ~130px wide here, so the thumbs shrink with it. */
+  .news-grid .movie-card__feedback-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  .news-card-skeleton {
+    display: flex;
+    min-height: 96px;
+  }
+
+  .news-card-skeleton__thumb {
+    width: 38%;
+    max-width: 150px;
+    aspect-ratio: auto;
+    flex-shrink: 0;
+  }
+
+  .news-card-skeleton__body {
+    flex: 1;
+    padding: var(--space-3);
+    gap: var(--space-2);
+    justify-content: center;
+  }
+
+  .news-card-skeleton__tag {
+    display: none;
+  }
+}
+
 /* ── Skeleton ── */
 /* Same pane as the loaded card, so nothing shifts shape when the data lands. */
 .news-card-skeleton {

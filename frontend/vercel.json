@@ -26,6 +26,7 @@
     { "source": "/robots.txt", "destination": "/robots.txt" },
     { "source": "/logo.png", "destination": "/logo.png" },
     { "source": "/favicon.svg", "destination": "/favicon.svg" },
+    { "source": "/logo-128.webp", "destination": "/logo-128.webp" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

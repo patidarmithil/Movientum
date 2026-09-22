@@ -5,8 +5,12 @@ export const userService = {
     const response = await api.get('/api/v1/users/me/analysis')
     return response.data
   },
-  getRecExplanation: async () => {
-    const response = await api.get('/api/v1/users/me/analysis/rec-explanation')
+  getEngineSnapshot: async () => {
+    const response = await api.get('/api/v1/users/me/analysis/engine')
+    return response.data
+  },
+  getFeedbackSnapshot: async (days = 90) => {
+    const response = await api.get('/api/v1/users/me/analysis/feedback', { params: { days } })
     return response.data
   },
   getDateRange: async () => {

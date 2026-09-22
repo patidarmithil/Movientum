@@ -7,27 +7,47 @@
  * The class names are unchanged (.movie-card__feedback-overlay /
  * .movie-card__feedback-btn) so nothing that already targets them breaks.
  *
- * Desktop: hidden, revealed on card hover/focus at the TOP of the poster.
- * Touch:   always visible, pinned to the BOTTOM — see the media query below.
+ * Desktop: hidden, revealed on card hover/focus at the BOTTOM of the poster —
+ *          thumbs-up bottom-left, thumbs-down bottom-right.
+ * Touch:   always visible, and on a title card it moves out of the artwork into
+ *          the .movie-card__meta row — see the media query below.
  */
 
 .movie-card__feedback-overlay {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 6px 8px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 100%);
-  border-top-left-radius: 11px;
-  border-top-right-radius: 11px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 100%);
+  border-bottom-left-radius: 11px;
+  border-bottom-right-radius: 11px;
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(4px);
   transition: opacity 220ms ease, transform 220ms ease;
   pointer-events: none;
   z-index: 10;
+}
+
+/* ── Title cards (movie / trailer / AI rec) ───────────────────────
+ * The control sits in the .movie-card__meta row in the DOM so that touch
+ * layouts can keep it there, out of the artwork. On a pointer device it is
+ * lifted back out and laid across the foot of the poster: .movie-card__info is
+ * the containing block, so `bottom: 100%` is exactly the poster's lower edge.
+ */
+.movie-card__info {
+  position: relative;
+}
+
+.movie-card__meta .movie-card__feedback-overlay {
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  width: auto;
+  border-radius: 0;
 }
 
 .movie-card:hover .movie-card__feedback-overlay,
@@ -81,9 +101,9 @@
 }
 
 /* ── News cards ───────────────────────────────────────────────────
- * A news thumbnail is 16/9, not a 2/3 poster, and the centre of it is already
- * taken by the "Read Article ↗" hover label. So the control sits top-right and
- * does not stretch across the full width.
+ * A news thumbnail is 16/9, not a 2/3 poster, and the foot of it is already
+ * taken by the "Read Article ↗" hover label. So the control sits bottom-right
+ * and does not stretch across the full width.
  */
 .news-card__thumb-wrap .movie-card__feedback-overlay {
   left: auto;
@@ -92,7 +112,7 @@
   gap: 8px;
   padding: 6px;
   background: none;
-  border-radius: 0 11px 0 11px;
+  border-radius: 0;
 }
 
 /* ── Touch / mobile: always visible, pinned to the bottom ──────────
@@ -118,11 +138,42 @@
     border-radius: 0 0 11px 11px;
   }
 
+  /* On a phone the poster is ~110px wide and already carries the rating chip,
+     the TV badge and the date badge. So the control leaves the artwork entirely
+     and rides in the meta row, pushed to its right edge by the auto margin. */
+  .movie-card__meta .movie-card__feedback-overlay {
+    position: static;
+    width: auto;
+    margin-left: auto;
+    flex-shrink: 0;
+    gap: 6px;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
   /* 32px keeps the tap target usable; the icons stay 14px. */
   .movie-card__feedback-btn {
     width: 32px;
     height: 32px;
     background: rgba(20, 20, 20, 0.85);
+  }
+
+  /* In the meta row there is no artwork behind the buttons, so they shrink to
+     the row's height and drop the dark pill. */
+  .movie-card__meta .movie-card__feedback-btn {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .movie-card__meta .movie-card__feedback-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .movie-card__meta .movie-card__feedback-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
 
   /* No hover on touch, so :hover would stick after a tap. */
@@ -141,10 +192,10 @@
   }
 
   /* On a compact news card the thumbnail is only ~90px wide, so a pinned bar
-     would cover most of it. Keep it top-right and compact there. */
+     would cover most of it. Keep it bottom-right and compact there. */
   .news-card__thumb-wrap .movie-card__feedback-overlay {
-    top: 0;
-    bottom: auto;
+    top: auto;
+    bottom: 0;
     left: auto;
     right: 0;
     width: auto;

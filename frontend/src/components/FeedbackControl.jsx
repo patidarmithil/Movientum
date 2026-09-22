@@ -134,7 +134,10 @@ export default function FeedbackControl({
         title="Not for me"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm12-3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
+          {/* The second subpath used to start at x=22 and run to x=25, outside the
+              24-wide viewBox, so it rendered as a clipped stray stroke next to the
+              hand. These are the mirrored coordinates of the thumbs-up bracket. */}
+          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
         </svg>
       </button>
     </div>

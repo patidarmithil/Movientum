@@ -1,166 +1,158 @@
-.collection-card {
+/* WatchlistCollectionCard — one watchlist on the dashboard.
+   A framed tile: accent-coloured stage with the list's posters fanned across it,
+   then the name and count underneath. The card fills its grid cell; the grid in
+   Dashboard.css decides how many fit per row. */
+
+.wl-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  cursor: pointer;
   width: 100%;
-}
-
-.collection-card__cover {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius-md);
+  height: 100%;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
   overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--ease-hover), transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.wl-card:hover,
+.wl-card:focus-visible {
+  border-color: var(--glass-border-hover);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.8);
+}
+
+.wl-card:focus-visible {
+  outline: 2px solid #00D4FF;
+  outline-offset: 3px;
+}
+
+/* ── Cover stage ── */
+.wl-card__cover {
   position: relative;
-  background: var(--card-accent, linear-gradient(135deg, #B048FF, #5227FF));
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset;
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
-}
-
-.collection-card:hover .collection-card__cover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 32px -10px var(--card-accent, rgba(176, 72, 255, 0.45));
-}
-
-.collection-card__img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 110%, rgba(0, 0, 0, 0.45) 0%, transparent 65%),
+    var(--wl-accent);
 }
 
-/* ── Poster fan: overlapping stack instead of a cramped grid collage ── */
-.poster-fan {
-  position: relative;
-  width: 100%;
-  height: 100%;
+.wl-card__fan {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(120% 90% at 50% 100%, rgba(0, 0, 0, 0.35) 0%, transparent 60%),
-    var(--card-accent);
 }
 
-.poster-fan__item {
+/* Sized by the stage's height so the whole 2:3 poster always fits inside the
+   frame, whatever width the grid gives the card. */
+.wl-card__poster {
   position: absolute;
-  width: 50%;
+  height: 80%;
   aspect-ratio: 2 / 3;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(8, 8, 8, 0.6);
-  transform: translateX(var(--fan-x)) rotate(var(--fan-r)) translateY(4%);
-  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(8, 8, 8, 0.55);
+  box-shadow: 0 10px 22px -6px rgba(0, 0, 0, 0.65);
+  transform: translateX(var(--fan-x)) rotate(var(--fan-r)) translateY(3%);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.poster-fan__item img {
+.wl-card__poster img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 
-.collection-card:hover .poster-fan__item {
-  transform: translateX(calc(var(--fan-x) * 1.55)) rotate(calc(var(--fan-r) * 1.15)) translateY(0%);
-  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.6);
+.wl-card:hover .wl-card__poster,
+.wl-card:focus-visible .wl-card__poster {
+  transform: translateX(calc(var(--fan-x) * 1.3)) rotate(calc(var(--fan-r) * 1.15)) translateY(0);
 }
 
-.poster-fan__overflow {
+.wl-card__more {
   position: absolute;
   right: 10px;
   bottom: 10px;
-  padding: 5px 12px;
+  z-index: 10;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
   color: var(--text-primary);
-  background: rgba(8, 8, 8, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(8, 8, 8, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.15);
   pointer-events: none;
 }
 
-.collection-card__empty {
+.wl-card__empty {
+  position: absolute;
+  inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(120% 90% at 50% 100%, rgba(0, 0, 0, 0.3) 0%, transparent 60%),
-    var(--card-accent);
+  gap: var(--space-2);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.collection-card__info {
+/* ── Name and count ── */
+.wl-card__info {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 2px;
+  min-width: 0;
+  padding: var(--space-4);
 }
 
-.collection-card__title {
-  font-size: 15px;
+.wl-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
   font-weight: 700;
+  line-height: 1.3;
   color: var(--text-primary);
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  white-space: normal;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.collection-card__meta {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
-  letter-spacing: 0.03em;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-  .collection-card {
-    gap: 10px;
-  }
-
-  .collection-card__cover {
-    aspect-ratio: 16 / 10;
-  }
-
-  .poster-fan__item {
-    width: 44%;
-  }
-
-  .collection-card__title {
-    font-size: 14px;
-  }
-
-  .collection-card__meta {
-    font-size: 11px;
-  }
+.wl-card__meta {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
 }
 
 @media (max-width: 480px) {
-  .collection-card {
-    gap: 8px;
+  .wl-card__info {
+    padding: var(--space-3);
   }
 
-  .collection-card__cover {
-    aspect-ratio: 16 / 10;
-    border-radius: 10px;
+  .wl-card__title {
+    font-size: 14px;
   }
 
-  .poster-fan__item {
-    width: 45%;
+  .wl-card__meta {
+    font-size: 12px;
   }
 
-  .collection-card__title {
-    font-size: 13px;
-    -webkit-line-clamp: 2;
-  }
-
-  .collection-card__meta {
+  .wl-card__more {
+    right: 6px;
+    bottom: 6px;
+    padding: 3px 8px;
     font-size: 11px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-card,
+  .wl-card__poster { transition: none; }
+  .wl-card:hover,
+  .wl-card:focus-visible { transform: none; }
 }

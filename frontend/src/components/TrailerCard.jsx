@@ -97,16 +97,6 @@ export default function TrailerCard({
             {item.video_type?.toUpperCase()}
           </div>
 
-          {showFeedback && (item.tmdb_id ?? item.id) && (
-            <FeedbackControl
-              kind="title"
-              tmdbId={item.tmdb_id ?? item.id}
-              mediaType={item.media_type || 'movie'}
-              source={feedbackSource}
-              onDismiss={onDismiss}
-            />
-          )}
-
           {/* Play button overlay */}
           <div style={{
             position: 'absolute', inset: 0, display: 'flex',
@@ -133,11 +123,22 @@ export default function TrailerCard({
 
         <div className="movie-card__info">
           <h3 className="movie-card__title">{item.title}</h3>
-          <p className="movie-card__meta">
+          {/* Control lives in the meta row; CSS lifts it onto the poster foot on
+              desktop and keeps it inline here on touch. */}
+          <div className="movie-card__meta">
             <span className="movie-card__year">
               {formatReleaseDate(item.release_date || item.first_air_date) || 'Upcoming'}
             </span>
-          </p>
+            {showFeedback && (item.tmdb_id ?? item.id) && (
+              <FeedbackControl
+                kind="title"
+                tmdbId={item.tmdb_id ?? item.id}
+                mediaType={item.media_type || 'movie'}
+                source={feedbackSource}
+                onDismiss={onDismiss}
+              />
+            )}
+          </div>
         </div>
       </BorderGlow>
     </div>

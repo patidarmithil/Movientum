@@ -76,6 +76,48 @@ const GENRE_OPTIONS = [
 
 
 
+// ── Last-visit snapshot ─────────────────────────────────────────
+// The rails from the last successful home bundle, kept in localStorage so a
+// new tab or a return visit can paint them immediately while the backend is
+// still waking up (a cold start runs ~30-40 s). The bundle is always
+// re-requested and replaces the snapshot as soon as it arrives, so this only
+// changes what is on screen during that wait, never what the backend returns.
+// Deliberately localStorage, not the storage.js wrapper (auth-only), same as
+// mv_loader_posters below.
+const HOME_SNAPSHOT_KEY = 'mv_home_snapshot_v1'
+const HOME_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const DEFAULT_UPCOMING_FILTER = 'month'
+const DEFAULT_TRAILER_REGION = 'All'
+
+function readHomeSnapshot() {
+  try {
+    // Only for a first paint in this tab: an existing session already has
+    // its own rails, and a changed filter/region would not match the snapshot
+    // (which is always taken with the defaults).
+    if (sessionStorage.getItem('home_trending') !== null) return null
+    const filter = sessionStorage.getItem('home_upcomingFilter')
+    const region = sessionStorage.getItem('home_trailerRegion')
+    if (filter !== null && JSON.parse(filter) !== DEFAULT_UPCOMING_FILTER) return null
+    if (region !== null && JSON.parse(region) !== DEFAULT_TRAILER_REGION) return null
+
+    const snap = JSON.parse(localStorage.getItem(HOME_SNAPSHOT_KEY) || 'null')
+    if (!snap || snap.v !== 1 || Date.now() - snap.t > HOME_SNAPSHOT_MAX_AGE_MS) return null
+    if (!snap.trending?.length || !snap.topRated?.length || !snap.upcoming?.length) return null
+    return snap
+  } catch {
+    return null
+  }
+}
+
+function writeHomeSnapshot({ trending, topRated, upcoming, trailers }) {
+  try {
+    if (!trending.length || !topRated.length || !upcoming.length) return
+    localStorage.setItem(HOME_SNAPSHOT_KEY, JSON.stringify({
+      v: 1, t: Date.now(), trending, topRated, upcoming, trailers,
+    }))
+  } catch { /* quota exceeded / private mode — non-fatal */ }
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return 'To Be Confirmed'
   try {
@@ -94,8 +136,12 @@ export default function Home() {
   const [showContactModal, setShowContactModal] = useState(false)
   const [contactStatus, setContactStatus] = useState('idle') // idle | sending | sent | error
 
+  // Read once, before the rail states below use it as their initial value.
+  const [snapshot] = useState(readHomeSnapshot)
+  const paintedFromSnapshotRef = useRef(snapshot !== null)
+
   // Main columns states
-  const [trending, setTrending] = useSessionState('home_trending', [])
+  const [trending, setTrending] = useSessionState('home_trending', () => snapshot?.trending || [])
   const [trendLoad, setTrendLoad] = useState(trending.length === 0)
   const [showLoader, setShowLoader] = useState(trending.length === 0)
   const [mountedAt] = useState(() => performance.now())
@@ -138,7 +184,7 @@ export default function Home() {
     return () => clearTimeout(timer)
   }, [trendLoad])
 
-  const [topRated, setTopRated] = useSessionState('home_topRated', [])
+  const [topRated, setTopRated] = useSessionState('home_topRated', () => snapshot?.topRated || [])
   const [topRatedLoad, setTopRatedLoad] = useState(topRated.length === 0)
 
   const [selectedGenreId, setSelectedGenreId] = useSessionState('home_selectedGenreId', 28) // Default: Action
@@ -157,7 +203,7 @@ export default function Home() {
   // refreshes it in the background and swaps in the fresh result silently.
   // A region-pill change (effect further down) still clears and refetches for
   // real, since that's a genuine user-initiated change, not a repeat visit.
-  const [trailers, setTrailers] = useSessionState('home_trailers', [])
+  const [trailers, setTrailers] = useSessionState('home_trailers', () => snapshot?.trailers || [])
   const [trailersLoad, setTrailersLoad] = useState(trailers.length === 0)
   
   // Trailer Modal state
@@ -165,12 +211,12 @@ export default function Home() {
   const [trailerModalData, setTrailerModalData] = useState(null)
 
   // Trailer Region State
-  const [trailerRegion, setTrailerRegion] = useSessionState('home_trailerRegion', 'All')
+  const [trailerRegion, setTrailerRegion] = useSessionState('home_trailerRegion', DEFAULT_TRAILER_REGION)
   const TRAILER_REGIONS = ['All', 'India', 'Anime', 'Hollywood', 'Other']
 
   // Sidebar states
-  const [upcomingFilter, setUpcomingFilter] = useSessionState('home_upcomingFilter', 'month') // Default: month
-  const [upcoming, setUpcoming] = useSessionState('home_upcoming', [])
+  const [upcomingFilter, setUpcomingFilter] = useSessionState('home_upcomingFilter', DEFAULT_UPCOMING_FILTER)
+  const [upcoming, setUpcoming] = useSessionState('home_upcoming', () => snapshot?.upcoming || [])
   const [upcomingLoad, setUpcomingLoad] = useState(upcoming.length === 0)
 
   // Refs to track if filter changed vs initial mount
@@ -206,6 +252,32 @@ export default function Home() {
     const haveLists = trending.length > 0 && topRated.length > 0 && upcoming.length > 0
     const haveTrailers = trailers.length > 0
 
+    // Painted from the last-visit snapshot: keep it on screen and fetch the
+    // real bundle in the background. A failure leaves the snapshot up rather
+    // than swapping a full page for the error screen.
+    if (paintedFromSnapshotRef.current) {
+      paintedFromSnapshotRef.current = false
+      setTrendLoad(false); setTopRatedLoad(false); setUpcomingLoad(false)
+      setTrailersLoad(!haveTrailers)
+      pageService.getHome({ upcomingFilter, region: null })
+        .then((data) => {
+          const fresh = {
+            trending: data?.trending?.movies || [],
+            topRated: data?.top_rated?.movies || [],
+            upcoming: data?.upcoming?.movies || [],
+            trailers: data?.trailers?.data || [],
+          }
+          if (fresh.trending.length) { setTrending(fresh.trending); cacheLoaderPosters(fresh.trending) }
+          if (fresh.topRated.length) setTopRated(fresh.topRated)
+          if (fresh.upcoming.length) setUpcoming(fresh.upcoming)
+          if (fresh.trailers.length || !haveTrailers) setTrailers(fresh.trailers)
+          writeHomeSnapshot(fresh)
+        })
+        .catch(() => { if (!haveTrailers) setTrailers([]) })
+        .finally(() => setTrailersLoad(false))
+      return
+    }
+
     if (haveLists) {
       // Restored from session state — paint instantly, no skeleton.
       setTrendLoad(false); setTopRatedLoad(false); setUpcomingLoad(false)
@@ -225,11 +297,18 @@ export default function Home() {
     })
       .then((data) => {
         const trendingItems = data?.trending?.movies || []
+        const topRatedItems = data?.top_rated?.movies || []
+        const upcomingItems = data?.upcoming?.movies || []
+        const trailerItems = data?.trailers?.data || []
         setTrending(trendingItems)
         cacheLoaderPosters(trendingItems)
-        setTopRated(data?.top_rated?.movies || [])
-        setUpcoming(data?.upcoming?.movies || [])
-        setTrailers(data?.trailers?.data || [])
+        setTopRated(topRatedItems)
+        setUpcoming(upcomingItems)
+        setTrailers(trailerItems)
+        // The snapshot is only valid for the default filter and region.
+        if (upcomingFilter === DEFAULT_UPCOMING_FILTER && trailerRegion === DEFAULT_TRAILER_REGION) {
+          writeHomeSnapshot({ trending: trendingItems, topRated: topRatedItems, upcoming: upcomingItems, trailers: trailerItems })
+        }
       })
       .catch(() => {
         setTrending([]); setTopRated([]); setUpcoming([])

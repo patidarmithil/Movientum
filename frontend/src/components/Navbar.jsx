@@ -12,7 +12,7 @@ import './Navbar.css'
 
 /**
  * Navbar — Redesigned brand header.
- * Features left brand logo (favicon.svg) and beta label, left-shifted search bar,
+ * Features left brand logo (logo-128.webp) and beta label, left-shifted search bar,
  * and right-aligned actions (Explore and Account/User Profile avatar).
  */
 export default function Navbar() {
@@ -480,7 +480,7 @@ export default function Navbar() {
         {/* Signed-out visitors have no home to go back to — the landing page is
             their home, so the logo returns them there instead of to /home. */}
         <Link to={isLoggedIn ? '/home' : '/intro'} className="navbar__logo" aria-label="Movientum home" onClick={() => setMobileMenuOpen(false)}>
-          <img src="/favicon.svg" alt="Movientum Logo" className="navbar__logo-img" />
+          <img src="/logo-128.webp" alt="Movientum Logo" className="navbar__logo-img" />
           <span className="navbar__logo-text">
             OVI
             <span className="brand-name__e" aria-label="E">
@@ -1219,7 +1219,7 @@ export default function Navbar() {
           <div className={`navbar__mobile-drawer${mobileMenuOpen ? ' navbar__mobile-drawer--open' : ''}`} role="dialog" aria-label="Mobile navigation">
             <div className="navbar__mobile-drawer-header">
               <Link to={isLoggedIn ? '/home' : '/intro'} className="navbar__logo" onClick={() => setMobileMenuOpen(false)}>
-                <img src="/favicon.svg" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
+                <img src="/logo-128.webp" alt="" className="navbar__logo-img" style={{ width: '30px', height: '30px' }} />
                 <span className="navbar__logo-text" style={{ fontSize: '15px' }}>OVIENTUM</span>
               </Link>
               <button 

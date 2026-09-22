@@ -114,22 +114,24 @@ function AIRecCard({ item, memoryMap, onThumb, onDismiss, isExiting = false }) {
               <div className="movie-card__tv-badge">TV</div>
             )}
 
-            <FeedbackControl
-              kind="title"
-              tmdbId={item.tmdb_id}
-              mediaType={item.media_type}
-              source="ai_recommendations"
-              value={signal ?? null}
-              onChange={(next) => onThumb(item, next)}
-              onDismiss={onDismiss}
-            />
           </div>
 
           <div className="movie-card__info">
             <h3 className="movie-card__title">{item.title}</h3>
-            <p className="movie-card__meta">
+            {/* Control lives in the meta row; CSS lifts it onto the poster foot
+                on desktop and keeps it inline here on touch. */}
+            <div className="movie-card__meta">
               <span className="movie-card__year">{item.release_date ? item.release_date.slice(0, 4) : ''}</span>
-            </p>
+              <FeedbackControl
+                kind="title"
+                tmdbId={item.tmdb_id}
+                mediaType={item.media_type}
+                source="ai_recommendations"
+                value={signal ?? null}
+                onChange={(next) => onThumb(item, next)}
+                onDismiss={onDismiss}
+              />
+            </div>
             {item.reason && (
               <p className="movie-card__meta" style={{ marginTop: '4px', fontStyle: 'italic', color: '#94a3b8', fontSize: '0.65rem', whiteSpace: 'normal', lineHeight: 1.2 }}>
                 {item.reason}

@@ -3,8 +3,8 @@
    Source of truth: plans/website.md
    ═══════════════════════════════════════════════════════ */
 
-/* ── Google Fonts fallback (loaded in index.html) ──── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+/* Google Fonts are loaded non-blocking from index.html. A CSS @import here
+   was a second, render-blocking copy of the same request. */
 @import './styles/burst.css';
 
 /* ── CSS Tokens ──────────────────────────────────────── */

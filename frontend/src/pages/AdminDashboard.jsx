@@ -6,6 +6,8 @@ import AdminAnalytics from '../components/AdminAnalytics';
 import './AdminDashboard.css';
 import './AdminPage.css'; // Import the new styles we created
 
+// Must match NIGHTLY_STEPS in backend/app/routers/internal.py.
+const NIGHTLY_STEP_KEYS = ["expire_trailers", "sync_movies", "retrain_ranker", "build_title_index", "check_episodes", "refresh_trailers"];
 
 export default function AdminDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -46,29 +48,46 @@ export default function AdminDashboard() {
 
   const TASKS = [
     { 
-      key: "nightly_job", name: "Overall Nightly Job", desc: "Runs the full suite of nightly updates.",
+      key: "nightly_job", name: "Overall Nightly Job", desc: "Runs every job below in order: expire trailers → sync movies → retrain ranker → title index → new episodes → refresh trailers. News Daily Fetch is excluded.",
+      summarize: (r) => r.failed?.length ? `${r.steps} steps, failed: ${r.failed.join(', ')}` : `All ${r.steps} steps succeeded`,
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     },
     { 
       key: "sync_movies", name: "Sync Movies", desc: "Synchronize popular and upcoming movies from TMDB.",
+      summarize: (r) => `${r.inserted ?? 0} inserted, ${r.updated ?? 0} updated, ${r.failed ?? 0} failed`,
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
     },
     { 
-      key: "retrain_ranker", name: "Retrain ML Ranker", desc: "Retrains the XGBRanker model using recent logs.",
+      key: "retrain_ranker", name: "Retrain ML Ranker", desc: "Retrains the XGBRanker on recent signals; only an approved model (beats the composite on held-out users) goes live.",
+      summarize: (r) => r.status === 'ok'
+        ? `Approved — ${r.rows_trained} rows, best iter ${r.best_iteration ?? '–'}`
+        : `Not applied (${r.reason || r.status})${r.details ? ': ' + r.details.join('; ') : ''}`,
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
     },
     { 
       key: "check_episodes", name: "Check New Episodes", desc: "Checks for new episodes of tracked TV shows.",
+      summarize: (r) => `${r.checked ?? 0} trackers checked`,
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
     },
     {
       key: "refresh_trailers", name: "Refresh Trailers", desc: "Rebuilds the home page trailer index from TMDB's newest releases per region.",
+      summarize: (r) => `${r.total ?? 0} trailers indexed across ${r.regions?.length ?? 0} regions`,
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+    },
+    {
+      key: "expire_trailers", name: "Expire Old Trailers", desc: "Removes stale entries from the trailer index in every region.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>,
+      summarize: (r) => `${r.removed ?? 0} trailers removed`
+    },
+    {
+      key: "build_title_index", name: "Build News Title Index", desc: "Rebuilds the catalogue title index used to link news articles to movies and shows.",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>,
+      summarize: (r) => `${r.entries ?? 0} titles indexed`
     },
     {
       key: "news_daily_fetch", name: "News Daily Fetch", desc: "Fetches NewsAPI, Currents and ApiTube, dedupes, and replaces the live news snapshot (~36 API requests).",
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><line x1="10" y1="7" x2="18" y2="7"></line><line x1="10" y1="11" x2="18" y2="11"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>,
-      summarize: (r) => `Gen ${r.generation}: ${r.raw} raw → ${r.deduped} deduped → ${r.stored} stored (` +
+      summarize: (r) => r.stored == null ? '' : `Gen ${r.generation}: ${r.raw} raw → ${r.deduped} deduped → ${r.stored} stored (` +
         Object.entries(r.per_source || {}).map(([k, v]) => `${k} ${v}`).join(', ') + `)`
     }
   ];
@@ -165,6 +184,11 @@ export default function AdminDashboard() {
           const st = currentStatuses[k];
           return st && (st.progress > 0 && st.progress < 100 && st.status !== 'FAILURE');
         });
+
+        // The nightly chain drives its step rows server-side; poll them too so they update live.
+        if (activeKeys.includes('nightly_job')) {
+          NIGHTLY_STEP_KEYS.forEach(k => { if (!activeKeys.includes(k)) activeKeys.push(k); });
+        }
 
         if (activeKeys.length > 0) {
           activeKeys.forEach(async (key) => {
@@ -367,7 +391,7 @@ export default function AdminDashboard() {
                                 background: isFailed ? '#ef4444' : isSuccess ? '#10b981' : isCancelled ? '#4b5563' : '#56CFE1',
                               }} />
                             </div>
-                            {isSuccess && task.summarize && state.result?.stored != null && (
+                            {isSuccess && task.summarize && state.result && task.summarize(state.result) && (
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{task.summarize(state.result)}</div>
                             )}
                             {isFailed && state.error && (

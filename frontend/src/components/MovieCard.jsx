@@ -189,23 +189,15 @@ const MovieCard = memo(function MovieCard({
             )}
 
             {badge}
-
-            {showFeedback && tmdbId && (
-              <FeedbackControl
-                kind="title"
-                tmdbId={tmdbId}
-                mediaType={mediaType}
-                source={feedbackSource}
-                value={feedbackValue}
-                onChange={onFeedbackChange}
-                onDismiss={onDismiss}
-              />
-            )}
           </div>
 
           <div className="movie-card__info">
             <h3 className="movie-card__title">{movie.title}</h3>
-            <p className="movie-card__meta">
+            {/* The meta row is the control's home in the DOM on every breakpoint.
+                On desktop CSS lifts it onto the foot of the poster; on touch it
+                stays here, flush right of the year/genre. A <div>, not a <p>:
+                the control is a <div> and cannot nest inside a paragraph. */}
+            <div className="movie-card__meta">
               <span className="movie-card__year">{movie.release_year}</span>
               {movie.genres?.[0] && (
                 <>
@@ -213,7 +205,18 @@ const MovieCard = memo(function MovieCard({
                   <span className="movie-card__genre">{movie.genres[0]}</span>
                 </>
               )}
-            </p>
+              {showFeedback && tmdbId && (
+                <FeedbackControl
+                  kind="title"
+                  tmdbId={tmdbId}
+                  mediaType={mediaType}
+                  source={feedbackSource}
+                  value={feedbackValue}
+                  onChange={onFeedbackChange}
+                  onDismiss={onDismiss}
+                />
+              )}
+            </div>
           </div>
         </BorderGlow>
       </Link>

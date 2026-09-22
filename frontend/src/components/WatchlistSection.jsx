@@ -23,26 +23,36 @@ export default function WatchlistSection() {
   const [items, setItems] = useSessionState('home_watchlist', [])
   const [loading, setLoading] = useState(items.length === 0)
   const fetchedRef = useRef(false)
+  // "Still mounted?" has to survive across effect runs, so it is a ref rather
+  // than a per-run local. Under StrictMode the effect runs, is cleaned up, then
+  // runs again: with a local flag the first run's cleanup set it false, the
+  // second run skipped the fetch on fetchedRef, and the in-flight response then
+  // bailed out before setLoading(false) — the rail sat on skeletons forever in
+  // dev. The ref is set true at the top of every run, so the response resolves
+  // against the live mount.
+  const aliveRef = useRef(true)
 
   useEffect(() => {
-    if (fetchedRef.current) return
-    fetchedRef.current = true
-    let mounted = true
+    aliveRef.current = true
 
     async function fetchWatchlist() {
       try {
         const data = await planToWatchService.getHomeStrip()
-        if (!mounted) return
+        if (!aliveRef.current) return
         setItems(shuffleArray(data.items || []))
       } catch (err) {
         console.error("Watchlist fetch error:", err)
       } finally {
-        if (mounted) setLoading(false)
+        if (aliveRef.current) setLoading(false)
       }
     }
 
-    fetchWatchlist()
-    return () => { mounted = false }
+    if (!fetchedRef.current) {
+      fetchedRef.current = true
+      fetchWatchlist()
+    }
+
+    return () => { aliveRef.current = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
