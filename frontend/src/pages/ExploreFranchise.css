@@ -1,0 +1,195 @@
+/* ExploreFranchise.css — /explore/franchise/:slug. Reuses .xres__* bits from ExploreResults.css. */
+
+.xfr {
+  min-height: 100vh;
+  padding: calc(var(--navbar-h, 64px) + 24px) 0 96px;
+  background: var(--x-bg);
+  overflow-x: clip;
+}
+.xfr__layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.xfr__rail {
+  position: sticky;
+  top: calc(var(--navbar-h, 64px) + 20px);
+  align-self: start;
+  padding: 22px 24px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--x-line);
+  background: var(--x-panel);
+}
+
+/* Fade-watched switch */
+.xfr__fade {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.xfr__fade > svg { color: var(--x-muted); }
+.xfr__fade > span:first-of-type { flex: 1; }
+.xfr__fade input { position: absolute; opacity: 0; pointer-events: none; }
+.xfr__switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 22px;
+  background: #3a3a3f;
+  transition: background 160ms ease;
+}
+.xfr__switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 160ms ease;
+}
+.xfr__fade input:checked + .xfr__switch { background: var(--x-accent); }
+.xfr__fade input:checked + .xfr__switch::after { transform: translateX(18px); }
+.xfr__fade input:focus-visible + .xfr__switch { outline: 2px solid var(--x-accent); outline-offset: 2px; }
+
+.xfr__progress {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.xfr__progress::before {
+  content: '';
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.xfr__progress span {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  max-width: calc(100% - 44px);
+  border-radius: 4px;
+  background: var(--x-accent);
+}
+.xfr__progress em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--x-faint);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* ── Main ────────────────────────────────────────────────────────────── */
+.xfr__main { min-width: 0; }
+.xfr__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: var(--x-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+.xfr__back:hover { color: var(--x-text); }
+
+.xfr__hero {
+  aspect-ratio: 21 / 9;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--x-tile);
+}
+.xfr__hero > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.xfr__hero-posters {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  height: 100%;
+}
+.xfr__hero-posters img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.xfr__head { margin: 26px 0 26px; }
+.xfr__title {
+  margin: 0;
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.xfr__ghost {
+  display: inline-block;
+  width: 60%;
+  height: 0.9em;
+  border-radius: 8px;
+  background: var(--x-tile);
+}
+.xfr__meta {
+  margin: 10px 0 0;
+  color: var(--x-muted);
+  font-size: 15px;
+}
+
+/* Numbered grid: the order is the point of this page, so the number sits on the poster. */
+.xfr__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 28px 20px;
+}
+.xfr__item {
+  position: relative;
+  transition: opacity 200ms ease;
+}
+.xfr__item.is-watched { opacity: 0.32; }
+.xfr__item.is-watched:hover { opacity: 1; }
+.xfr__num {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  left: 10px;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.xfr__missing {
+  max-width: 560px;
+  margin: 80px auto 0;
+  padding: 0 16px;
+}
+.xfr__missing h1 { margin: 0 0 10px; font-size: 32px; font-weight: 800; }
+.xfr__missing p { margin: 0 0 20px; color: var(--x-muted); }
+.xfr__missing .xres__btn { display: inline-grid; place-items: center; text-decoration: none; }
+
+@media (max-width: 900px) {
+  .xfr { padding-top: var(--navbar-h, 64px); }
+  .xfr__layout { grid-template-columns: minmax(0, 1fr); padding: 0 16px; }
+  .xfr__back { margin-top: 12px; }
+  .xfr__hero { aspect-ratio: 16 / 9; margin: 0 -16px; border-radius: 0; }
+  .xfr__head { margin: 18px 0 10px; }
+  .xfr__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; }
+  .xfr__num { font-size: 26px; top: 4px; left: 7px; }
+}
+
+@media (max-width: 360px) {
+  .xfr__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

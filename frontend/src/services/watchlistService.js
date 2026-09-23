@@ -32,6 +32,31 @@ export const watchlistService = {
     api.patch(`/api/v1/watchlists/${collectionId}`, { name, description }).then((r) => r.data),
 
   /**
+   * POST /api/v1/watchlists/{collectionId}/cover — upload banner image (multipart)
+   */
+  uploadCover: (collectionId, file) => {
+    const form = new FormData()
+    form.append('image', file)
+    // The shared instance defaults to JSON, which would make axios serialize the
+    // FormData into a JSON object; multipart lets the browser add the boundary.
+    return api.post(`/api/v1/watchlists/${collectionId}/cover`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data)
+  },
+
+  /**
+   * DELETE /api/v1/watchlists/{collectionId}/cover — remove banner image
+   */
+  deleteCover: (collectionId) =>
+    api.delete(`/api/v1/watchlists/${collectionId}/cover`).then((r) => r.data),
+
+  /**
+   * GET /api/v1/watchlists/{collectionId}/providers — { items: { "movie:123": ["Netflix", ...] } }
+   */
+  getProviders: (collectionId) =>
+    api.get(`/api/v1/watchlists/${collectionId}/providers`).then((r) => r.data),
+
+  /**
    * DELETE /api/v1/watchlists/{collectionId} — delete collection
    */
   deleteCollection: (collectionId) =>

@@ -191,6 +191,19 @@ export function AuthProvider({ children }) {
     clearSession()
   }, [clearSession])
 
+  // Forced logout from api.js after the server rejected the refresh token. The
+  // tokens are already gone, so there is nothing to revoke server-side. This
+  // used to call logout(), which awaited a /logout round trip before clearing
+  // state — long enough for session restore to finish a device login in the
+  // meantime, and the late clear then wiped that fresh session, so the user
+  // had to reload again to get back in.
+  const expireSession = useCallback(() => {
+    if (storage.getItem(KEYS.access)) return  // a newer session already landed
+    setAccessToken(null)
+    setUser(null)
+    setIsLoggedIn(false)
+  }, [])
+
   const refreshToken = useCallback(async () => {
     if (refreshingRef.current) return null
 
@@ -240,6 +253,7 @@ export function AuthProvider({ children }) {
     googleLogin,
     register,
     logout,
+    expireSession,
     refreshToken,
     updateUser,
   }), [
@@ -251,6 +265,7 @@ export function AuthProvider({ children }) {
     googleLogin,
     register,
     logout,
+    expireSession,
     refreshToken,
     updateUser,
   ])

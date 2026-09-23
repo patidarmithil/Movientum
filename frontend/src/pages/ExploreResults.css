@@ -1,0 +1,206 @@
+/* ExploreResults.css — /explore results: filter rail + chip row + poster grid.
+   (Explore.css is left for the recommendation pages that still import it.) */
+
+.xres {
+  min-height: 100vh;
+  padding: calc(var(--navbar-h, 64px) + 24px) 0 96px;
+  background: var(--x-bg);
+  overflow-x: clip;
+}
+.xres__layout {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  gap: 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* ── Rail ────────────────────────────────────────────────────────────── */
+.xres__rail {
+  position: sticky;
+  top: calc(var(--navbar-h, 64px) + 20px);
+  align-self: start;
+  max-height: calc(100vh - var(--navbar-h, 64px) - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 22px 24px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--x-line);
+  background: var(--x-panel);
+}
+.xres__rail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 16px;
+  font-size: 20px;
+  color: var(--x-muted);
+}
+.xres__rail-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--x-text);
+}
+.xres__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #e5e5e5;
+  color: #0a0a0a;
+  font-size: 13px;
+  font-weight: 700;
+}
+.xres__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--x-muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+.xres__clear:hover { color: var(--x-text); }
+
+/* ── Main column ─────────────────────────────────────────────────────── */
+.xres__main { min-width: 0; }
+.xres__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 18px;
+}
+.xres__title {
+  margin: 0;
+  font-size: clamp(30px, 3.6vw, 48px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+.xres__count {
+  margin: 0;
+  font-size: 15px;
+  color: var(--x-muted);
+}
+
+.xres__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.xres__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--x-line-hi);
+  background: var(--x-tile);
+  color: var(--x-text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.xres__chip:hover { border-color: rgba(255, 255, 255, 0.45); }
+.xres__chip svg { color: var(--x-muted); }
+
+.xres__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 28px 20px;
+}
+.xres__sentinel { height: 1px; }
+.xres__end {
+  margin: 40px 0 0;
+  text-align: center;
+  color: var(--x-faint);
+  font-size: 14px;
+}
+.xres__state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 32px 0;
+  color: var(--x-muted);
+  font-size: 16px;
+}
+.xres__state p { margin: 0; }
+.xres__btn {
+  height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Mobile bar ──────────────────────────────────────────────────────── */
+.xres__mbar {
+  position: sticky;
+  top: var(--navbar-h, 64px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 -16px 12px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--x-bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.xres__mbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--x-line-hi);
+  background: var(--x-tile);
+  color: var(--x-text);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.xres__msort { flex: 1; min-width: 0; }
+
+@media (max-width: 1200px) {
+  .xres__layout { grid-template-columns: 280px minmax(0, 1fr); gap: 28px; padding: 0 24px; }
+}
+
+@media (max-width: 900px) {
+  .xres { padding-top: calc(var(--navbar-h, 64px) + 12px); }
+  .xres__layout { grid-template-columns: minmax(0, 1fr); padding: 0 16px; }
+  .xres__head { margin-bottom: 6px; }
+  /* One swipeable row instead of a wall of chips above the posters. */
+  .xres__chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -16px 18px;
+    padding: 0 16px;
+  }
+  .xres__chips::-webkit-scrollbar { display: none; }
+  .xres__chips > * { flex-shrink: 0; }
+  .xres__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; }
+}
+
+@media (max-width: 360px) {
+  .xres__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

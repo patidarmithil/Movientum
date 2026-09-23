@@ -96,6 +96,65 @@ const processQueue = (error, token = null) => {
   failedQueue = []
 }
 
+// Refresh tokens rotate: the backend blacklists the old one on use. Two tabs
+// reloading together would both send the same refresh token, the second gets a
+// 401, and its forced logout wiped the pair the first tab had just stored. The
+// lock (shared across tabs through localStorage) lets one tab refresh while the
+// others wait and pick up the new token.
+const REFRESH_LOCK_KEY = 'mv_refreshing'
+const REFRESH_LOCK_TTL_MS = 10000
+const REFRESH_WAIT_MS = 8000
+
+const acquireRefreshLock = () => {
+  try {
+    const held = localStorage.getItem(REFRESH_LOCK_KEY)
+    if (held && Date.now() - parseInt(held, 10) < REFRESH_LOCK_TTL_MS) return false
+    localStorage.setItem(REFRESH_LOCK_KEY, Date.now().toString())
+    return true
+  } catch { return true }
+}
+
+const releaseRefreshLock = () => {
+  try { localStorage.removeItem(REFRESH_LOCK_KEY) } catch { /* ignore */ }
+}
+
+/** Resolves with the access token once it differs from `stale`, or null on timeout. */
+const waitForNewAccessToken = (stale) => new Promise((resolve) => {
+  const started = Date.now()
+  const tick = () => {
+    const current = storage.getItem(KEYS.access)
+    if (current && current !== stale) return resolve(current)
+    if (Date.now() - started > REFRESH_WAIT_MS) return resolve(null)
+    setTimeout(tick, 200)
+  }
+  tick()
+})
+
+const isAuthRejection = (err) => err?.response?.status === 401 || err?.response?.status === 403
+
+/**
+ * POST /auth/refresh, falling back to the secondary backend on a network or
+ * 5xx failure the same way every other request does. A cold primary used to
+ * make the refresh fail, which was treated as an expired session.
+ */
+const postRefresh = async (refreshToken) => {
+  const body = { refresh_token: refreshToken }
+  try {
+    return await axios.post(`${BASE_URL}/api/v1/auth/refresh`, body, { timeout: 120000 })
+  } catch (err) {
+    const retryable = !err.response || err.response.status >= 500
+    if (!retryable || !SECONDARY_URL || SECONDARY_URL === BASE_URL) throw err
+    return axios.post(`${SECONDARY_URL}/api/v1/auth/refresh`, body, { timeout: 120000 })
+  }
+}
+
+const clearStoredSession = () => {
+  storage.removeItem(KEYS.access)
+  storage.removeItem(KEYS.refresh)
+  storage.removeItem('mv_user')
+  window.dispatchEvent(new Event('mv:logout'))
+}
+
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
@@ -166,19 +225,32 @@ api.interceptors.response.use(
 
     // Skip retry for auth endpoints where 401 means invalid credentials, not an expired access token
     if (original?.url?.includes('/auth/refresh')) {
-      // Refresh failed → force logout
-      storage.removeItem(KEYS.access)
-      storage.removeItem(KEYS.refresh)
-      storage.removeItem('mv_user')
-      window.dispatchEvent(new Event('mv:logout'))
+      // Only a real rejection ends the session; a timeout or 5xx keeps it.
+      if (isAuthRejection(error)) clearStoredSession()
       return Promise.reject(error)
     }
 
-    if (original?.url?.includes('/auth/login') || original?.url?.includes('/auth/device-login')) {
+    if (
+      original?.url?.includes('/auth/login') ||
+      original?.url?.includes('/auth/device-login') ||
+      original?.url?.includes('/auth/logout') ||
+      original?.url?.includes('/auth/google')
+    ) {
       return Promise.reject(error)
     }
 
     if (error.response?.status === 401 && !original._retry) {
+      // The token this request carried may already be replaced — a login,
+      // device login or another tab's refresh landed while it was in flight.
+      // Retry with the current one instead of rotating the refresh token again.
+      const sentAuth = original.headers?.['Authorization'] || original.headers?.Authorization
+      const currentAccess = storage.getItem(KEYS.access)
+      if (currentAccess && sentAuth !== `Bearer ${currentAccess}`) {
+        original._retry = true
+        original.headers['Authorization'] = `Bearer ${currentAccess}`
+        return api(original)
+      }
+
       // If already refreshing, queue this request until refresh completes
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -202,12 +274,23 @@ api.interceptors.response.use(
         return Promise.reject(error)
       }
 
+      // Another tab is mid-refresh with this same refresh token: wait for the
+      // pair it stores rather than sending a token that is about to be revoked.
+      if (!acquireRefreshLock()) {
+        const fresh = await waitForNewAccessToken(currentAccess)
+        isRefreshing = false
+        if (fresh) {
+          processQueue(null, fresh)
+          original.headers['Authorization'] = `Bearer ${fresh}`
+          return api(original)
+        }
+        processQueue(error, null)
+        return Promise.reject(error)
+      }
+
       try {
         // Call refresh directly (avoid circular import with AuthContext)
-        const response = await axios.post(
-          `${api.defaults.baseURL}/api/v1/auth/refresh`,
-          { refresh_token: storedRefresh }
-        )
+        const response = await postRefresh(storedRefresh)
         const { access_token, refresh_token } = response.data.data
         storage.setItem(KEYS.access,  access_token)
         storage.setItem(KEYS.refresh, refresh_token)
@@ -222,14 +305,23 @@ api.interceptors.response.use(
         isRefreshing = false
         processQueue(refreshError, null)
 
-        // Refresh failed → clear session, redirect to login
-        storage.removeItem(KEYS.access)
-        storage.removeItem(KEYS.refresh)
-        storage.removeItem('mv_user')
-        window.dispatchEvent(new Event('mv:logout'))
+        // Only a 401/403 from /auth/refresh means the session is over. A
+        // timeout or 5xx (Azure cold start) keeps the tokens so the next
+        // request can try again instead of logging the user out.
+        // Also skip the logout when the stored pair changed while refreshing
+        // (a login or device login in this tab, or another tab's refresh).
+        const pairChanged = storage.getItem(KEYS.refresh) !== storedRefresh
+        const latestAccess = storage.getItem(KEYS.access)
+        if (pairChanged && latestAccess) {
+          original.headers['Authorization'] = `Bearer ${latestAccess}`
+          return api(original)
+        }
+        if (isAuthRejection(refreshError)) clearStoredSession()
 
         refreshError.message = `${refreshError.message} [MV-FAU02]`;
         return Promise.reject(refreshError)
+      } finally {
+        releaseRefreshLock()
       }
     }
 

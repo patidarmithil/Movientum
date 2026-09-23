@@ -1,11 +1,12 @@
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import { notificationService } from '../services/notificationService'
 import SearchOverlay from './SearchOverlay'
+import ExploreMenu from './explore/ExploreMenu'
 import TrailerModal from './TrailerModal'
 import api from '../utils/api'
 import './Navbar.css'
@@ -60,6 +61,19 @@ export default function Navbar() {
   }, [])
 
   const [highlightExplore, setHighlightExplore] = useState(false)
+
+  // Explore facet menu (popover on desktop, bottom sheet on mobile).
+  const [exploreOpen, setExploreOpen] = useState(false)
+  const exploreBtnRef = useRef(null)
+  const exploreActive = location.pathname.startsWith('/explore')
+  const closeExplore = useCallback(() => setExploreOpen(false), [])
+  // Close it whenever the route changes (adjusting state during render, not in an effect).
+  const locKey = location.pathname + location.search
+  const [exploreLoc, setExploreLoc] = useState(locKey)
+  if (exploreLoc !== locKey) {
+    setExploreLoc(locKey)
+    setExploreOpen(false)
+  }
 
   // Listen to explore page highlight requests
   useEffect(() => {
@@ -561,18 +575,20 @@ export default function Navbar() {
           ) : (
             <>
               {/* Explore nav button (Compass Icon + Text) */}
-              <NavLink
-                to="/explore"
-                className={({ isActive }) =>
-                  `navbar__link navbar__link--icon${isActive ? ' navbar__link--active' : ''}${highlightExplore ? ' navbar__link--highlighted' : ''}`
-                }
+              <button
+                type="button"
+                ref={exploreBtnRef}
+                aria-haspopup="menu"
+                aria-expanded={exploreOpen}
+                onClick={() => setExploreOpen((o) => !o)}
+                className={`navbar__link navbar__link--icon navbar__link--button${exploreActive || exploreOpen ? ' navbar__link--active' : ''}${highlightExplore ? ' navbar__link--highlighted' : ''}`}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
                 </svg>
                 <span>Explore</span>
-              </NavLink>
+              </button>
 
               {/* News nav button */}
               <NavLink
@@ -1202,6 +1218,8 @@ export default function Navbar() {
             <SearchOverlay isOpen={searchOpen} setIsOpen={setSearchOpen} />
           )}
 
+          <ExploreMenu open={exploreOpen} onClose={closeExplore} anchorRef={exploreBtnRef} />
+
 
           </div>
         </div>
@@ -1244,16 +1262,16 @@ export default function Navbar() {
                   <polyline points="9 22 9 12 15 12 15 22"></polyline>
                 </svg> Home
               </NavLink>
-              <NavLink 
-                to="/explore" 
-                className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
-                onClick={() => setMobileMenuOpen(false)}
+              <button
+                type="button"
+                className={`navbar__mobile-drawer-link navbar__link--button${exploreActive ? ' navbar__mobile-drawer-link--active' : ''}`}
+                onClick={() => { setMobileMenuOpen(false); setExploreOpen(true) }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
                 </svg> Explore
-              </NavLink>
+              </button>
               <NavLink 
                 to="/about" 
                 className={({ isActive }) => `navbar__mobile-drawer-link${isActive ? ' navbar__mobile-drawer-link--active' : ''}`}
@@ -1455,16 +1473,19 @@ export default function Navbar() {
               <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
             </svg>
           </NavLink>
-          <NavLink
-            to="/explore"
-            className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}
+          <button
+            type="button"
+            className={`navbar__mobile-tab navbar__link--button${exploreActive || exploreOpen ? ' navbar__mobile-tab--active' : ''}`}
             aria-label="Explore"
+            aria-haspopup="menu"
+            aria-expanded={exploreOpen}
+            onClick={() => setExploreOpen((o) => !o)}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
             </svg>
-          </NavLink>
+          </button>
           <NavLink
             to="/news"
             className={({ isActive }) => `navbar__mobile-tab${isActive ? ' navbar__mobile-tab--active' : ''}`}

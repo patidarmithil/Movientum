@@ -1,0 +1,34 @@
+/* Top-of-page aurora for the explore pages — sizing mirrors .explore-aurora-bg
+   on /recommendations; the fade lands on the explore surface colour. */
+.xres,
+.xhub,
+.xfr {
+  position: relative;
+}
+
+.x-aurora {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 520px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  overflow: hidden;
+}
+
+.x-aurora__fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, var(--x-bg, #080808) 100%);
+}
+
+/* Page content sits above the canvas. */
+.xres__layout,
+.xhub__inner,
+.xfr__layout,
+.xfr__missing {
+  position: relative;
+  z-index: 1;
+}

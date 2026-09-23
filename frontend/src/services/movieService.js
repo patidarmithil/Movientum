@@ -65,6 +65,17 @@ export const movieService = {
     api.get('/api/v1/movies/genres').then((r) => r.data),
 
   /**
+   * GET /api/v1/movies/explore — filtered browse (TMDB discover).
+   * @returns {Promise<{ movies, total, page, limit, has_more, all_genres }>}
+   */
+  exploreTitles: (params, signal) =>
+    api.get('/api/v1/movies/explore', { params, signal }).then((r) => r.data),
+
+  /** GET /api/v1/explore/franchises — franchise hub, ranked, served from memory. */
+  getFranchises: () =>
+    api.get('/api/v1/explore/franchises').then((r) => r.data?.franchises ?? []),
+
+  /**
    * GET /api/v1/movies/top_rated → top rated movies and tv
    */
   getTopRated: () =>

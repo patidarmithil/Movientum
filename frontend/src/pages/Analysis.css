@@ -725,9 +725,26 @@ a.an-rank__name:hover { text-decoration: underline; text-underline-offset: 3px; 
   font-size: 0.8rem;
 }
 
-.an-slider { display: grid; grid-template-columns: 7rem minmax(0, 1fr) 2.8rem; align-items: center; gap: var(--space-3); padding: 5px 0; font-size: 0.86rem; }
+.an-slider { display: grid; grid-template-columns: 7rem minmax(0, 1fr) 4rem; align-items: center; gap: var(--space-3); padding: 5px 0; font-size: 0.86rem; }
 .an-slider label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-slider output { text-align: right; color: var(--text-muted); }
+.an-slider__num {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+  text-align: right;
+  font: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.an-slider__num::-webkit-outer-spin-button,
+.an-slider__num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.an-slider__num:hover { border-color: var(--glass-border); }
+.an-slider__num:focus-visible { outline: none; color: var(--text-primary); border-color: var(--an-strong); }
 .an-slider--wide { grid-template-columns: 1fr; }
 .an-slider--wide label { white-space: normal; line-height: 1.5; }
 
@@ -998,7 +1015,7 @@ a.an-rank__name:hover { text-decoration: underline; text-underline-offset: 3px; 
   .an-tile__why { font-size: 0.72rem; }
 
   /* Settings */
-  .an-slider { grid-template-columns: 5.5rem minmax(0, 1fr) 2.6rem; gap: var(--space-2); }
+  .an-slider { grid-template-columns: 5.5rem minmax(0, 1fr) 3.4rem; gap: var(--space-2); }
   .an-slider--wide { grid-template-columns: 1fr; }
   .an-seg--full button { padding: 8px 6px; min-height: 38px; font-size: 0.8rem; }
   .an-chip--btn { min-height: 34px; }

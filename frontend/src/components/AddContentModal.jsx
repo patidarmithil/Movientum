@@ -191,6 +191,7 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
   return createPortal(
     <div className="acm-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Add Content">
       <div className="acm-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="acm-grab" aria-hidden="true"><span /></div>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="acm-header">
@@ -269,6 +270,11 @@ export default function AddContentModal({ collectionId, isOpen, onClose, onItemA
               </div>
             </>
           )}
+        </div>
+
+        {/* Mobile-only footer: a clear way out once titles are added */}
+        <div className="acm-footer">
+          <button type="button" className="acm-done-btn" onClick={onClose}>Done</button>
         </div>
 
       </div>

@@ -1,0 +1,286 @@
+/* ExploreHub.css — /explore/:facet. Four layouts: A–Z tiles, tone cards, flags, franchise banners.
+   Tokens come from components/explore/explore-tokens.css (imported in ExploreHub.jsx). */
+
+.xhub {
+  min-height: 100vh;
+  padding: calc(var(--navbar-h, 64px) + 32px) 0 96px;
+  background: var(--x-bg);
+  overflow-x: clip;
+}
+.xhub__inner {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* ── Header: title left, search pill right ───────────────────────────── */
+.xhub__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.xhub__title {
+  margin: 0;
+  font-size: clamp(40px, 5.4vw, 68px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.xhub__search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 540px);
+  height: 54px;
+  padding: 0 18px 0 20px;
+  border-radius: 14px;
+  background: var(--x-field);
+  border: 1px solid transparent;
+  color: var(--x-muted);
+  font-size: 20px;
+  transition: border-color 140ms ease;
+}
+.xhub__search:focus-within { border-color: var(--x-line-hi); }
+.xhub__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: var(--x-text);
+  font-size: 17px;
+  outline: none;
+}
+.xhub__search input::placeholder { color: var(--x-muted); }
+.xhub__search input::-webkit-search-cancel-button { display: none; }
+.xhub__search button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--x-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+.xhub__empty {
+  color: var(--x-muted);
+  font-size: 16px;
+  padding: 40px 0;
+}
+
+/* ── A–Z (category, language) ────────────────────────────────────────── */
+.xhub-alpha__group {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  padding: 28px 0;
+  border-bottom: 1px solid var(--x-line);
+}
+.xhub-alpha__group:first-child { padding-top: 0; }
+.xhub-alpha__group:last-child { border-bottom: 0; }
+.xhub-alpha__letter {
+  font-size: 84px;
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+.xhub-alpha__tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+}
+.xhub-alpha__tile {
+  display: flex;
+  align-items: center;
+  min-height: 78px;
+  padding: 0 24px;
+  border-radius: 10px;
+  background: var(--x-tile);
+  color: var(--x-text);
+  font-size: 20px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 140ms ease;
+}
+.xhub-alpha__tile:hover { background: var(--x-tile-hi); }
+
+/* ── Tone cards (genre, family, anime) ───────────────────────────────── */
+.xhub-tone {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 34px;
+}
+.xhub-tone__card {
+  --tone: #2a2a2a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  aspect-ratio: 16 / 9.4;
+  padding: 30px 34px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  background:
+    linear-gradient(140deg,
+      color-mix(in srgb, var(--tone) 72%, #080808) 0%,
+      color-mix(in srgb, var(--tone) 28%, #0d0d0d) 55%,
+      #0f0f10 100%);
+  color: var(--x-text);
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+/* The one loud moment: the card lights from inside in its own colour. */
+.xhub-tone__card:hover,
+.xhub-tone__card:focus-visible {
+  border-color: color-mix(in srgb, var(--tone) 100%, #fff 25%);
+  box-shadow:
+    inset 0 0 60px color-mix(in srgb, var(--tone) 55%, transparent),
+    0 0 28px color-mix(in srgb, var(--tone) 35%, transparent);
+}
+.xhub-tone__label {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--tone) 80%, transparent);
+}
+.xhub-tone__hint {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* ── Flags (country) ─────────────────────────────────────────────────── */
+.xhub-flag {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 34px;
+}
+.xhub-flag__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  min-height: 204px;
+  padding: 24px 12px;
+  border-radius: 10px;
+  background: var(--x-tile);
+  color: var(--x-text);
+  text-decoration: none;
+  transition: background 140ms ease;
+}
+.xhub-flag__tile:hover { background: var(--x-tile-hi); }
+.xhub-flag__img {
+  width: 68px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.xhub-flag__name {
+  font-size: 21px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ── Franchise banners ───────────────────────────────────────────────── */
+.xhub-fr {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+}
+.xhub-fr__card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
+  margin: -14px;
+  border-radius: 12px;
+  color: var(--x-text);
+  text-decoration: none;
+  transition: background 160ms ease;
+}
+.xhub-fr__card:hover { background: var(--x-tile); }
+.xhub-fr__art {
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--x-tile);
+}
+.xhub-fr__art > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.xhub-fr__posters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  height: 100%;
+}
+.xhub-fr__posters img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.xhub-fr__title {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.xhub-fr__card--ghost .xhub-fr__art,
+.xhub-fr__ghostline {
+  background: linear-gradient(90deg, #161618 0%, #1f1f22 50%, #161618 100%);
+  background-size: 200% 100%;
+  animation: xhub-shimmer 1.3s linear infinite;
+}
+.xhub-fr__ghostline {
+  display: block;
+  width: 70%;
+  height: 18px;
+  border-radius: 6px;
+}
+@keyframes xhub-shimmer { to { background-position: -200% 0; } }
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .xhub-alpha__tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .xhub-tone { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+  .xhub-flag { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+  .xhub-fr { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .xhub { padding-top: calc(var(--navbar-h, 64px) + 16px); }
+  .xhub__inner { padding: 0 16px; }
+  .xhub__head { flex-direction: column; align-items: stretch; gap: 16px; margin-bottom: 24px; }
+  .xhub__search { width: 100%; height: 48px; font-size: 18px; }
+  .xhub__search input { font-size: 16px; }
+
+  .xhub-alpha__group { grid-template-columns: 1fr; gap: 12px; padding: 20px 0; }
+  .xhub-alpha__letter { font-size: 48px; }
+  .xhub-alpha__tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .xhub-alpha__tile { min-height: 56px; padding: 0 14px; font-size: 15px; }
+
+  .xhub-tone { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .xhub-tone__card { padding: 16px; }
+  .xhub-tone__label { font-size: 21px; }
+  .xhub-tone__hint { font-size: 12px; }
+
+  .xhub-flag { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .xhub-flag__tile { min-height: 116px; gap: 12px; padding: 14px 6px; }
+  .xhub-flag__img { width: 44px; height: 31px; border-radius: 4px; }
+  .xhub-flag__name { font-size: 13px; }
+
+  .xhub-fr { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .xhub-fr__card { padding: 0; margin: 0; gap: 8px; }
+  .xhub-fr__card:hover { background: none; }
+  .xhub-fr__title { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xhub-fr__card--ghost .xhub-fr__art, .xhub-fr__ghostline { animation: none; }
+}

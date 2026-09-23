@@ -49,6 +49,8 @@ const RecommendationsContent = lazy(() => import('./pages/RecommendationsContent
 const Search = lazy(() => import('./pages/Search'))
 const PersonPage = lazy(() => import('./pages/PersonPage'))
 const Explore = lazy(() => import('./pages/Explore'))
+const ExploreHub = lazy(() => import('./pages/ExploreHub'))
+const ExploreFranchise = lazy(() => import('./pages/ExploreFranchise'))
 const TierList = lazy(() => import('./pages/TierList'))
 const TierBoard = lazy(() => import('./pages/TierBoard'))
 const Analysis = lazy(() => import('./pages/Analysis'))
@@ -117,12 +119,11 @@ function PrefetchRoutes({ isLoggedIn }) {
 
 // Listens for forced-logout event dispatched by api.js interceptor
 function LogoutListener() {
-  const { logout } = useAuth()
+  const { expireSession } = useAuth()
   useEffect(() => {
-    const handler = () => logout()
-    window.addEventListener('mv:logout', handler)
-    return () => window.removeEventListener('mv:logout', handler)
-  }, [logout])
+    window.addEventListener('mv:logout', expireSession)
+    return () => window.removeEventListener('mv:logout', expireSession)
+  }, [expireSession])
   return null
 }
 
@@ -200,6 +201,8 @@ function AppRoutes() {
 
   useEffect(() => {
     const path = location.pathname;
+    // Explore pages title themselves from their filters / facet / franchise name.
+    if (path === "/explore" || path.startsWith("/explore/")) return;
     let title = "Movientum — Your Movies, Your Way"; // default fallback
 
     if (path === "/" || path === "/intro" || path === "/about") {
@@ -226,8 +229,6 @@ function AppRoutes() {
       title = "Recommendation Content - Movientum";
     } else if (path.startsWith("/person/")) {
       title = "Person - Movientum";
-    } else if (path === "/explore") {
-      title = "Explore - Movientum";
     } else if (path === "/tierlist") {
       title = "Tier Lists - Movientum";
     } else if (path.startsWith("/tierlist/")) {
@@ -335,6 +336,8 @@ function AppRoutes() {
 
           {/* Improvement 1.6 — Explore */}
           <Route path="/explore" element={<PageTransition><Explore /></PageTransition>} />
+          <Route path="/explore/franchise/:slug" element={<PageTransition><ExploreFranchise /></PageTransition>} />
+          <Route path="/explore/:facet" element={<PageTransition><ExploreHub /></PageTransition>} />
 
           {/* Tier lists — browse, build, and open a shared board */}
           <Route path="/tierlist" element={<PageTransition><TierList /></PageTransition>} />

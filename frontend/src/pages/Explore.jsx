@@ -1,819 +1,355 @@
 /**
- * Explore.jsx — Filtered movie browse with Infinite Scroll
+ * Explore.jsx — filtered browse with a filter rail and infinite scroll.
  *
- * Route: /explore
- * Endpoint: GET /api/v1/movies/explore
+ * Route: /explore?category=heist&countries=IN&…
+ * Endpoint: GET /api/v1/movies/explore (TMDB discover proxy; facet slugs are mapped
+ * to TMDB ids server-side in app/services/explore_service.py)
+ *
+ * The URL is the only source of filter state: the navbar menu and the hub pages
+ * link here with a query string, and every rail control rewrites it. Results are
+ * kept in sessionStorage keyed by that query so Back lands on the same scroll.
+ *
+ * Layout: sticky filter rail on the left (≥901px); a bottom sheet on mobile.
  */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
-import api from '../utils/api'
-import { useAuth } from '../context/AuthContext'
-import { useSessionState } from '../hooks/useSessionState'
+import { LuSlidersHorizontal, LuX } from 'react-icons/lu'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
-import Aurora from '../components/Aurora'
-import FilterDropdown from '../components/FilterDropdown'
-import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
-import './Explore.css'
+import { FilterPanel, FilterSheet, Select } from '../components/explore/ExploreFilters'
+import { DEFAULT_FILTERS, MIN_YEAR, countActive } from '../utils/exploreFilters'
+import { movieService } from '../services/movieService'
+import { useSessionState } from '../hooks/useSessionState'
+import { useMediaQuery } from '../hooks/useMediaQuery'
+import {
+  CATEGORY_BY_SLUG, CINEMAS, COMPANIES, COUNTRY_BY_CODE, CURRENT_YEAR, DURATIONS, FAMILY_BY_SLUG,
+  GENRE_BY_SLUG, LANGUAGE_BY_SLUG, SORTS,
+} from '../utils/exploreTaxonomy'
+import { OTT, ottProviderIds } from '../utils/ott'
+import ExploreAurora from '../components/explore/ExploreAurora'
+import '../components/explore/explore-tokens.css'
+import './ExploreResults.css'
 
-const SORT_OPTIONS = [
-  { value: 'popularity',   label: 'Most Popular' },
-  { value: 'rating',       label: 'Top Rated' },
-  { value: 'moctale',      label: 'Moctale Score' },
-  { value: 'release_date', label: 'Newest First' },
-  { value: 'title',        label: 'A – Z' },
-]
+const LIMIT = 24
+const LEGACY_AGE = { kids: 'under10', teens: 'under16' }
 
-const AGE_RATING_OPTIONS = [
-  { value: '', label: 'Any Age' },
-  { value: 'kids', label: 'Kids & Family (PG and below)' },
-  { value: 'teens', label: 'Teens (PG-13 and below)' },
-]
+const list = (sp, key) => sp.get(key)?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
 
-const TYPE_OPTIONS = [
-  { value: '',      label: 'All' },
-  { value: 'movie', label: 'Movies' },
-  { value: 'tv',    label: 'Series' },
-  { value: 'anime', label: 'Anime' },
-]
+function parseFilters(sp) {
+  const type = sp.get('type') ?? ''
+  const num = (key, fallback) => {
+    const n = Number(sp.get(key))
+    return sp.get(key) != null && Number.isFinite(n) ? n : fallback
+  }
+  return {
+    ...DEFAULT_FILTERS,
+    sort: sp.get('sort') || 'popularity',
+    type: type === 'movie' || type === 'tv' ? type : '',
+    anime: type === 'anime' ? 'only' : (['hide', 'only'].includes(sp.get('anime')) ? sp.get('anime') : ''),
+    genres: list(sp, 'genres').map((g) => g.toLowerCase()),
+    category: sp.get('category') ?? '',
+    language: sp.get('language') ?? '',
+    countries: list(sp, 'countries').map((c) => c.toUpperCase()),
+    family: sp.get('family') || LEGACY_AGE[sp.get('age_rating')] || '',
+    award: sp.get('award') === '1' || sp.get('award') === 'true',
+    duration: sp.get('duration') ?? '',
+    yearFrom: num('year_from', MIN_YEAR),
+    yearTo: num('year_to', CURRENT_YEAR),
+    minRating: num('min_rating', 0),
+    cinema: sp.get('cinema') ?? '',
+    companies: list(sp, 'companies'),
+    ott: list(sp, 'ott'),
+  }
+}
 
-const CINEMA_OPTIONS = [
-  { value: '', label: 'All Cinema' },
-  { value: 'hollywood', label: 'Hollywood' },
-  { value: 'bollywood', label: 'Bollywood' },
-  { value: 'tollywood', label: 'Tollywood' },
-  { value: 'kollywood', label: 'Kollywood' },
-  { value: 'mollywood', label: 'Mollywood' },
-  { value: 'sandalwood', label: 'Sandalwood' },
-  { value: 'kdrama', label: 'K-Drama' },
-]
+/** Filters -> URL query (defaults omitted, fixed key order so it doubles as a cache key). */
+function toSearch(f) {
+  const p = new URLSearchParams()
+  if (f.category) p.set('category', f.category)
+  if (f.genres.length) p.set('genres', f.genres.join(','))
+  if (f.language) p.set('language', f.language)
+  if (f.countries.length) p.set('countries', f.countries.join(','))
+  if (f.family) p.set('family', f.family)
+  if (f.award) p.set('award', '1')
+  if (f.anime) p.set('anime', f.anime)
+  if (f.type) p.set('type', f.type)
+  if (f.duration) p.set('duration', f.duration)
+  if (f.yearFrom > MIN_YEAR) p.set('year_from', String(f.yearFrom))
+  if (f.yearTo < CURRENT_YEAR) p.set('year_to', String(f.yearTo))
+  if (f.minRating > 0) p.set('min_rating', String(f.minRating))
+  if (f.cinema) p.set('cinema', f.cinema)
+  if (f.companies.length) p.set('companies', f.companies.join(','))
+  if (f.ott.length) p.set('ott', f.ott.join(','))
+  if (f.sort !== 'popularity') p.set('sort', f.sort)
+  return p
+}
 
-const COMPANIES = [
-  { id: '420', label: 'Marvel Studios' },
-  { id: '2', label: 'Walt Disney' },
-  { id: '174', label: 'Warner Bros.' },
-  { id: '33', label: 'Universal' },
-  { id: '4', label: 'Paramount' },
-  { id: '34', label: 'Sony Pictures' },
-  { id: '178464', label: 'Netflix Studios' },
-  { id: '41077', label: 'A24' },
-  { id: '3172', label: 'Blumhouse' },
-  { id: '4439', label: 'Yash Raj Films' },
-  { id: '7293', label: 'Dharma Productions' },
-  { id: '194232', label: 'Apple Studios' },
-  { id: '20580', label: 'Amazon Studios' },
-  { id: '3268', label: 'HBO' },
-  { id: '14439', label: 'Lionsgate' },
-  { id: '25', label: '20th Century Studios' },
-  { id: '10146', label: 'Focus Features' },
-  { id: '1088', label: 'Illumination' },
-  { id: '3', label: 'Pixar' },
-  { id: '56', label: 'Amblin Entertainment' },
-]
+function toApiParams(f, page) {
+  const p = { page, limit: LIMIT, sort: f.sort }
+  if (f.category) p.category = f.category
+  if (f.genres.length) p.genres = f.genres.join(',')
+  if (f.language) p.language = f.language
+  if (f.countries.length) p.countries = f.countries.join(',')
+  if (f.family) p.family = f.family
+  if (f.award) p.award = true
+  if (f.anime) p.anime = f.anime
+  if (f.type) p.type = f.type
+  if (f.duration) p.duration = f.duration
+  if (f.yearFrom > MIN_YEAR) p.year_from = f.yearFrom
+  if (f.yearTo < CURRENT_YEAR) p.year_to = f.yearTo
+  if (f.minRating > 0) p.min_rating = f.minRating
+  if (f.cinema) p.cinema = f.cinema
+  if (f.companies.length) p.companies = f.companies.join(',')
+  if (f.ott.length) p.providers = ottProviderIds(f.ott).join(',')
+  return p
+}
 
-const COUNTRIES = [
-  { code: 'US', label: 'USA' },
-  { code: 'IN', label: 'India' },
-  { code: 'GB', label: 'UK' },
-  { code: 'KR', label: 'South Korea' },
-  { code: 'JP', label: 'Japan' },
-  { code: 'FR', label: 'France' },
-  { code: 'ES', label: 'Spain' },
-  { code: 'DE', label: 'Germany' },
-  { code: 'CA', label: 'Canada' },
-]
+function pageTitle(f) {
+  if (f.category) return CATEGORY_BY_SLUG[f.category]?.label ?? 'Explore'
+  const genre = f.genres.length === 1 ? GENRE_BY_SLUG[f.genres[0]]?.label : null
+  if (f.anime === 'only') return genre ? `${genre} Anime` : 'Anime'
+  if (f.language) return LANGUAGE_BY_SLUG[f.language]?.label ?? 'Explore'
+  if (f.countries.length === 1) return COUNTRY_BY_CODE[f.countries[0]]?.label ?? 'Explore'
+  if (genre) return genre
+  if (f.award) return 'Award Winners'
+  if (f.family) return 'Family Friendly'
+  if (f.type === 'movie') return 'Movies'
+  if (f.type === 'tv') return 'Shows'
+  return 'Explore'
+}
 
-const PROVIDERS = [
-  { id: '8', label: 'Netflix' },
-  { id: '119', label: 'Prime Video' },
-  { id: '122,337', label: 'Disney' },
-  { id: '1899', label: 'HBO' },
-  { id: '220', label: 'JioCinema' },
-  { id: '232', label: 'ZEE5' },
-  { id: '237', label: 'SonyLIV' },
-  { id: '350', label: 'Apple TV+' },
-]
+const label = (arr, v, key = 'value') => arr.find((o) => o[key] === v)?.label ?? v
 
-const CURRENT_YEAR = new Date().getFullYear()
-
-function RangeSlider({ min, max, value, onChange, step = 1, label, format = (v) => v }) {
-  const pct = ((value - min) / (max - min)) * 100
-  return (
-    <div className="explore-slider">
-      <div className="explore-slider__header">
-        <span className="explore-slider__label">{label}</span>
-        <span className="explore-slider__value">{format(value)}</span>
-      </div>
-      <div className="explore-slider__track-wrap">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="explore-slider__input"
-          style={{ '--pct': `${pct}%` }}
-        />
-      </div>
-    </div>
-  )
+/** Removable chips for everything set, each with the patch that clears it. */
+function activeChips(f) {
+  const chips = []
+  if (f.category) chips.push({ key: 'cat', text: `Category: ${CATEGORY_BY_SLUG[f.category]?.label ?? f.category}`, patch: { category: '' } })
+  f.countries.forEach((c) => chips.push({ key: `c-${c}`, text: `Country: ${COUNTRY_BY_CODE[c]?.label ?? c}`, patch: { countries: f.countries.filter((x) => x !== c) } }))
+  if (f.language) chips.push({ key: 'lang', text: `Language: ${LANGUAGE_BY_SLUG[f.language]?.label ?? f.language}`, patch: { language: '' } })
+  f.genres.forEach((g) => chips.push({ key: `g-${g}`, text: `Genre: ${GENRE_BY_SLUG[g]?.label ?? g}`, patch: { genres: f.genres.filter((x) => x !== g) } }))
+  if (f.family) chips.push({ key: 'fam', text: `Age: ${FAMILY_BY_SLUG[f.family]?.label ?? f.family}`, patch: { family: '' } })
+  if (f.anime) chips.push({ key: 'anime', text: f.anime === 'only' ? 'Only anime' : 'Anime hidden', patch: { anime: '' } })
+  if (f.type) chips.push({ key: 'type', text: f.type === 'movie' ? 'Movies' : 'Shows', patch: { type: '' } })
+  if (f.duration) chips.push({ key: 'dur', text: label(DURATIONS, f.duration), patch: { duration: '' } })
+  if (f.yearFrom > MIN_YEAR || f.yearTo < CURRENT_YEAR) {
+    chips.push({ key: 'yr', text: `${f.yearFrom > MIN_YEAR ? f.yearFrom : 'Any'}–${f.yearTo < CURRENT_YEAR ? f.yearTo : 'now'}`, patch: { yearFrom: MIN_YEAR, yearTo: CURRENT_YEAR } })
+  }
+  if (f.minRating > 0) chips.push({ key: 'mr', text: `★ ${f.minRating}+`, patch: { minRating: 0 } })
+  if (f.cinema) chips.push({ key: 'cin', text: label(CINEMAS, f.cinema), patch: { cinema: '' } })
+  f.companies.forEach((c) => chips.push({ key: `co-${c}`, text: label(COMPANIES, c, 'id'), patch: { companies: f.companies.filter((x) => x !== c) } }))
+  f.ott.forEach((o) => chips.push({ key: `o-${o}`, text: label(OTT, o, 'id'), patch: { ott: f.ott.filter((x) => x !== o) } }))
+  return chips
 }
 
 export default function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { isLoggedIn } = useAuth()
+  const filters = useMemo(() => parseFilters(searchParams), [searchParams])
+  const queryKey = useMemo(() => toSearch(filters).toString(), [filters])
+  const isMobile = useMediaQuery('(max-width: 900px)')
 
-  // ── Filter state ──────────────────────────────────────────
-  const [selectedGenres, setSelectedGenres] = useState(
-    () => searchParams.get('genres')?.split(',').filter(Boolean) ?? []
-  )
-  const [selectedType, setSelectedType] = useState(
-    () => searchParams.get('type') ?? ''
-  )
-  const [selectedCompanies, setSelectedCompanies] = useState(
-    () => searchParams.get('companies')?.split(',').filter(Boolean) ?? []
-  )
-  const [selectedCountries, setSelectedCountries] = useState(
-    () => searchParams.get('countries')?.split(',').filter(Boolean) ?? []
-  )
-  const [selectedProviders, setSelectedProviders] = useState(
-    () => searchParams.get('providers')?.split(',').filter(Boolean) ?? []
-  )
-  const [minRating,  setMinRating]  = useState(() => Number(searchParams.get('min_rating') ?? 0))
-  const [yearFrom,   setYearFrom]   = useState(() => Number(searchParams.get('year_from') ?? 1900))
-  const [yearTo,     setYearTo]     = useState(() => Number(searchParams.get('year_to')   ?? CURRENT_YEAR))
-  const [sort,       setSort]       = useState(() => searchParams.get('sort') ?? 'popularity')
-  const [ageRating,  setAgeRating]  = useState(() => searchParams.get('age_rating') ?? '')
-  const [selectedCinema, setSelectedCinema] = useState(() => searchParams.get('cinema') ?? '')
-  const [page,       setPage]       = useSessionState('explore_page', () => Number(searchParams.get('page') ?? 1))
+  const [movies, setMovies] = useSessionState('explore_movies', [])
+  const [total, setTotal] = useSessionState('explore_total', 0)
+  const [hasMore, setHasMore] = useSessionState('explore_hasMore', true)
+  const [page, setPage] = useSessionState('explore_page', 1)
+  const [lastQuery, setLastQuery] = useSessionState('explore_query', null)
 
-  // ── Debounced state for sliders/inputs ────────────────────
-  const [debouncedMinRating, setDebouncedMinRating] = useState(minRating)
-  const [debouncedYearFrom, setDebouncedYearFrom] = useState(yearFrom)
-  const [debouncedYearTo, setDebouncedYearTo] = useState(yearTo)
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedMinRating(minRating)
-    }, 400)
-    return () => clearTimeout(handler)
-  }, [minRating])
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedYearFrom(yearFrom)
-      setDebouncedYearTo(yearTo)
-    }, 400)
-    return () => clearTimeout(handler)
-  }, [yearFrom, yearTo])
-
-  // ── Data ──────────────────────────────────────────────────
-  const [movies,    setMovies]    = useSessionState('explore_movies', [])
-  const [allGenres, setAllGenres] = useSessionState('explore_allGenres', [])
-  const [total,     setTotal]     = useSessionState('explore_total', 0)
-  const [hasMore,    setHasMore]   = useSessionState('explore_hasMore', true)
-  
-  const [loading,   setLoading]   = useState(movies.length === 0)
+  const [loading, setLoading] = useState(() => !(lastQuery === queryKey && movies.length > 0))
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error,     setError]     = useState(null)
+  const [error, setError] = useState(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
-  const [lastExploreQuery, setLastExploreQuery] = useSessionState('explore_query', '')
+  const filtersRef = useRef(filters)
+  // Declared before the fetch effect so the ref is current when it runs.
+  useEffect(() => { filtersRef.current = filters }, [filters])
+  const abortRef = useRef(null)
+  const fetchingRef = useRef(false)
+  const sentinelRef = useRef(null)
+  const firstRun = useRef(true)
 
-  const currentQueryStr = [
-    selectedGenres.join(','),
-    selectedCompanies.join(','),
-    selectedCountries.join(','),
-    selectedProviders.join(','),
-    debouncedMinRating,
-    debouncedYearFrom,
-    debouncedYearTo,
-    sort,
-    selectedType,
-    ageRating,
-    selectedCinema
-  ].join('|')
+  const setFilters = useCallback((next) => {
+    setSearchParams(toSearch(next), { replace: true })
+  }, [setSearchParams])
+  const patch = useCallback((p) => setFilters({ ...filtersRef.current, ...p }), [setFilters])
 
-  const isMounted = useRef(false)
-  const isPageMounted = useRef(false)
-  const initialQueryMatch = useRef(currentQueryStr === lastExploreQuery)
-
-  const LIMIT = 24
-  const observerRef = useRef(null)
-  const abortControllerRef = useRef(null)
-  const isFetchingRef = useRef(false)
-
-  // ── Fetch ─────────────────────────────────────────────────
-  const fetchMovies = useCallback(async (p, isInitial = false) => {
-    if (isFetchingRef.current && !isInitial) return
-    isFetchingRef.current = true
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
+  const fetchPage = useCallback(async (p) => {
+    abortRef.current?.abort()
     const controller = new AbortController()
-    abortControllerRef.current = controller
-
-    if (isInitial) {
-      setLoading(true)
-    } else {
-      setLoadingMore(true)
-    }
+    abortRef.current = controller
+    fetchingRef.current = true
+    if (p === 1) setLoading(true)
+    else setLoadingMore(true)
     setError(null)
 
     try {
-      const params = {
-        page:  p,
-        limit: LIMIT,
-        sort:  sort,
-      }
-      if (selectedGenres.length)         params.genres     = selectedGenres.join(',')
-      if (selectedCompanies.length)      params.companies  = selectedCompanies.join(',')
-      if (selectedCountries.length)      params.countries  = selectedCountries.join(',')
-      if (selectedProviders.length)      params.providers  = selectedProviders.join(',')
-      if (debouncedMinRating > 0)        params.min_rating = debouncedMinRating
-      if (debouncedYearFrom > 1900)      params.year_from  = debouncedYearFrom
-      if (debouncedYearTo < CURRENT_YEAR) params.year_to    = debouncedYearTo
-      if (selectedType)                  params.type       = selectedType
-      if (ageRating)                     params.age_rating = ageRating
-      if (selectedCinema)                params.cinema     = selectedCinema
-
-      const r = await api.get('/api/v1/movies/explore', { 
-        params,
-        signal: controller.signal 
+      const data = await movieService.exploreTitles(toApiParams(filtersRef.current, p), controller.signal)
+      const fresh = data.movies ?? []
+      setTotal(data.total ?? 0)
+      setHasMore(data.has_more ?? fresh.length >= LIMIT)
+      setMovies((prev) => {
+        if (p === 1) return fresh
+        const seen = new Set(prev.map((m) => `${m.id}-${m.media_type}`))
+        return [...prev, ...fresh.filter((m) => !seen.has(`${m.id}-${m.media_type}`))]
       })
-      const newMovies = r.data.movies ?? []
-      const totalCount = r.data.total ?? 0
-      setTotal(totalCount)
-      if (r.data.all_genres?.length) setAllGenres(r.data.all_genres)
-
-      if (isInitial) {
-        setMovies(newMovies)
-      } else {
-        setMovies((prev) => {
-          const existingIds = new Set(prev.map(m => `${m.id}-${m.media_type}`))
-          const uniqueNew = newMovies.filter(m => !existingIds.has(`${m.id}-${m.media_type}`))
-          return [...prev, ...uniqueNew]
-        })
-      }
-
-      if (r.data.has_more !== undefined) {
-        setHasMore(r.data.has_more)
-      } else {
-        setHasMore(newMovies.length >= LIMIT)
-      }
     } catch (err) {
-      if (!axios.isCancel(err) && err.name !== 'AbortError') {
-        setError('Failed to load movies')
+      if (!axios.isCancel(err) && err.name !== 'AbortError' && err.name !== 'CanceledError') {
+        setError('Could not load titles.')
       }
     } finally {
-      isFetchingRef.current = false
-      if (abortControllerRef.current === controller) {
+      if (abortRef.current === controller) {
+        fetchingRef.current = false
         setLoading(false)
         setLoadingMore(false)
       }
     }
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating, selectedCinema])
+  }, [setMovies, setTotal, setHasMore])
 
-  // Reset page and movies list when filters change
+  // New filter set -> page 1. On the very first run, a cached result for the
+  // same query (Back navigation) is kept as-is.
   useEffect(() => {
-    console.log('[Explore Mount/Update] isMounted:', isMounted.current, 'initialQueryMatch:', initialQueryMatch.current, 'moviesCount:', movies?.length, 'currentQueryStr:', currentQueryStr, 'lastExploreQuery:', lastExploreQuery)
-    
-    if (!isMounted.current) {
-      isMounted.current = true
-      if (initialQueryMatch.current && movies.length > 0) {
-        console.log('[Explore Mount] Cache hit! Keeping cached movies and skipping fetch')
-        setLoading(false)
-        return // Skip initial reset/fetch since cache matches URL
-      }
-      console.log('[Explore Mount] Cache miss or empty movies. Resetting states and fetching page 1')
+    if (firstRun.current) {
+      firstRun.current = false
+      if (lastQuery === queryKey && movies.length > 0) return
     } else {
-      // Scroll to top when filters are modified
       window.scrollTo(0, 0)
     }
-
-    setLastExploreQuery(currentQueryStr)
-
-    isFetchingRef.current = false
-    setMovies([])
+    setLastQuery(queryKey)
     setPage(1)
     setHasMore(true)
-    fetchMovies(1, true)
-
-    // Sync URL params (excluding page parameter on first load)
-    const p = {}
-    if (selectedGenres.length)     p.genres     = selectedGenres.join(',')
-    if (selectedCompanies.length)  p.companies  = selectedCompanies.join(',')
-    if (selectedCountries.length)  p.countries  = selectedCountries.join(',')
-    if (selectedProviders.length)  p.providers  = selectedProviders.join(',')
-    if (debouncedMinRating > 0)    p.min_rating = String(debouncedMinRating)
-    if (debouncedYearFrom > 1900)  p.year_from  = String(debouncedYearFrom)
-    if (debouncedYearTo < CURRENT_YEAR) p.year_to = String(debouncedYearTo)
-    if (sort !== 'popularity')     p.sort       = sort
-    if (selectedType)              p.type       = selectedType
-    if (ageRating)                 p.age_rating = ageRating
-    if (selectedCinema)            p.cinema     = selectedCinema
-    setSearchParams(p, { replace: true })
+    fetchPage(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGenres, selectedCompanies, selectedCountries, selectedProviders, debouncedMinRating, debouncedYearFrom, debouncedYearTo, sort, selectedType, ageRating, selectedCinema])
+  }, [queryKey])
 
-  // Fetch subsequent pages when page increments
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  const loadMore = useCallback(() => {
+    if (fetchingRef.current) return
+    const next = page + 1
+    setPage(next)
+    fetchPage(next)
+  }, [page, setPage, fetchPage])
+
+  // Infinite scroll
   useEffect(() => {
-    if (!isPageMounted.current) {
-      isPageMounted.current = true
-      if (initialQueryMatch.current && movies.length > 0) {
-        return // Skip fetching subsequent pages on mount if cached
-      }
-    }
+    if (loading || loadingMore || !hasMore || error) return
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore() },
+      { rootMargin: '400px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loading, loadingMore, hasMore, error, loadMore])
 
-    if (page > 1) {
-      fetchMovies(page, false)
-
-      // Sync URL page parameter
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
-        next.set('page', String(page))
-        return next
-      }, { replace: true, preventScrollReset: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
-
-  // Infinite scroll trigger
+  const title = pageTitle(filters)
   useEffect(() => {
-    if (loading || loadingMore || !hasMore) return
+    document.title = title === 'Explore' ? 'Explore - Movientum' : `${title} - Explore - Movientum`
+  }, [title])
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isFetchingRef.current && hasMore) {
-          setPage((prev) => prev + 1)
-        }
-      },
-      { threshold: 0.05, rootMargin: '300px' }
-    )
-
-    const currentTrigger = observerRef.current
-    if (currentTrigger) {
-      observer.observe(currentTrigger)
-    }
-
-    return () => {
-      if (currentTrigger) {
-        observer.unobserve(currentTrigger)
-      }
-    }
-  }, [loading, loadingMore, hasMore])
-
-  // ── Toggles ──────────────────────────────────────────────
-  const toggleGenre = (g) =>
-    setSelectedGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
-    )
-
-  const toggleCompany = (c) =>
-    setSelectedCompanies((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-    )
-
-  const toggleCountry = (c) =>
-    setSelectedCountries((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-    )
-
-  const toggleProvider = (p) =>
-    setSelectedProviders((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-    )
-
-  const clearAll = () => {
-    setSelectedGenres([])
-    setSelectedCompanies([])
-    setSelectedCountries([])
-    setSelectedProviders([])
-    setMinRating(0)
-    setYearFrom(1900)
-    setYearTo(CURRENT_YEAR)
-    setSort('popularity')
-    setSelectedType('')
-    setAgeRating('')
-    setSelectedCinema('')
-    setPage(1)
-  }
-
-  const hasFilters =
-    selectedGenres.length > 0 ||
-    selectedCompanies.length > 0 ||
-    selectedCountries.length > 0 ||
-    selectedProviders.length > 0 ||
-    minRating > 0 ||
-    yearFrom > 1900 ||
-    yearTo < CURRENT_YEAR ||
-    sort !== 'popularity' ||
-    selectedType !== '' ||
-    ageRating !== '' ||
-    selectedCinema !== ''
-
-  const getHeroTitle = () => {
-    if (selectedGenres.length === 1) {
-      return selectedGenres[0]
-    }
-    if (selectedType === 'movie') return 'Movies'
-    if (selectedType === 'tv') return 'Series'
-    if (selectedType === 'anime') return 'Anime'
-    return 'Explore'
-  }
+  const chips = activeChips(filters)
+  const nActive = countActive(filters)
+  const clearAll = () => setFilters({ ...DEFAULT_FILTERS })
+  const closeSheet = useCallback(() => setSheetOpen(false), [])
 
   return (
-    <main className="explore-page page-content">
-      {/* ── Background Aurora Animation ── */}
-      <div className="explore-aurora-bg" aria-hidden="true">
-        <Aurora
-          colorStops={["#7928CA", "#FF0080", "#00DFD8"]}
-          blend={0.5}
-          amplitude={1.0}
-          speed={0.7}
-        />
-        <div className="explore-aurora-overlay" />
-      </div>
-
-      <div className="explore-page__inner">
-        {/* Category Hero Title */}
-        <header className="explore-header-section">
-          <span className="explore-category-tag">Category</span>
-          <h1 className="explore-hero-title">{getHeroTitle()}</h1>
-        </header>
-
-        {/* ── Horizontal Filter Bar ── */}
-        <div className="explore-filter-bar">
-          <div className="explore-filter-row">
-            {/* Type Pills */}
-            <div className="filter-pills">
-              {TYPE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.label}
-                  className={`filter-pill ${selectedType === opt.value ? 'active' : ''}`}
-                  onClick={() => setSelectedType(opt.value)}
-                  type="button"
-                >
-                  {opt.label}
+    <main className="xres page-content">
+      <ExploreAurora variant="results" />
+      <div className="xres__layout">
+        {!isMobile && (
+          <aside className="xres__rail" aria-label="Filters">
+            <header className="xres__rail-head">
+              <LuSlidersHorizontal aria-hidden />
+              <h2>Filters</h2>
+              {nActive > 0 && <span className="xres__badge">{nActive}</span>}
+              {nActive > 0 && (
+                <button type="button" className="xres__clear" onClick={clearAll}>
+                  <LuX aria-hidden /> Clear
                 </button>
-              ))}
+              )}
+            </header>
+            <FilterPanel value={filters} onChange={setFilters} idPrefix="xr" />
+          </aside>
+        )}
+
+        <section className="xres__main">
+          <header className="xres__head">
+            <h1 className="xres__title">{title}</h1>
+            {!loading && !error && (
+              <p className="xres__count">{total > 0 ? `${total.toLocaleString()} titles` : ''}</p>
+            )}
+          </header>
+
+          {isMobile && (
+            <div className="xres__mbar">
+              <button type="button" className="xres__mbtn" onClick={() => setSheetOpen(true)}>
+                <LuSlidersHorizontal aria-hidden /> Filters
+                {nActive > 0 && <span className="xres__badge">{nActive}</span>}
+              </button>
+              <div className="xres__msort">
+                <Select id="xm-sort-bar" label="Sort by" value={filters.sort} options={SORTS} onChange={(v) => patch({ sort: v || 'popularity' })} />
+              </div>
             </div>
+          )}
 
-            {/* Cinema Dropdown */}
-            <FilterDropdown
-              label={`Cinema: ${CINEMA_OPTIONS.find(o => o.value === selectedCinema)?.label || 'All Cinema'}`}
-              active={selectedCinema !== ''}
-            >
-              <div className="filter-dropdown__menu-list">
-                {CINEMA_OPTIONS.map((o) => (
-                  <label key={o.value} className={`filter-dropdown__menu-item ${selectedCinema === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="cinema-option"
-                      className="filter-dropdown__radio"
-                      checked={selectedCinema === o.value}
-                      onChange={() => setSelectedCinema(o.value)}
-                    />
-                    <span>{o.label}</span>
-                  </label>
-                ))}
-              </div>
-            </FilterDropdown>
-
-            {/* Genre Dropdown */}
-            <FilterDropdown 
-              label={selectedGenres.length > 0 ? `Genre (${selectedGenres.length})` : 'Genre'}
-              active={selectedGenres.length > 0}
-            >
-              <div className="filter-dropdown__menu-list">
-                {allGenres.map((g) => (
-                  <label key={g} className={`filter-dropdown__menu-item ${selectedGenres.includes(g) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                    <input
-                      type="checkbox"
-                      className="filter-dropdown__checkbox"
-                      checked={selectedGenres.includes(g)}
-                      onChange={() => toggleGenre(g)}
-                    />
-                    <span>{g}</span>
-                  </label>
-                ))}
-              </div>
-            </FilterDropdown>
-
-            {/* Sort Dropdown */}
-            <FilterDropdown
-              label={`Sort: ${SORT_OPTIONS.find(o => o.value === sort)?.label || 'Most Popular'}`}
-              active={sort !== 'popularity'}
-            >
-              <div className="filter-dropdown__menu-list">
-                {SORT_OPTIONS.map((o) => (
-                  <label key={o.value} className={`filter-dropdown__menu-item ${sort === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="sort-option"
-                      className="filter-dropdown__radio"
-                      checked={sort === o.value}
-                      onChange={() => setSort(o.value)}
-                    />
-                    <span>{o.label}</span>
-                  </label>
-                ))}
-              </div>
-            </FilterDropdown>
-
-            {/* Countries Dropdown */}
-            <FilterDropdown
-              label={selectedCountries.length > 0 ? `Countries (${selectedCountries.length})` : 'Countries'}
-              active={selectedCountries.length > 0}
-            >
-              <div className="filter-dropdown__menu-list filter-dropdown__custom-container--scrollable" style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                {COUNTRIES.map((c) => (
-                  <label key={c.code} className={`filter-dropdown__menu-item ${selectedCountries.includes(c.code) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                    <input
-                      type="checkbox"
-                      className="filter-dropdown__checkbox"
-                      checked={selectedCountries.includes(c.code)}
-                      onChange={() => toggleCountry(c.code)}
-                    />
-                    <span>{c.label}</span>
-                  </label>
-                ))}
-              </div>
-            </FilterDropdown>
-
-            {/* Year Dropdown */}
-            <FilterDropdown
-              label={(yearFrom > 1900 || yearTo < CURRENT_YEAR) ? `Year: ${yearFrom}–${yearTo}` : 'Year'}
-              active={yearFrom > 1900 || yearTo < CURRENT_YEAR}
-            >
-              <div className="filter-dropdown__custom-container">
-                <div className="filter-dropdown__input-group">
-                  <div className="filter-dropdown__input-field">
-                    <label>From</label>
-                    <input
-                      type="number"
-                      min="1900"
-                      max={CURRENT_YEAR}
-                      value={yearFrom}
-                      onChange={(e) => setYearFrom(Number(e.target.value) || 1900)}
-                    />
-                  </div>
-                  <div className="filter-dropdown__input-field">
-                    <label>To</label>
-                    <input
-                      type="number"
-                      min="1900"
-                      max={CURRENT_YEAR}
-                      value={yearTo}
-                      onChange={(e) => setYearTo(Number(e.target.value) || CURRENT_YEAR)}
-                    />
-                  </div>
-                </div>
-                
-                {/* Preset Decades */}
-                <div className="filter-dropdown__presets">
-                  {[
-                    { label: '2020s', start: 2020, end: CURRENT_YEAR },
-                    { label: '2010s', start: 2010, end: 2019 },
-                    { label: '2000s', start: 2000, end: 2009 },
-                    { label: '1990s', start: 1990, end: 1999 },
-                    { label: '1980s', start: 1980, end: 1989 },
-                    { label: 'Clear', start: 1900, end: CURRENT_YEAR },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      className="filter-dropdown__preset-btn"
-                      onClick={() => {
-                        setYearFrom(preset.start)
-                        setYearTo(preset.end)
-                      }}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </FilterDropdown>
-
-            {/* Rating Dropdown */}
-            <FilterDropdown
-              label={minRating > 0 ? `Rating: ★ ${minRating.toFixed(1)}+` : 'Rating'}
-              active={minRating > 0}
-            >
-              <div className="filter-dropdown__custom-container" style={{ minWidth: '220px' }}>
-                <RangeSlider
-                  label="Min Rating"
-                  min={0} max={10} step={0.5}
-                  value={minRating}
-                  onChange={setMinRating}
-                  format={(v) => v === 0 ? 'Any' : `★ ${v.toFixed(1)}+`}
-                />
-              </div>
-            </FilterDropdown>
-
-            {/* Age Rating Dropdown */}
-            <FilterDropdown
-              label={`Age Rating: ${AGE_RATING_OPTIONS.find(o => o.value === ageRating)?.label || 'Any Age'}`}
-              active={ageRating !== ''}
-            >
-              <div className="filter-dropdown__menu-list">
-                {AGE_RATING_OPTIONS.map((o) => (
-                  <label key={o.value} className={`filter-dropdown__menu-item ${ageRating === o.value ? 'filter-dropdown__menu-item--active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="age-rating-option"
-                      className="filter-dropdown__radio"
-                      checked={ageRating === o.value}
-                      onChange={() => setAgeRating(o.value)}
-                    />
-                    <span>{o.label}</span>
-                  </label>
-                ))}
-              </div>
-            </FilterDropdown>
-
-            {/* More Filters Dropdown */}
-            <FilterDropdown
-              label={
-                (selectedCompanies.length + selectedProviders.length) > 0 
-                  ? `More (${selectedCompanies.length + selectedProviders.length})` 
-                  : 'More'
-              }
-              active={(selectedCompanies.length + selectedProviders.length) > 0}
-            >
-              <div className="filter-dropdown__custom-container filter-dropdown__custom-container--scrollable" style={{ minWidth: '280px', maxHeight: '380px', overflowY: 'auto', gap: '16px' }}>
-                {/* Production Companies */}
-                <div>
-                  <span className="filter-section-header">Production Houses</span>
-                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                    {COMPANIES.map((c) => (
-                      <label key={c.id} className={`filter-dropdown__menu-item ${selectedCompanies.includes(c.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                        <input
-                          type="checkbox"
-                          className="filter-dropdown__checkbox"
-                          checked={selectedCompanies.includes(c.id)}
-                          onChange={() => toggleCompany(c.id)}
-                        />
-                        <span>{c.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Providers */}
-                <div>
-                  <span className="filter-section-header">OTT Platforms</span>
-                  <div className="filter-dropdown__options-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                    {PROVIDERS.map((p) => (
-                      <label key={p.id} className={`filter-dropdown__menu-item ${selectedProviders.includes(p.id) ? 'filter-dropdown__menu-item--active' : ''}`}>
-                        <input
-                          type="checkbox"
-                          className="filter-dropdown__checkbox"
-                          checked={selectedProviders.includes(p.id)}
-                          onChange={() => toggleProvider(p.id)}
-                        />
-                        <span>{p.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </FilterDropdown>
-
-            {/* Clear All Button */}
-            {hasFilters && (
-              <button 
-                type="button" 
-                className="filter-clear-all-btn"
-                onClick={clearAll}
-              >
-                Reset Filters
+          <div className="xres__chips">
+            {chips.map((c) => (
+              <button key={c.key} type="button" className="xres__chip" onClick={() => patch(c.patch)} aria-label={`Remove ${c.text}`}>
+                {c.text} <LuX aria-hidden />
+              </button>
+            ))}
+            {!filters.award && (
+              <button type="button" className="xchip xchip--sky" onClick={() => patch({ award: true })}>
+                <span className="xchip__box" aria-hidden /> Award Winner
+              </button>
+            )}
+            {filters.award && (
+              <button type="button" className="xchip xchip--sky is-on" aria-pressed="true" onClick={() => patch({ award: false })}>
+                <span className="xchip__box" aria-hidden /> Award Winner
+              </button>
+            )}
+            {!filters.family && (
+              <button type="button" className="xchip xchip--mint" onClick={() => patch({ family: 'under10' })}>
+                <span className="xchip__box" aria-hidden /> Family Friendly
               </button>
             )}
           </div>
-        </div>
 
-        {/* ── Results Meta & Active Chips ── */}
-        <div className="explore-results-meta">
-          <p className="explore-main__count">
-            {total > 0 && (
-              <>
-                {total.toLocaleString()}{' '}
-                {selectedType === 'movie'
-                  ? `movie${total !== 1 ? 's' : ''}`
-                  : selectedType === 'tv'
-                  ? `TV show${total !== 1 ? 's' : ''}`
-                  : selectedType === 'anime'
-                  ? 'anime'
-                  : `title${total !== 1 ? 's' : ''}`}
-              </>
-            )}
-          </p>
-
-          {hasFilters && (
-            <div className="explore-active-chips">
-              {selectedType && (
-                <button key="active-chip-type" className="explore-active-chip" onClick={() => setSelectedType('')}>
-                  {selectedType === 'movie' ? 'Movies' : selectedType === 'tv' ? 'TV Shows' : 'Anime'} ×
-                </button>
-              )}
-              {selectedCinema && (
-                <button key="active-chip-cinema" className="explore-active-chip" onClick={() => setSelectedCinema('')}>
-                  {CINEMA_OPTIONS.find(o => o.value === selectedCinema)?.label} ×
-                </button>
-              )}
-              {selectedGenres.map((g) => (
-                <button key={g} className="explore-active-chip" onClick={() => toggleGenre(g)}>
-                  {g} ×
-                </button>
-              ))}
-              {(yearFrom > 1900 || yearTo < CURRENT_YEAR) && (
-                <button className="explore-active-chip" onClick={() => { setYearFrom(1900); setYearTo(CURRENT_YEAR) }}>
-                  Year: {yearFrom > 1900 ? yearFrom : 'Any'}–{yearTo < CURRENT_YEAR ? yearTo : 'Now'} ×
-                </button>
-              )}
-              {minRating > 0 && (
-                <button className="explore-active-chip" onClick={() => setMinRating(0)}>
-                  Rating: ★ {minRating.toFixed(1)}+ ×
-                </button>
-              )}
-              {selectedCompanies.map((cId) => {
-                const company = COMPANIES.find(c => c.id === cId)
-                return (
-                  <button key={cId} className="explore-active-chip" onClick={() => toggleCompany(cId)}>
-                    {company ? company.label : cId} ×
-                  </button>
-                )
-              })}
-              {selectedCountries.map((code) => {
-                const country = COUNTRIES.find(c => c.code === code)
-                return (
-                  <button key={code} className="explore-active-chip" onClick={() => toggleCountry(code)}>
-                    {country ? country.label : code} ×
-                  </button>
-                )
-              })}
-              {selectedProviders.map((pId) => {
-                const provider = PROVIDERS.find(p => p.id === pId)
-                return (
-                  <button key={pId} className="explore-active-chip" onClick={() => toggleProvider(pId)}>
-                    {provider ? provider.label : pId} ×
-                  </button>
-                )
-              })}
-              {ageRating && (
-                <button key="active-chip-age" className="explore-active-chip" onClick={() => setAgeRating('')}>
-                  {AGE_RATING_OPTIONS.find(o => o.value === ageRating)?.label} ×
-                </button>
-              )}
+          {error && (
+            <div className="xres__state">
+              <p>{error} Check your connection and try again.</p>
+              <button type="button" className="xres__btn" onClick={() => fetchPage(movies.length ? page : 1)}>Retry</button>
             </div>
           )}
-        </div>
 
-        {/* Error */}
-        {error && (
-          <div className="error-state">{error}</div>
-        )}
+          {!error && !loading && movies.length === 0 && (
+            <div className="xres__state">
+              <p>No titles match these filters. Remove one, or start over.</p>
+              {nActive > 0 && <button type="button" className="xres__btn" onClick={clearAll}>Clear all filters</button>}
+            </div>
+          )}
 
-        {/* Grid and Skeletons */}
-        {!error && (movies.length > 0 || loading) && (
-          <>
-            <StaggerContainer className="explore-grid" instant={false}>
-              {movies.map((m, index) => (
-                <StaggerItem key={`${m.id}-${m.media_type}`} index={index}>
-                  <MovieCard movie={m} />
-                </StaggerItem>
-              ))}
-              {loading && <MovieCardSkeleton count={24} />}
-              {loadingMore && <MovieCardSkeleton count={8} />}
-            </StaggerContainer>
-
-            <div ref={observerRef} style={{ height: 20, margin: '20px 0' }} />
-
-            {!loading && !loadingMore && !hasMore && (
-              <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', margin: '40px 0 20px', fontSize: '13px' }}>
-                No more titles to load.
-              </p>
-            )}
-          </>
-        )}
-
-        {!loading && !error && movies.length === 0 && (
-          <div className="empty-state">
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎬</div>
-            <h3>No movies match these filters</h3>
-            <p>Try removing some filters</p>
-            <button className="filter-clear-all-btn" style={{ marginTop: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }} onClick={clearAll}>
-              Reset filters
-            </button>
+          <div className="xres__grid">
+            {loading
+              ? <MovieCardSkeleton count={LIMIT} />
+              : movies.map((m) => <MovieCard key={`${m.id}-${m.media_type}`} movie={m} />)}
+            {loadingMore && <MovieCardSkeleton count={8} />}
           </div>
-        )}
+
+          {!loading && hasMore && !error && <div ref={sentinelRef} className="xres__sentinel" aria-hidden />}
+          {!loading && !hasMore && movies.length > 0 && <p className="xres__end">That’s everything for these filters.</p>}
+        </section>
       </div>
-      <div className="fixed-bottom-fade" />
+
+      {isMobile && sheetOpen && (
+        <FilterSheet
+          initial={filters}
+          onClose={closeSheet}
+          onApply={(next) => { setFilters(next); setSheetOpen(false) }}
+        >
+          {(draft, setDraft) => <FilterPanel value={draft} onChange={setDraft} idPrefix="xm" />}
+        </FilterSheet>
+      )}
     </main>
   )
 }
-

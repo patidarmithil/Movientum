@@ -54,22 +54,57 @@ const formatINR = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(inrVal);
 };
 
-// ── Collection Box (Sequel/Prequel) ──────────────────────────────
-function CollectionBox({ name, parts }) {
+// ── Collection Timeline (franchise, in release order) ────────────
+// Every part of the collection sits on one dotted line in release order, with
+// the title being viewed marked on it — so "where does this one fall" reads at
+// a glance instead of through PREQUEL/SEQUEL badges.
+function CollectionTimeline({ name, parts, currentId }) {
   const scrollRef = useRef(null)
-  
+  const [canPrev, setCanPrev] = useState(false)
+  const [canNext, setCanNext] = useState(false)
+
   // Dragging state refs
   const isDragging = useRef(false)
+  const didDrag = useRef(false)
   const startX = useRef(0)
   const scrollLeftStart = useRef(0)
 
-  const handleMouseDown = (e) => {
-    isDragging.current = true
+  const updateArrows = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
+    setCanPrev(el.scrollLeft > 4)
+    setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+
+  // Bring the current title into view without moving the page vertically
+  // (scrollIntoView would also scroll the window).
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const active = el.querySelector('.timeline-card--current')
+    if (active) {
+      const target = active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2
+      el.scrollLeft = Math.max(0, target)
+    }
+    updateArrows()
+    window.addEventListener('resize', updateArrows)
+    return () => window.removeEventListener('resize', updateArrows)
+  }, [currentId, parts, updateArrows])
+
+  const scrollByPage = (dir) => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
+  const handleMouseDown = (e) => {
+    const el = scrollRef.current
+    if (!el) return
+    isDragging.current = true
+    didDrag.current = false
     startX.current = e.pageX - el.offsetLeft
     scrollLeftStart.current = el.scrollLeft
-    el.style.scrollBehavior = 'auto'
+    el.style.scrollSnapType = 'none'
     el.style.cursor = 'grabbing'
   }
 
@@ -78,8 +113,8 @@ function CollectionBox({ name, parts }) {
     e.preventDefault()
     const el = scrollRef.current
     if (!el) return
-    const x = e.pageX - el.offsetLeft
-    const walk = (x - startX.current) * 2 // Scroll fast multiplier
+    const walk = (e.pageX - el.offsetLeft - startX.current) * 1.5
+    if (Math.abs(walk) > 5) didDrag.current = true
     el.scrollLeft = scrollLeftStart.current - walk
   }
 
@@ -87,52 +122,100 @@ function CollectionBox({ name, parts }) {
     isDragging.current = false
     const el = scrollRef.current
     if (el) {
-      el.style.scrollBehavior = 'smooth'
-      el.style.cursor = 'grab'
+      el.style.scrollSnapType = ''
+      el.style.cursor = ''
+    }
+  }
+
+  // A drag that ends over a card must not also open it.
+  const handleCardClick = (e) => {
+    if (didDrag.current) {
+      e.preventDefault()
+      didDrag.current = false
     }
   }
 
   return (
-    <div className="movie-detail__collection-box">
-      <h4 className="collection-box__title">{name}</h4>
-      <div className="scroll-row-container collection-box__scroll-wrap">
-        <div 
-          className="scroll-row collection-box__row" 
-          ref={scrollRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUpOrLeave}
-          onMouseLeave={handleMouseUpOrLeave}
-          style={{ cursor: 'grab', userSelect: 'none' }}
-        >
-          {parts.map(part => (
+    <section className="collection-timeline" aria-label={`${name} timeline`}>
+      <div className="collection-timeline__header">
+        <div>
+          <h3 className="collection-timeline__title">{name}</h3>
+          <p className="collection-timeline__sub">{parts.length} films · in release order</p>
+        </div>
+        <div className="collection-timeline__nav">
+          <button
+            type="button"
+            className="collection-timeline__arrow"
+            onClick={() => scrollByPage(-1)}
+            disabled={!canPrev}
+            aria-label="Scroll timeline left"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <button
+            type="button"
+            className="collection-timeline__arrow"
+            onClick={() => scrollByPage(1)}
+            disabled={!canNext}
+            aria-label="Scroll timeline right"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="collection-timeline__track"
+        ref={scrollRef}
+        onScroll={updateArrows}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+      >
+        {parts.map((part) => {
+          const isCurrent = part.id === currentId
+          const year = part.release_date ? part.release_date.slice(0, 4) : 'TBA'
+          const content = (
+            <>
+              <div className="timeline-card__poster-wrap">
+                {part.poster_path ? (
+                  <img
+                    src={`${TMDB_IMAGE_BASE}/w342${part.poster_path}`}
+                    alt={part.title}
+                    className="timeline-card__poster"
+                    loading="lazy"
+                    draggable={false}
+                  />
+                ) : (
+                  <div className="timeline-card__poster timeline-card__poster--empty">{part.title}</div>
+                )}
+              </div>
+              <div className="timeline-card__node" aria-hidden="true">
+                <span className="timeline-card__dot" />
+              </div>
+              <p className="timeline-card__title">{part.title}</p>
+              <p className="timeline-card__year">{isCurrent ? `${year} · Now viewing` : year}</p>
+            </>
+          )
+          return isCurrent ? (
+            <div key={part.id} className="timeline-card timeline-card--current" aria-current="page">
+              {content}
+            </div>
+          ) : (
             <Link
               key={part.id}
               to={`/movies/${part.id}`}
-              className="collection-card"
-              onDragStart={(e) => e.preventDefault()} // Prevent image dragging from interfering
+              className="timeline-card"
+              onClick={handleCardClick}
+              draggable={false}
             >
-              <div className="collection-card__poster-wrap">
-                <img
-                  src={`${TMDB_IMAGE_BASE}/w185${part.poster_path}`}
-                  alt={part.title}
-                  className="collection-card__poster"
-                  loading="lazy"
-                  onDragStart={(e) => e.preventDefault()}
-                />
-                <span className={`collection-card__badge badge--${part.badge.toLowerCase().replace(' ', '-')}`}>
-                  {part.badge}
-                </span>
-              </div>
-              <p className="collection-card__title">{part.title}</p>
-              {part.release_date && (
-                <p className="collection-card__year">{part.release_date.slice(0, 4)}</p>
-              )}
+              {content}
             </Link>
-          ))}
-        </div>
+          )
+        })}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -489,21 +572,18 @@ export default function MovieDetail() {
         setProviders(data?.providers?.available ? data.providers : null)
         if (!similarPending) setSimilar(similarData)
 
-        // Franchise strip: drop the movie being viewed, then label each remaining
-        // part relative to its release date.
+        // Franchise timeline: every part (including this one) in release order;
+        // undated / unannounced parts go last. Shown only when there is at least
+        // one other part to link to.
         const rawColl = data?.collection
         if (rawColl && detail) {
-          const currentDate = detail.release_date || ''
-          const parts = (rawColl.parts || [])
-            .filter((p) => p.id !== movieId)
-            .map((p, idx) => {
-              let badge = `PART ${idx + 1}`
-              if (p.release_date && currentDate) {
-                badge = p.release_date < currentDate ? 'PREQUEL' : 'SEQUEL'
-              }
-              return { ...p, badge }
-            })
-          setCollection(parts.length > 0 ? { name: rawColl.name, parts } : null)
+          const parts = [...(rawColl.parts || [])].sort((a, b) => {
+            if (!a.release_date) return b.release_date ? 1 : 0
+            if (!b.release_date) return -1
+            return a.release_date.localeCompare(b.release_date)
+          })
+          const hasOthers = parts.some((p) => p.id !== movieId)
+          setCollection(hasOthers ? { name: rawColl.name, parts } : null)
         } else {
           setCollection(null)
         }
@@ -777,6 +857,8 @@ export default function MovieDetail() {
 
           {/* Info */}
           <div className="movie-detail__info-col animate-fade-lift">
+            {/* Head: sits beside the poster on mobile, top of the column on desktop */}
+            <div className="movie-detail__head">
             <h1 className="movie-detail__title">{movie.title}</h1>
 
             {/* Meta */}
@@ -838,6 +920,7 @@ export default function MovieDetail() {
                 ))}
               </p>
             )}
+            </div>
 
             {/* Overview */}
             {loading ? (
@@ -976,15 +1059,6 @@ export default function MovieDetail() {
             {watchMsg && (
               <p className="movie-detail__toast" aria-live="polite">{watchMsg}</p>
             )}
-
-            {/* Collection Box */}
-            {collection && (
-              <CollectionBox
-                name={collection.name}
-                parts={collection.parts}
-                currentMovieDate={movie.release_date}
-              />
-            )}
           </div>
 
           {/* Rating Sidebar */}
@@ -1050,6 +1124,15 @@ export default function MovieDetail() {
         {/* Rendered once the bundle has delivered credits, so CastCrew never
             falls back to fetching them itself. */}
         {credits && <CastCrew movieId={movieId} credits={credits} />}
+
+        {/* ── Collection Timeline ── */}
+        {collection && (
+          <CollectionTimeline
+            name={collection.name}
+            parts={collection.parts}
+            currentId={movieId}
+          />
+        )}
 
         {/* ── In The News ── */}
         {/* Deferred: this section fetches its own feed on mount, and that

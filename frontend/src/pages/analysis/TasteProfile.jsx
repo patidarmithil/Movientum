@@ -57,7 +57,7 @@ export default function TasteProfile({ taste }) {
     <div className="an-taste">
       <article className="an-panel an-taste__genres">
         <h3 className="an-subhead">Genres</h3>
-        <p className="an-muted">Each watch, thumbs and watchlist add nudges these. Range is −100 to +100.</p>
+        <p className="an-muted">Each watch, thumbs and watchlist add moves these, with no upper limit. Bars scale to your strongest genre.</p>
         <SignedBars items={taste.genres} limit={19} />
       </article>
 

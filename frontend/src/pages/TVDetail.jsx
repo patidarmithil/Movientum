@@ -718,6 +718,8 @@ export default function TVDetail() {
 
           {/* Info column */}
           <div className="movie-detail__info-col animate-fade-lift">
+            {/* Head: sits beside the poster on mobile, top of the column on desktop */}
+            <div className="movie-detail__head">
             {/* Title */}
             <h1 className="movie-detail__title">{show.title}</h1>
 
@@ -762,7 +764,7 @@ export default function TVDetail() {
             </div>
 
             {/* TV badge */}
-            <div style={{ marginBottom: 8 }}>
+            <div className="movie-detail__badges">
               <span className="genre-tag" style={{ color: 'var(--warning)', borderColor: 'var(--warning)' }}>📺 TV Series</span>
               {!loading && networks.slice(0, 2).map((n) => (
                 <span key={n} className="genre-tag" style={{ marginLeft: 6 }}>{n}</span>
@@ -804,6 +806,7 @@ export default function TVDetail() {
                 ))}
               </p>
             )}
+            </div>
 
             {/* Overview */}
             {loading ? (

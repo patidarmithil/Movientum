@@ -1157,3 +1157,15 @@
     display: none;
   }
 }
+
+/* Explore opens a facet menu, so its trigger is a button styled as a nav link. */
+.navbar__link--button {
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.navbar__mobile-drawer-link.navbar__link--button {
+  width: 100%;
+  text-align: left;
+}

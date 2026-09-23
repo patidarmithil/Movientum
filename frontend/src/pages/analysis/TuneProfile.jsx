@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { userService } from '../../services/userService'
 import { languageName, pct } from './analysisUtils'
 
-const WEIGHT_MIN = -100
-const WEIGHT_MAX = 100
+// Weights are uncapped. The slider starts at ±100 (or the server's stored range)
+// and, when released near either end or given a big number, widens to 1.5× that
+// weight — so dragging to the end and letting go opens more room. Widening only
+// on release keeps the thumb from jumping under the pointer mid-drag.
+const DEFAULT_BOUND = 100
 const DEFAULT_THRESHOLD = 0.7
+
+const roomFor = (weight) => Math.ceil((Math.abs(weight) * 1.5) / 50) * 50
 
 const PRESETS = [
   ['Last 3 months', 3],
@@ -16,22 +21,46 @@ const PRESETS = [
 
 const toDateInput = (iso) => (iso ? iso.split('T')[0] : '')
 
-function WeightSlider({ label, value, onChange }) {
+function WeightSlider({ label, value, bound, onChange, onWiden }) {
   const id = `w-${label.replace(/\W+/g, '-')}`
+  const [draft, setDraft] = useState(null)
+  const shown = Math.round(value)
+  const pos = Math.max(-bound, Math.min(bound, value))
+  const commit = () => {
+    if (draft === null) return
+    const n = Number(draft)
+    if (draft.trim() !== '' && Number.isFinite(n)) {
+      onChange(n)
+      if (Math.abs(n) >= bound * 0.95) onWiden(n)
+    }
+    setDraft(null)
+  }
+  const release = () => { if (Math.abs(value) >= bound * 0.95) onWiden(value) }
   return (
     <div className="an-slider">
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
         type="range"
-        min={WEIGHT_MIN}
-        max={WEIGHT_MAX}
+        min={-bound}
+        max={bound}
         step="1"
-        value={value}
+        value={pos}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{ '--p': `${((value - WEIGHT_MIN) / (WEIGHT_MAX - WEIGHT_MIN)) * 100}%` }}
+        onPointerUp={release}
+        onKeyUp={release}
+        style={{ '--p': `${((pos + bound) / (2 * bound)) * 100}%` }}
       />
-      <output htmlFor={id} className="an-num">{value > 0 ? '+' : ''}{Math.round(value)}</output>
+      <input
+        type="number"
+        step="1"
+        className="an-num an-slider__num"
+        aria-label={`${label} weight`}
+        value={draft ?? String(shown)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
+      />
     </div>
   )
 }
@@ -45,6 +74,7 @@ export default function TuneProfile({ language, onSaved }) {
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
   const [genres, setGenres] = useState([])
   const [eras, setEras] = useState([])
+  const [weightBounds, setWeightBounds] = useState({ genres: DEFAULT_BOUND, eras: DEFAULT_BOUND })
   const [dirty, setDirty] = useState({ genres: false, eras: false })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
@@ -64,6 +94,10 @@ export default function TuneProfile({ language, onSaved }) {
         setThreshold(range.language_diversity_threshold ?? DEFAULT_THRESHOLD)
       }
       setGenres(taste?.data || [])
+      setWeightBounds({
+        genres: taste?.genre_bound || DEFAULT_BOUND,
+        eras: taste?.era_bound || DEFAULT_BOUND,
+      })
       // Decade buckets must match backend bin_release_era ("YYYYs") so a slider
       // maps onto content's release_era field.
       const existing = Object.fromEntries((taste?.era_data || []).map((e) => [e.id, e.weight]))
@@ -77,6 +111,8 @@ export default function TuneProfile({ language, onSaved }) {
   }, [])
 
   const sortedGenres = useMemo(() => [...genres].sort((a, b) => a.name.localeCompare(b.name)), [genres])
+  const widen = (kind, weight) =>
+    setWeightBounds((b) => ({ ...b, [kind]: Math.max(b[kind], roomFor(weight)) }))
 
   const setPreset = (months) => {
     setMessage(null)
@@ -222,13 +258,13 @@ export default function TuneProfile({ language, onSaved }) {
             <h4 className="an-minor">Genres</h4>
             {sortedGenres.length === 0 && <p className="an-muted">No genre weights yet.</p>}
             {sortedGenres.map((g) => (
-              <WeightSlider key={g.id} label={g.name} value={g.weight} onChange={(v) => updateGenre(g.id, v)} />
+              <WeightSlider key={g.id} label={g.name} value={g.weight} bound={weightBounds.genres} onChange={(v) => updateGenre(g.id, v)} onWiden={(v) => widen('genres', v)} />
             ))}
           </div>
           <div>
             <h4 className="an-minor">Decades</h4>
             {eras.map((e) => (
-              <WeightSlider key={e.id} label={e.name} value={e.weight} onChange={(v) => updateEra(e.id, v)} />
+              <WeightSlider key={e.id} label={e.name} value={e.weight} bound={weightBounds.eras} onChange={(v) => updateEra(e.id, v)} onWiden={(v) => widen('eras', v)} />
             ))}
           </div>
         </div>
