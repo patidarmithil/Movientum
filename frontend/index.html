@@ -30,7 +30,53 @@
         }
       })();
     </script>
-    
+    <!-- Early page-bundle fetch. On a direct load or refresh of /movies/:id or
+         /tv/:id, the bundle request starts here instead of after the JS entry
+         chunk has downloaded and React has mounted (~0.3-0.6 s later), and the
+         backdrop (the LCP image) is preloaded the moment its path is known.
+         pageService.getMovie/getTV consumes window.__mvEarlyPage once; any
+         failure or mismatch falls back to the normal api.js request, which
+         keeps the failover and 401-refresh handling. Crawlers are skipped for
+         the same reason api.js blocks them. -->
+    <script>
+      (function () {
+        try {
+          var m = window.location.pathname.match(/^\/(movies|tv)\/(\d+)\/?$/);
+          if (!m || !window.fetch) return;
+          if (/googlebot|bingbot|yandexbot|baiduspider|duckduckbot|yahoo! slurp|sogou|exabot|ia_archiver|facebot|facebookexternalhit|twitterbot|pinterest|slackbot|telegrambot|whatsapp/i.test(navigator.userAgent || '')) return;
+          var host = window.location.hostname;
+          var base = '%VITE_API_URL%';
+          if (!base || base.charAt(0) === '%') {
+            base = (host === 'localhost' || host === '127.0.0.1' || host === '[::1]')
+              ? 'http://localhost:8000' : 'https://movientum.azurewebsites.net';
+          }
+          // Same token lookup as utils/storage.js; an expired session sends no token.
+          var token = null;
+          var exp = localStorage.getItem('mv_login_expires_at');
+          if (!exp || Date.now() <= parseInt(exp, 10)) {
+            token = sessionStorage.getItem('mv_access_token') || localStorage.getItem('mv_access_token');
+          }
+          var mt = m[1] === 'movies' ? 'movie' : 'tv';
+          // No Content-Type on a GET: it would force a CORS preflight for guests.
+          var headers = {};
+          if (token) headers.Authorization = 'Bearer ' + token;
+          var p = fetch(base + '/api/v1/pages/' + mt + '/' + m[2], { headers: headers })
+            .then(function (r) { if (!r.ok) throw new Error('early ' + r.status); return r.json(); });
+          window.__mvEarlyPage = { key: mt + ':' + m[2], promise: p };
+          p.then(function (data) {
+            var b = data && data.detail && data.detail.backdrop_path;
+            if (!b) return;
+            var l = document.createElement('link');
+            l.rel = 'preload';
+            l.as = 'image';
+            l.href = 'https://image.tmdb.org/t/p/w1280' + b;
+            l.setAttribute('fetchpriority', 'high');
+            document.head.appendChild(l);
+          }).catch(function () {});
+        } catch (e) { /* fall back to the in-app request */ }
+      })();
+    </script>
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://movientum.vercel.app/" />

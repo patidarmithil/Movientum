@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { LuInbox, LuPlus } from 'react-icons/lu';
 import api from '../../utils/api';
+
+// Uploads are stored as API-relative paths; absolute URLs pass through.
+const resolveImage = (path) =>
+  path.startsWith('http') ? path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${path}`;
 
 export default function SettingsMyIssues() {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -22,13 +27,28 @@ export default function SettingsMyIssues() {
     fetchMyIssues();
   }, []);
 
+  const header = (
+    <div className="settings-header settings-header--row">
+      <div>
+        <h1>My Submitted Feedback</h1>
+        <p>History of feedback and issues you have reported.</p>
+      </div>
+      {!loading && !error && feedbacks.length > 0 && (
+        <Link to="/settings/feedback" className="settings-btn">
+          <LuPlus aria-hidden /> New Feedback
+        </Link>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="settings-card">
-        <div className="settings-header">
-          <h1>My Submitted Feedback</h1>
+        {header}
+        <div className="settings-loading" aria-busy="true">
+          <div className="skeleton" />
+          <div className="skeleton" />
         </div>
-        <div>Loading...</div>
       </div>
     );
   }
@@ -36,70 +56,42 @@ export default function SettingsMyIssues() {
   if (error) {
     return (
       <div className="settings-card">
-        <div className="settings-header">
-          <h1>My Submitted Feedback</h1>
-        </div>
-        <div className="error-text">{error}</div>
+        {header}
+        <div className="error-text" role="alert">{error}</div>
       </div>
     );
   }
 
   return (
     <div className="settings-card">
-      <div className="settings-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1>My Submitted Feedback</h1>
-          <p>History of feedback and issues you have reported.</p>
-        </div>
-        <Link to="/settings/feedback" className="settings-btn" style={{ textDecoration: 'none' }}>
-          New Feedback
-        </Link>
-      </div>
+      {header}
 
       {feedbacks.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--surface-input)', borderRadius: 'var(--radius-md)' }}>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>You haven't submitted any feedback yet.</p>
-          <Link to="/settings/feedback" className="settings-btn" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            Submit Feedback
-          </Link>
+        <div className="settings-empty">
+          <LuInbox aria-hidden />
+          <p>You haven't submitted any feedback yet.</p>
+          <Link to="/settings/feedback" className="settings-btn">Submit Feedback</Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="settings-issues">
           {feedbacks.map((item) => (
-            <div key={item.id} style={{ 
-              background: 'var(--surface-input)', 
-              padding: '1.5rem', 
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ 
-                  background: 'var(--accent)', 
-                  color: 'white', 
-                  padding: '2px 8px', 
-                  borderRadius: '12px', 
-                  fontSize: '0.75rem', 
-                  fontWeight: '600' 
-                }}>
-                  {item.category}
-                </span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <article key={item.id} className="settings-issue">
+              <div className="settings-issue__top">
+                <span className="settings-issue__tag">{item.category}</span>
+                <time className="settings-issue__date" dateTime={item.created_at}>
                   {new Date(item.created_at).toLocaleDateString()}
-                </span>
+                </time>
               </div>
-              <p style={{ margin: '0.5rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                {item.content}
-              </p>
+              <p className="settings-issue__body">{item.content}</p>
               {item.image_url && (
-                <div style={{ marginTop: '1rem' }}>
-                  <img 
-                    src={`http://localhost:8000${item.image_url}`} 
-                    alt="Feedback screenshot" 
-                    style={{ maxHeight: '150px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }} 
-                  />
-                </div>
+                <img
+                  className="settings-issue__img"
+                  src={resolveImage(item.image_url)}
+                  alt="Feedback screenshot"
+                  loading="lazy"
+                />
               )}
-            </div>
+            </article>
           ))}
         </div>
       )}

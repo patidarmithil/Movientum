@@ -41,6 +41,8 @@ import LazyMount from '../components/LazyMount'
 import './MovieDetail.css'   // reuse same layout CSS
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
+// Longest the backdrop trailer waits for the page to settle before autoplaying.
+const TRAILER_DEFER_MAX_MS = 2500
 
 export default function TVDetail() {
   const { id } = useParams()
@@ -70,6 +72,10 @@ export default function TVDetail() {
     return null
   })
   const [loading,    setLoading]    = useState(!cachedData?.show)
+  // Which title the trailer gate has opened for; compared rather than reset,
+  // so navigating to another title closes it without a setState in an effect.
+  const [trailerGateId, setTrailerGateId] = useState(null)
+  const trailerGateOpen = trailerGateId === tvId
   const [error,      setError]      = useState(null)
   const [hasImgError, setHasImgError] = useState(false)
   const [similar,       setSimilar]       = useState(cachedData?.similar || [])
@@ -111,8 +117,16 @@ export default function TVDetail() {
     setShowVideo(true)
   }, [])
 
+  // Deferred autoplay — see the matching comment in MovieDetail.jsx. The cap
+  // lives here; the "row settled + idle" trigger sits below, after
+  // similarLoading is declared.
   useEffect(() => {
-    if (!showVideo || !trailerKey || !backdropContainerRef.current) return;
+    const cap = setTimeout(() => setTrailerGateId(tvId), TRAILER_DEFER_MAX_MS)
+    return () => clearTimeout(cap)
+  }, [tvId])
+
+  useEffect(() => {
+    if (!showVideo || !trailerGateOpen || !trailerKey || !backdropContainerRef.current) return;
 
     let isApiReady = !!window.YT && !!window.YT.Player;
 
@@ -216,7 +230,7 @@ export default function TVDetail() {
       }
       setVideoReady(false);
     };
-  }, [showVideo, trailerKey, tvId]);
+  }, [showVideo, trailerGateOpen, trailerKey, tvId]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -319,6 +333,17 @@ export default function TVDetail() {
     }
   }, [loading])
   const [similarLoading, setSimilarLoading] = useState(!cachedData?.similar)
+
+  useEffect(() => {
+    if (similarLoading || loading) return
+    const open = () => setTrailerGateId(tvId)
+    if (typeof window.requestIdleCallback === 'function') {
+      const idle = window.requestIdleCallback(open, { timeout: 1000 })
+      return () => window.cancelIdleCallback(idle)
+    }
+    const t = setTimeout(open, 300)
+    return () => clearTimeout(t)
+  }, [similarLoading, loading, tvId])
   // Credits come down inside the page bundle and are handed to <CastCrew>.
   const [credits, setCredits] = useState(cachedData?.credits || null)
   const [providers, setProviders] = useState(cachedData?.providers || null)
@@ -371,6 +396,14 @@ export default function TVDetail() {
     // One request for the whole page: detail + videos + credits + similar +
     // this user's watch / collection / tracker state, all from a single Redis
     // key (GET /api/v1/pages/tv/{id}).
+    // Start "More like this" alongside the bundle when this page doesn't hold
+    // it yet, instead of after a `similar: null` bundle (two round trips in a
+    // row on a cold title). Same endpoint; the bundle's copy wins if present.
+    const similarEarly = cachedData?.similar
+      ? null
+      : movieService.getSimilar(tvId, 'tv')
+    similarEarly?.catch(() => {})
+
     pageService.getTV(tvId)
       .then((data) => {
         if (cancelled) return
@@ -421,7 +454,8 @@ export default function TVDetail() {
           return
         }
 
-        movieService.getSimilar(tvId, 'tv')
+        const similarRequest = similarEarly || movieService.getSimilar(tvId, 'tv')
+        similarRequest
           .then((res) => {
             if (cancelled) return
             const rows = res?.movies || []

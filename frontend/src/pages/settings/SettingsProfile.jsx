@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { LuCamera } from 'react-icons/lu';
 import settingsService from '../../services/settingsService';
 
 const SettingsProfile = () => {
@@ -72,7 +73,14 @@ const SettingsProfile = () => {
 
       <form onSubmit={handleSubmit}>
         <div className="avatar-upload">
-          <div className="avatar-preview-wrapper" onClick={handleAvatarClick}>
+          <div
+            className="avatar-preview-wrapper"
+            role="button"
+            tabIndex={0}
+            aria-label="Change profile photo"
+            onClick={handleAvatarClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAvatarClick(); } }}
+          >
             {!imgError ? (
               <img 
                 src={preview} 
@@ -91,17 +99,18 @@ const SettingsProfile = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
+            <span className="avatar-badge" aria-hidden><LuCamera /></span>
           </div>
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
             accept="image/*"
-            style={{ display: 'none' }}
+            hidden
           />
           <div>
-            <div style={{ fontWeight: 500 }}>Profile Photo</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>JPG, PNG or WEBP. Max 5MB.</div>
+            <div className="avatar-upload__title">Profile Photo</div>
+            <div className="avatar-upload__hint">JPG, PNG or WEBP. Max 5MB.</div>
           </div>
         </div>
 
@@ -141,8 +150,8 @@ const SettingsProfile = () => {
           <div className="char-count">{bio.length} / 160</div>
         </div>
 
-        {error && <div className="error-text" style={{ marginBottom: '1rem' }}>{error}</div>}
-        {success && <div className="success-text" style={{ marginBottom: '1rem' }}>{success}</div>}
+        {error && <div className="error-text" role="alert">{error}</div>}
+        {success && <div className="success-text" role="status">{success}</div>}
 
         <button type="submit" className="settings-btn" disabled={loading}>
           {loading ? 'Saving...' : 'Save Changes'}

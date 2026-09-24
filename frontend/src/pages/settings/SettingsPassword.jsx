@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import settingsService from '../../services/settingsService';
 
 const SettingsPassword = () => {
@@ -90,8 +90,8 @@ const SettingsPassword = () => {
           />
         </div>
 
-        {error && <div className="error-text" style={{ marginBottom: '1rem' }}>{error}</div>}
-        {success && <div className="success-text" style={{ marginBottom: '1rem' }}>{success}</div>}
+        {error && <div className="error-text" role="alert">{error}</div>}
+        {success && <div className="success-text" role="status">{success}</div>}
 
         <button type="submit" className="settings-btn" disabled={loading}>
           {loading ? 'Updating...' : 'Update Password'}

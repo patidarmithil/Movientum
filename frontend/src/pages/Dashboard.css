@@ -364,9 +364,10 @@
   .dashboard__stat-label {
     font-size: 10px;
   }
+  /* Two a row: a single full-width card made each list a screen tall. */
   .watchlist-grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-4);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
   }
 }
 

@@ -12,13 +12,16 @@
  *  - Sidebar:
  *    - Most Interested / Upcoming (GET /api/v1/movies/upcoming?filter={week|month|year})
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { movieService } from '../services/movieService'
 import { pageService } from '../services/pageService'
 import { useAuth } from '../context/AuthContext'
 import { useSessionState } from '../hooks/useSessionState'
-import Aurora from '../components/Aurora'
+// Lazy: Home is part of the entry bundle, so a static import dragged the WebGL
+// library (ogl-vendor) onto every page's critical path, title pages included.
+// The aurora is a decorative background and simply fades in a moment later.
+const Aurora = lazy(() => import('../components/Aurora'))
 import BorderGlow from '../components/BorderGlow'
 import HomeNewsStrip from '../components/HomeNewsStrip'
 import FilterDropdown from '../components/FilterDropdown'
@@ -479,12 +482,14 @@ export default function Home() {
       <main className="home page-content">
       {/* ── Background Aurora Animation ── */}
       <div className="home-aurora-bg" aria-hidden="true">
-        <Aurora
-          colorStops={['#5227FF', '#B497CF', '#080808']}
-          blend={0.5}
-          amplitude={1.0}
-          speed={0.7}
-        />
+        <Suspense fallback={null}>
+          <Aurora
+            colorStops={['#5227FF', '#B497CF', '#080808']}
+            blend={0.5}
+            amplitude={1.0}
+            speed={0.7}
+          />
+        </Suspense>
         <div className="home-aurora-overlay" />
       </div>
 

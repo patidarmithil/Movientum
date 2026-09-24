@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import Papa from 'papaparse';
+import { LuCircleCheck, LuDownload, LuFileSpreadsheet } from 'react-icons/lu';
 import settingsService from '../../services/settingsService';
 
 const SettingsImport = () => {
@@ -8,6 +9,7 @@ const SettingsImport = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleDownloadTemplate = () => {
@@ -48,10 +50,12 @@ const SettingsImport = () => {
 
   const handleDragOver = (e) => {
     e.preventDefault();
+    setDragOver(true);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
+    setDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       // Simulate an event object for handleFileChange
       handleFileChange({ target: { files: [e.dataTransfer.files[0]] } });
@@ -82,113 +86,85 @@ const SettingsImport = () => {
     }
   };
 
+  const onZoneKey = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
+  };
+
   return (
     <div className="settings-card">
-      <div className="settings-header">
-        <h1>Import List</h1>
-        <p>Import your watch history and ratings from a CSV file.</p>
+      <div className="settings-header settings-header--row">
+        <div>
+          <h1>Import List</h1>
+          <p>Import your watch history and ratings from a CSV file.</p>
+        </div>
+        <button type="button" className="settings-btn settings-btn--ghost" onClick={handleDownloadTemplate}>
+          <LuDownload aria-hidden /> Download Template
+        </button>
       </div>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <button type="button" className="settings-btn" onClick={handleDownloadTemplate} style={{ background: 'var(--surface-input)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-          Download Template
-        </button>
-
-        <div style={{ marginTop: '1.5rem' }}>
-          <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>CSV Template Structure Example:</h4>
-          <div style={{ overflowX: 'auto', background: 'var(--surface-input)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', maxWidth: '500px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.05)' }}>
-                  <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '500' }}>title</th>
-                  <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '500' }}>type</th>
-                  <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '500' }}>year</th>
-                  <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '500' }}>rating</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>Inception</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>movie</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>2010</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>
-                    <span style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px' }}>go_for_it</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>Breaking Bad</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>tv</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>2008</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--text-secondary)' }}>
-                    <span style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px' }}>perfection</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      <div className="settings-block">
+        <h4 className="settings-subtitle">CSV template structure</h4>
+        <div className="settings-table-wrap">
+          <table className="settings-table">
+            <thead>
+              <tr><th>title</th><th>type</th><th>year</th><th>rating</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Inception</td><td>movie</td><td>2010</td><td><code>go_for_it</code></td></tr>
+              <tr><td>Breaking Bad</td><td>tv</td><td>2008</td><td><code>perfection</code></td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div 
-          className="settings-form-group" 
-          style={{ 
-            border: '2px dashed var(--border)', 
-            padding: '3rem', 
-            textAlign: 'center', 
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            background: 'var(--surface-input)'
-          }}
+        <div
+          className={`settings-dropzone${dragOver ? ' is-over' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-label="Choose a CSV file"
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={onZoneKey}
           onDragOver={handleDragOver}
+          onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept=".csv" 
-            style={{ display: 'none' }} 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv"
+            hidden
           />
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📄</div>
+          <span className="settings-dropzone__icon"><LuFileSpreadsheet aria-hidden /></span>
           {file ? (
-            <p>Selected file: <strong style={{ color: 'var(--accent)' }}>{file.name}</strong></p>
+            <p>Selected file: <strong>{file.name}</strong></p>
           ) : (
-            <p style={{ color: 'var(--text-secondary)' }}>Click to select or drag and drop a CSV file here</p>
+            <p>Tap to choose or drop a CSV file here</p>
           )}
+          <small>.csv only</small>
         </div>
 
-        {error && <div className="error-text" style={{ marginBottom: '1rem' }}>{error}</div>}
+        {error && <div className="error-text" role="alert">{error}</div>}
 
         {preview.length > 0 && !stats && (
-          <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Preview (First 10 rows)</h3>
-            <div style={{ overflowX: 'auto', background: 'var(--surface-input)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <div className="settings-block">
+            <h4 className="settings-subtitle">Preview (first 10 rows)</h4>
+            <div className="settings-table-wrap">
+              <table className="settings-table">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.05)' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '500' }}>Title</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '500' }}>Type</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '500' }}>Year</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '500' }}>Rating</th>
-                  </tr>
+                  <tr><th>Title</th><th>Type</th><th>Year</th><th>Rating</th></tr>
                 </thead>
                 <tbody>
                   {preview.map((row, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{row.title || '-'}</td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{row.type || '-'}</td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{row.year || '-'}</td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                        <span style={{ 
-                          background: 'rgba(255,255,255,0.1)', 
-                          padding: '2px 6px', 
-                          borderRadius: '4px' 
-                        }}>
-                          {row.rating || '-'}
-                        </span>
-                      </td>
+                    <tr key={idx}>
+                      <td>{row.title || '-'}</td>
+                      <td>{row.type || '-'}</td>
+                      <td>{row.year || '-'}</td>
+                      <td><code>{row.rating || '-'}</code></td>
                     </tr>
                   ))}
                 </tbody>
@@ -198,24 +174,12 @@ const SettingsImport = () => {
         )}
 
         {stats && (
-          <div style={{ 
-            marginBottom: '2rem', 
-            background: 'var(--surface-input)', 
-            padding: '1.5rem', 
-            borderRadius: 'var(--radius-sm)', 
-            border: '1px solid var(--success)' 
-          }}>
-            <h3 style={{ marginBottom: '1rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-              Import Complete!
-            </h3>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-              <li><strong style={{ color: 'var(--text-primary)' }}>Imported:</strong> {stats.imported} successfully matched and added.</li>
-              <li><strong style={{ color: 'var(--text-primary)' }}>Skipped:</strong> {stats.skipped} had invalid or missing data.</li>
-              <li><strong style={{ color: 'var(--text-primary)' }}>Unmatched:</strong> {stats.unmatched} titles could not be found in our database.</li>
+          <div className="settings-result" role="status">
+            <h3><LuCircleCheck aria-hidden /> Import complete</h3>
+            <ul className="settings-result__stats">
+              <li><strong>{stats.imported}</strong> imported</li>
+              <li><strong>{stats.skipped}</strong> skipped (invalid data)</li>
+              <li><strong>{stats.unmatched}</strong> not found</li>
             </ul>
           </div>
         )}

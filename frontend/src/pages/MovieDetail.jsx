@@ -37,6 +37,8 @@ import AIRecommendations from '../components/AIRecommendations'
 import './MovieDetail.css'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
+// Longest the backdrop trailer waits for the page to settle before autoplaying.
+const TRAILER_DEFER_MAX_MS = 2500
 
 const formatUSD = (val) => {
   if (!val) return 'N/A';
@@ -249,6 +251,10 @@ export default function MovieDetail() {
   const [watchStatus,   setWatchStatus]   = useState(cachedData?.watchStatus || { watched: false, watchlisted: false })
   const [loading,       setLoading]       = useState(!cachedData?.movie)
   const [similarLoading,setSimilarLoading]= useState(!cachedData?.similar)
+  // Which title the trailer gate has opened for; compared rather than reset,
+  // so navigating to another title closes it without a setState in an effect.
+  const [trailerGateId, setTrailerGateId] = useState(null)
+  const trailerGateOpen = trailerGateId === movieId
   const [error,         setError]         = useState(null)
   const [hasImgError,   setHasImgError]   = useState(false)
   const [watchBusy,     setWatchBusy]     = useState(false)
@@ -309,8 +315,28 @@ export default function MovieDetail() {
     setShowVideo(true)
   }, [])
 
+  // The autoplay trailer pulls ~3 MB of YouTube player JS plus video. Starting
+  // it the moment data lands made it compete with the backdrop, posters and the
+  // "More like this" request. It still autoplays — just once the row has
+  // settled and the browser is idle, or after TRAILER_DEFER_MAX_MS regardless.
   useEffect(() => {
-    if (!showVideo || !trailerKey || !backdropContainerRef.current) return;
+    const cap = setTimeout(() => setTrailerGateId(movieId), TRAILER_DEFER_MAX_MS)
+    return () => clearTimeout(cap)
+  }, [movieId])
+
+  useEffect(() => {
+    if (similarLoading || loading) return
+    const open = () => setTrailerGateId(movieId)
+    if (typeof window.requestIdleCallback === 'function') {
+      const idle = window.requestIdleCallback(open, { timeout: 1000 })
+      return () => window.cancelIdleCallback(idle)
+    }
+    const t = setTimeout(open, 300)
+    return () => clearTimeout(t)
+  }, [similarLoading, loading, movieId])
+
+  useEffect(() => {
+    if (!showVideo || !trailerGateOpen || !trailerKey || !backdropContainerRef.current) return;
 
     let isApiReady = !!window.YT && !!window.YT.Player;
 
@@ -415,7 +441,7 @@ export default function MovieDetail() {
       }
       setVideoReady(false);
     };
-  }, [showVideo, trailerKey, movieId]);
+  }, [showVideo, trailerGateOpen, trailerKey, movieId]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -552,6 +578,15 @@ export default function MovieDetail() {
     setError(null)
     setHasImgError(false)
 
+    // "More like this" used to be requested only after the bundle came back
+    // with `similar: null`, so a cold title paid two full round trips in a row.
+    // When this page doesn't already hold the row, ask for it alongside the
+    // bundle; the bundle's copy wins if it has one. Same endpoint, same result.
+    const similarEarly = cachedData?.similar
+      ? null
+      : movieService.getSimilar(movieId, 'movie')
+    similarEarly?.catch(() => {})
+
     pageService.getMovie(movieId)
       .then((data) => {
         if (cancelled) return
@@ -616,9 +651,10 @@ export default function MovieDetail() {
           return
         }
 
-        // Second request, only on a cold title: same endpoint the row always
-        // used, so the results are exactly what the bundle would have carried.
-        movieService.getSimilar(movieId, 'movie')
+        // Cold title: same endpoint the row always used, so the results are
+        // exactly what the bundle would have carried — usually already in flight.
+        const similarRequest = similarEarly || movieService.getSimilar(movieId, 'movie')
+        similarRequest
           .then((res) => {
             if (cancelled) return
             const rows = res?.movies || []

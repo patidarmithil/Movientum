@@ -234,6 +234,118 @@
   color: #fff;
 }
 
+/* Desktop / tablet: poster grid, 5 per row (mobile keeps the list layout below) */
+@media (min-width: 769px) {
+  .mi-list {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 28px 18px;
+  }
+
+  .mi-list > .stagger-item-wrap {
+    min-width: 0;
+  }
+
+  .mi-item {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    height: 100%;
+    transition: transform 0.25s ease;
+  }
+
+  .mi-item:hover {
+    transform: translateY(-4px);
+  }
+
+  .mi-poster-wrap {
+    position: relative;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    transition: box-shadow 0.25s ease;
+  }
+
+  .mi-item:hover .mi-poster-wrap {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+  }
+
+  .mi-poster {
+    transition: transform 0.4s ease;
+  }
+
+  .mi-item:hover .mi-poster {
+    transform: scale(1.04);
+  }
+
+  /* Rank sits over the poster's top-left corner */
+  .mi-rank {
+    position: absolute;
+    z-index: 1;
+    left: 8px;
+    top: 6px;
+    min-width: 0;
+    text-align: left;
+    font-size: 2.6rem;
+    color: #fff;
+    letter-spacing: -1px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+    pointer-events: none;
+  }
+
+  .mi-info {
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mi-title {
+    font-size: 0.98rem;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .mi-meta {
+    font-size: 0.78rem;
+  }
+
+  .mi-stats {
+    margin-left: 0;
+    margin-top: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .mi-interested {
+    font-size: 0.92rem;
+  }
+
+  .mi-share {
+    font-size: 0.8rem;
+    padding: 4px 6px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .mi-container {
+    gap: 24px;
+  }
+
+  .mi-sidebar {
+    flex-basis: 170px;
+  }
+
+  .mi-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* Loaders and Empty States */
 .mi-loading, .mi-empty {
   text-align: center;

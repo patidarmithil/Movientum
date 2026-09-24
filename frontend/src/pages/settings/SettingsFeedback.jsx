@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { LuChevronDown } from 'react-icons/lu';
 import api from '../../utils/api';
+
+const CATEGORIES = ['Improvement Idea', 'Bug/Error', 'Content Missing', 'Other'];
 
 export default function SettingsFeedback() {
   const [category, setCategory] = useState('Improvement Idea');
@@ -71,46 +74,41 @@ export default function SettingsFeedback() {
         <p>Help us improve Movientum. We'd love to hear your thoughts, ideas, or any issues you've encountered.</p>
       </div>
 
-      {message && <div className="success-text" style={{ marginBottom: '1rem' }}>{message}</div>}
-      {error && <div className="error-text" style={{ marginBottom: '1rem' }}>{error}</div>}
+      {message && <div className="success-text" role="status">{message}</div>}
+      {error && <div className="error-text" role="alert">{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="settings-form-group" ref={dropdownRef}>
-          <label htmlFor="category">Category</label>
-          <div style={{ position: 'relative' }}>
+          <label id="category-label">Category</label>
+          <div className="settings-select">
             <button
               type="button"
-              className="settings-input"
-              style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              className="settings-input settings-select__btn"
+              aria-haspopup="listbox"
+              aria-expanded={isDropdownOpen}
+              aria-labelledby="category-label"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <span>{category}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
+              <LuChevronDown aria-hidden />
             </button>
             {isDropdownOpen && (
-              <div style={{
-                position: 'absolute', top: '100%', left: 0, right: 0,
-                background: 'var(--surface-input)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)', marginTop: '4px', zIndex: 10
-              }}>
-                {['Improvement Idea', 'Bug/Error', 'Content Missing', 'Other'].map((option) => (
-                  <div
-                    key={option}
-                    style={{
-                      padding: '10px 14px', cursor: 'pointer',
-                      background: category === option ? 'var(--accent-hover)' : 'transparent'
-                    }}
-                    onClick={() => {
-                      setCategory(option);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    {option}
-                  </div>
+              <ul className="settings-select__menu" role="listbox" aria-labelledby="category-label">
+                {CATEGORIES.map((option) => (
+                  <li key={option} role="option" aria-selected={category === option}>
+                    <button
+                      type="button"
+                      className={`settings-select__opt${category === option ? ' is-selected' : ''}`}
+                      onClick={() => {
+                        setCategory(option);
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      {option}
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </div>
@@ -135,7 +133,6 @@ export default function SettingsFeedback() {
             className="settings-input"
             accept="image/*"
             onChange={handleImageChange}
-            style={{ padding: '7px 14px' }}
           />
         </div>
 

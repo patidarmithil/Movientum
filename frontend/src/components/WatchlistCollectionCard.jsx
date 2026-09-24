@@ -72,6 +72,9 @@ export default function WatchlistCollectionCard({ collection }) {
   const overflow = itemCount - shown.length
   const countLabel = `${itemCount} ${itemCount === 1 ? 'title' : 'titles'}`
   const layout = FAN_LAYOUTS[shown.length]
+  // The banner the user uploaded on the collection page wins over the poster fan.
+  const [coverFailed, setCoverFailed] = useState(false)
+  const customCover = !coverFailed ? collection.cover_image_url : null
 
   return (
     <div
@@ -84,7 +87,16 @@ export default function WatchlistCollectionCard({ collection }) {
       style={{ '--wl-accent': accent }}
     >
       <div className="wl-card__cover">
-        {shown.length === 0 ? (
+        {customCover ? (
+          <img
+            className="wl-card__custom"
+            src={customCover}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setCoverFailed(true)}
+          />
+        ) : shown.length === 0 ? (
           <div className="wl-card__empty">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -108,7 +120,7 @@ export default function WatchlistCollectionCard({ collection }) {
             ))}
           </div>
         )}
-        {overflow > 0 && <span className="wl-card__more">+{overflow}</span>}
+        {!customCover && overflow > 0 && <span className="wl-card__more">+{overflow}</span>}
       </div>
 
       <div className="wl-card__info">

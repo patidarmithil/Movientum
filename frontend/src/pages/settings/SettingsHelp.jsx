@@ -1,9 +1,8 @@
-import React from 'react';
 import Help from '../Help';
 
 const SettingsHelp = () => {
   return (
-    <div className="settings-card">
+    <div className="settings-card settings-embed">
       <Help />
     </div>
   );

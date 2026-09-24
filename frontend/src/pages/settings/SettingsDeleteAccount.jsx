@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import settingsService from '../../services/settingsService';
 
@@ -38,7 +38,7 @@ const SettingsDeleteAccount = () => {
   return (
     <div className="settings-card danger-card">
       <div className="settings-header">
-        <h1 style={{ color: 'var(--error)' }}>Delete Account</h1>
+        <h1>Delete Account</h1>
         <p>
           Once you delete your account, there is no going back. Please be certain.
           This will delete all your ratings, watch history, watchlists, and profile data.
@@ -71,7 +71,7 @@ const SettingsDeleteAccount = () => {
           />
         </div>
 
-        {error && <div className="error-text" style={{ marginBottom: '1rem' }}>{error}</div>}
+        {error && <div className="error-text" role="alert">{error}</div>}
 
         <button 
           type="submit" 

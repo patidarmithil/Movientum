@@ -85,8 +85,17 @@ import './components/Navbar.css'
  * Warms the chunks a visitor is most likely to open next, once the browser is
  * idle and the current page has finished its own work. Nothing renders here.
  */
-function PrefetchRoutes({ isLoggedIn }) {
+function PrefetchRoutes({ isLoggedIn, isLoading }) {
+  const { pathname } = useLocation()
+  // A title page is a destination, not a stop on the way to /intro, and it is
+  // busy with its own heaviest requests; prefetching Intro there downloaded
+  // ~17 KB of JS + CSS that was never used.
+  const onTitlePage = /^\/(movies|tv)\/\d+/.test(pathname)
+
   useEffect(() => {
+    // Wait for the session check: before it resolves every visitor looks
+    // logged out, which prefetched Intro for signed-in users too.
+    if (isLoading) return
     let cancelled = false
     const run = () => {
       if (cancelled) return
@@ -94,7 +103,7 @@ function PrefetchRoutes({ isLoggedIn }) {
       if (isLoggedIn) {
         import('./pages/MovieDetail')
         import('./pages/TVDetail')
-      } else {
+      } else if (!onTitlePage) {
         import('./pages/Intro')
       }
     }
@@ -112,7 +121,7 @@ function PrefetchRoutes({ isLoggedIn }) {
       if (idleId !== null && 'cancelIdleCallback' in window) window.cancelIdleCallback(idleId)
       if (timerId !== null) clearTimeout(timerId)
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, isLoading, onTitlePage])
 
   return null
 }
@@ -263,7 +272,7 @@ function AppRoutes() {
   return (
     <>
       <LogoutListener />
-      <PrefetchRoutes isLoggedIn={isLoggedIn} />
+      <PrefetchRoutes isLoggedIn={isLoggedIn} isLoading={isLoading} />
       <MobileRefreshDetector />
       <ScrollRestore />
       <Navbar />

@@ -1,9 +1,8 @@
-import React from 'react';
 import Privacy from '../Privacy';
 
 const SettingsPrivacy = () => {
   return (
-    <div className="settings-card">
+    <div className="settings-card settings-embed">
       <Privacy />
     </div>
   );

@@ -72,8 +72,10 @@ export default function Recommendations() {
         setFetchedAt(Date.now())
       } else {
         setMovies((prev) => {
-          const existingIds = new Set(prev.map(m => m.id))
-          const uniqueNew = newMovies.filter(m => !existingIds.has(m.id))
+          // Movie and TV ids overlap on TMDB, so dedupe on id + media type.
+          const keyOf = (m) => `${m.media_type || 'movie'}:${m.id}`
+          const existingKeys = new Set(prev.map(keyOf))
+          const uniqueNew = newMovies.filter(m => !existingKeys.has(keyOf(m)))
           return [...prev, ...uniqueNew]
         })
       }
