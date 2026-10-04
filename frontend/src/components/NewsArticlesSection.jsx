@@ -32,7 +32,7 @@ function ChevronRightIcon() {
   )
 }
 
-export default function NewsArticlesSection({ itemId, itemTitle, mediaType = 'movie' }) {
+export default function NewsArticlesSection({ itemId, mediaType = 'movie' }) {
   const { exitingIds, dismissArticle, filterHidden } = useNewsDismiss()
   const [articles, setArticles] = useState([])
   const [loading, setLoading]   = useState(true)

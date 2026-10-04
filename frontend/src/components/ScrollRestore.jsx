@@ -54,7 +54,7 @@ export default function ScrollRestore() {
         scrollState.window = parsed.window ?? 0
         scrollState.elements = parsed.elements ?? {}
       }
-    } catch (e) {}
+    } catch { /* corrupt or missing saved state */ }
 
     // Cache element -> identifier so a dragged/auto-scrolled element (many
     // 'scroll' events per second) is never re-scanned via getElementsByClassName.
@@ -124,7 +124,7 @@ export default function ScrollRestore() {
           sessionStorage.setItem(cacheKey, JSON.stringify(scrollState))
           scrollRegistry.current[cacheKey] = scrollState
           log(`saved ${location.pathname}${location.search}`, scrollState)
-        } catch (err) {}
+        } catch { /* storage unavailable */ }
       }, 100)
     }
 
@@ -163,7 +163,7 @@ export default function ScrollRestore() {
       if (saved) {
         savedData = JSON.parse(saved)
       }
-    } catch (e) {}
+    } catch { /* storage unavailable */ }
 
     const pathChanged = location.pathname !== prevPathname.current
     prevPathname.current = location.pathname
@@ -222,7 +222,7 @@ export default function ScrollRestore() {
             element = document.getElementById(selector.slice(1))
           } else if (selector.startsWith('.')) {
             // Selector format: .className[index]
-            const match = selector.match(/^\.([^\[]+)\[(\d+)\]$/)
+            const match = selector.match(/^\.([^[]+)\[(\d+)\]$/)
             if (match) {
               const className = match[1]
               const index = parseInt(match[2], 10)
@@ -231,7 +231,7 @@ export default function ScrollRestore() {
             }
           } else {
             // Selector format: tagName[index]
-            const match = selector.match(/^([^\[]+)\[(\d+)\]$/)
+            const match = selector.match(/^([^[]+)\[(\d+)\]$/)
             if (match) {
               const tagName = match[1]
               const index = parseInt(match[2], 10)

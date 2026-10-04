@@ -52,15 +52,19 @@ export default function HomeNewsStrip() {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
+    // A response from the previous auth state (guest list arriving after the
+    // user's for-you list) must not overwrite the current one.
+    let ignore = false
     setLoading(true)
     const fetchNews = isLoggedIn 
       ? newsService.getForYou(1, 6) 
       : newsService.getLatest(1, 6)
 
     fetchNews
-      .then((data) => setArticles(data.articles || []))
-      .catch(() => setArticles([]))
-      .finally(() => setLoading(false))
+      .then((data) => { if (!ignore) setArticles(data?.articles || []) })
+      .catch(() => { if (!ignore) setArticles([]) })
+      .finally(() => { if (!ignore) setLoading(false) })
+    return () => { ignore = true }
   }, [isLoggedIn])
 
   // Don't render if no articles and loaded (or logged out)

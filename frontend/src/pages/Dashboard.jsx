@@ -22,8 +22,8 @@ import { tileImageUrl } from '../utils/tierImages'
 import Aurora from '../components/Aurora'
 import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
-import ScrollReveal from '../components/ScrollReveal'
 import './Dashboard.css'
+import { getAvatarUrl, avatarFallback } from '../utils/avatar'
 
 const TABS = [
   { key: 'watchlist', label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> My Watchlists</> },
@@ -32,12 +32,6 @@ const TABS = [
   { key: 'ratings',   label: <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg" style={{ marginRight: '6px' }}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg> My Ratings</> },
 ]
 
-const RATING_LABELS = {
-  skip:       { label: 'Skip',       color: '#FF4D6D' },
-  timepass:   { label: 'Timepass',   color: '#FFC300' },
-  go_for_it:  { label: 'Go for it',  color: '#00E5A0' },
-  perfection: { label: 'Perfection', color: '#9B59FF' },
-}
 
 /**
  * Extract movie object from API item.
@@ -272,9 +266,7 @@ export default function Dashboard() {
   const tabError   = { history: errH,  watchlist: errW,  ratings: errR,  tierlists: errT }
 
   const initials = (user?.username || user?.email || '?').charAt(0).toUpperCase()
-  const avatarUrl = user?.avatar_url
-    ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar_url}`)
-    : null
+  const avatarUrl = user ? getAvatarUrl(user) : null
 
   return (
     <main className="dashboard page-content" id="dashboard-page">
@@ -299,6 +291,7 @@ export default function Dashboard() {
                 src={avatarUrl}
                 alt={user?.username || 'User'}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={avatarFallback(user)}
               />
             ) : (
               initials
@@ -327,8 +320,8 @@ export default function Dashboard() {
         </div>
 
         {/* ── Tabs ── */}
-        <div className="dashboard__tabs-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', marginBottom: 'var(--space-6)' }}>
-          <div className="dashboard__tabs" role="tablist" aria-label="Dashboard sections" style={{ borderBottom: 'none', marginBottom: 0 }}>
+        <div className="dashboard__tabs-wrapper">
+          <div className="dashboard__tabs" role="tablist" aria-label="Dashboard sections">
             {TABS.map((t) => (
               <button
                 key={t.key}
@@ -342,7 +335,7 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          <Link to="/settings/import" className="btn btn--secondary btn--sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Link to="/settings/import" className="btn btn--secondary btn--sm dashboard__import">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="nav-icon-svg">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>

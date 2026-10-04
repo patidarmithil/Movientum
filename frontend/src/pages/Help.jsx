@@ -1,4 +1,3 @@
-import React from 'react'
 import './Help.css'
 
 
@@ -14,6 +13,7 @@ function TutorialStep({ number, title, description }) {
     </div>
   )
 }
+import { Link } from 'react-router-dom'
 
 export default function Help() {
   return (
@@ -71,7 +71,7 @@ export default function Help() {
           <span>✓ Your Analytics</span>
           <span>✓ Personalized News</span>
         </div>
-        <a href="/signup" className="help-btn">Create Free Account →</a>
+        <Link to="/signup" className="help-btn">Create Free Account →</Link>
       </section>
 
       <section className="help-section">

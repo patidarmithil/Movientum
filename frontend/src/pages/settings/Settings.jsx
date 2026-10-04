@@ -1,12 +1,13 @@
 import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import {
-  LuUser, LuKeyRound, LuTrash2, LuUpload, LuMessageSquarePlus, LuInbox,
+  LuUser, LuKeyRound, LuTrash2, LuUpload, LuDownload, LuMessageSquarePlus, LuInbox,
   LuCircleHelp, LuShieldCheck, LuFileText, LuChevronRight, LuChevronLeft,
   LuLayoutDashboard,
 } from 'react-icons/lu';
 import { useAuth } from '../../context/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import './Settings.css';
+import { getAvatarUrl, avatarFallback } from '../../utils/avatar';
 
 // One list drives the desktop sidebar, the phone index and the phone sub-header
 // title, so a new page is added here once.
@@ -22,6 +23,7 @@ const NAV_GROUPS = [
     label: 'Content',
     items: [
       { to: '/settings/import', label: 'Import List', hint: 'Bring ratings in from a CSV', Icon: LuUpload },
+      { to: '/settings/export', label: 'Export Data', hint: 'Download your list or an AI-ready file', Icon: LuDownload },
     ],
   },
   {
@@ -51,14 +53,12 @@ const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 function ProfileBlock({ user, compact = false }) {
   const initials = (user?.username || user?.email || '?').charAt(0).toUpperCase();
-  const avatarUrl = user?.avatar_url
-    ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar_url}`)
-    : null;
+  const avatarUrl = user ? getAvatarUrl(user) : null;
 
   return (
     <div className={`settings-profile${compact ? ' settings-profile--compact' : ''}`}>
       <div className="settings-profile__avatar">
-        {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
+        {avatarUrl ? <img src={avatarUrl} alt="" onError={avatarFallback(user)} /> : initials}
       </div>
       <div className="settings-profile__info">
         <span className="settings-profile__name">{user?.username || 'User'}</span>

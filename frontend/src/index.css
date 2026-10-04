@@ -599,3 +599,9 @@ button {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
+/* Suspense fallback while a route chunk loads: holds the page height so the
+   footer does not flash into view between pages. */
+.route-fallback {
+  min-height: 100vh;
+  min-height: 100dvh;
+}

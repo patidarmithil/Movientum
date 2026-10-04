@@ -1,6 +1,6 @@
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 import { Link } from 'react-router-dom'
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import BorderGlow from './BorderGlow'
 import FeedbackControl from './FeedbackControl'
 import { recFeedback } from '../services/feedbackService'

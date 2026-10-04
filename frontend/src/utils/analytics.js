@@ -21,7 +21,7 @@ export const getQueue = () => {
 export const setQueue = (queue) => {
   try {
     sessionStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  } catch {}
+  } catch { /* storage unavailable */ }
 };
 
 const checkPrivacy = () => {

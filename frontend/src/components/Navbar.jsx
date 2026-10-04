@@ -2,7 +2,6 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
-import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import { notificationService } from '../services/notificationService'
 import SearchOverlay from './SearchOverlay'
@@ -10,12 +9,18 @@ import ExploreMenu from './explore/ExploreMenu'
 import TrailerModal from './TrailerModal'
 import api from '../utils/api'
 import './Navbar.css'
+import { getAvatarUrl, avatarFallback } from '../utils/avatar'
 
 /**
  * Navbar — Redesigned brand header.
  * Features left brand logo (logo-128.webp) and beta label, left-shifted search bar,
  * and right-aligned actions (Explore and Account/User Profile avatar).
  */
+// Corrupt or blocked storage must not throw inside the notification handlers.
+function readSeenNotifs() {
+  try { return JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}') || {} } catch { return {} }
+}
+
 export default function Navbar() {
   const { isLoggedIn, isLoading, user, logout } = useAuth()
   const navigate = useNavigate()
@@ -268,7 +273,7 @@ export default function Navbar() {
             return dateB - dateA // Latest released first
           })
 
-          const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
+          const savedSeen = readSeenNotifs()
           const finalNotifs = notifs.map(n => ({
             ...n,
             seen: savedSeen[n.id] || false
@@ -342,7 +347,7 @@ export default function Navbar() {
   const handleNotifClick = () => {
     setNotifOpen(!notifOpen)
     if (!notifOpen && unreadCount > 0) {
-      const savedSeen = JSON.parse(localStorage.getItem('wl_notifs_seen') || '{}')
+      const savedSeen = readSeenNotifs()
       visibleNotifications.forEach(n => {
         if (n.category === 'released') {
           const nDate = new Date(n.created_at)
@@ -453,16 +458,6 @@ export default function Navbar() {
   )
   }
 
-  const addTestNotification = () => {
-    const newNotif = {
-      id: Date.now(),
-      message: "This is a test notification. Notifications are working!",
-      seen: false,
-      created_at: new Date().toISOString(),
-      category: 'released'
-    }
-    setNotifications([newNotif, ...notifications])
-  }
 
   // Avatar initials from user name/email
   const initials = user
@@ -478,9 +473,7 @@ export default function Navbar() {
     location.pathname === '/about' ||
     (location.pathname === '/' && !isLoggedIn)
 
-  const avatarUrl = user?.avatar_url
-    ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar_url}`)
-    : null
+  const avatarUrl = user ? getAvatarUrl(user) : null
 
   return (
     <nav
@@ -843,6 +836,7 @@ export default function Navbar() {
                       src={avatarUrl}
                       alt={user?.username || 'User'}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={avatarFallback(user)}
                     />
                   ) : (
                     initials
@@ -1425,6 +1419,7 @@ export default function Navbar() {
                           src={avatarUrl}
                           alt={user?.username || 'User'}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={avatarFallback(user)}
                         />
                       ) : (
                         initials

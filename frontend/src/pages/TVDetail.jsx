@@ -20,12 +20,9 @@ import { watchingTrackerService } from '../services/watchingTrackerService'
 import { useAuth } from '../context/AuthContext'
 import CastCrew from '../components/CastCrew'
 import NewsArticlesSection from '../components/NewsArticlesSection'
-import MovieCard from '../components/MovieCard'
-import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import RatingMeter from '../components/RatingMeter'
 import TrailerModal from '../components/TrailerModal'
 import ImageLightbox from '../components/ImageLightbox'
-import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import ProductionTags from '../components/ProductionTags'
 import { pageCache } from '../utils/pageCache'
@@ -34,7 +31,6 @@ import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
 import { tempTrackerService } from '../services/tempTrackerService'
 import { fireBurst } from '../utils/burstEffect'
-import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import MovieRow from '../components/MovieRow'
 import AIRecommendations from '../components/AIRecommendations'
 import LazyMount from '../components/LazyMount'
@@ -375,7 +371,7 @@ export default function TVDetail() {
         show.release_year
       )
       setReqNeededState({ loading: false, success: true })
-    } catch (err) {
+    } catch {
       setReqNeededState({ loading: false, success: false })
     }
   }

@@ -1,64 +1,54 @@
-# News Integration
+# News
 
-## Overview & Architecture
+Movientum shows entertainment news on its own page, as a strip on Home, and as a rail on each movie/TV page. **All news lives in Redis — never in PostgreSQL.**
 
-Movientum features an aggregated entertainment news feed that keeps users engaged. It operates in two modes:
-1. **Global Feed** (`/feed/latest`): Chronological entertainment news for anonymous users.
-2. **For-You Feed** (`/feed/for-you`): A highly personalized feed for authenticated users, where articles are algorithmically scored based on the user's specific genre preferences, watched movies, and favorite directors.
+## How news gets in (one button)
 
----
+There is no automatic crawling. An admin presses **"News Daily Fetch"** in the admin panel. That runs:
 
-## Logics & Business Rules
+1. **Fetch** — NewsAPI (50), Currents (600) and ApiTube (50) articles, in parallel (`news_fetch_service.py`).
+2. **Deduplicate** — same URL, same title fingerprint, or near-identical text → keep one. About 500 remain.
+3. **Enrich** (`news_service.build_snapshot`):
+   - **Categories** — rule-based keyword scoring (`news_taxonomy.py`), refined by a small TF-IDF + logistic-regression model trained on the batch itself (`news_nlp.py`).
+   - **Entity links** — match headlines to real titles in the catalog, so "Dune" news links to the Dune page (`news_entity_linker.py`, index rebuilt nightly at 03:45).
+   - **Quality score** and **taste facets** (genres, people, keywords of linked titles).
+4. **Swap** — write everything as a new *generation* `news:v3:{N+1}:*`, point `news:v3:gen` to it, delete the old one after 10 s.
 
-### External API Ingestion
-News is ingested via the external `NewsAPI` service. Because the free tier is strictly rate-limited (100 requests/day), the FastAPI server NEVER queries NewsAPI on-demand. Instead, a background Celery task (`trigger_global_fetch`) routinely pulls the latest entertainment articles and stores them in the local PostgreSQL database (`news_articles` table).
+Readers always see a complete snapshot: the new one becomes visible only at the swap. A lock blocks two builds at once, and an empty fetch never replaces a good snapshot.
 
-### The "For-You" Scoring Algorithm
-When an authenticated user requests their personalized feed, the system:
-1. Fetches their top 10 preferred genres from `UserGenrePreference`.
-2. Fetches their last 200 watched movies from `WatchHistory`.
-3. Fetches up to 50 directors associated with those watched movies.
-4. Performs a full-text search similarity score against the `news_articles` title and content using the extracted keywords (genres, titles, directors).
-5. Sorts the articles by this calculated relevance score rather than pure chronology.
+## Feed tabs
 
----
+`GET /api/v1/news/feed?tab=...&category=...`
 
-## Code Structure & Detailed Logic
+| Tab | Order |
+|---|---|
+| `latest` | Newest first |
+| `editorial` | Highest quality score |
+| `trending` | Views per hour, computed on demand |
+| `for-you` | Personalised (below) |
+| `category=` | Articles tagged with that category |
 
-### Backend Implementation
-- **`app/services/news_service.py`**: Handles the NewsAPI ingestion mapping and the SQL weighting logic for the personalized feed.
-- **`app/routers/news.py`**: Exposes the REST endpoints and manages the Redis caching layers.
+## "For You" scoring
 
-### Aggressive Caching
-Because the For-You feed requires 4 heavy database queries (Genres + WatchHistory + Movies + Directors) just to build the search query, the resulting keyword profile is cached in Upstash Redis (`key_user_prefs`) for 15 minutes. The final scored feed page is also cached (`key_news_feed_user`) for 5 minutes.
+Uses the same `user_taste_profiles` as recommendations (read-only). Each article gets:
 
----
+| Part | Weight |
+|---|---|
+| Genre match | 0.30 |
+| Person match | 0.20 |
+| Linked title the user rated/watched/saved | 0.20 |
+| Keyword match | 0.10 |
+| Source reliability | 0.12 |
+| Recency | 0.08 |
+| Negative taste | −0.15 |
+| Already seen | −0.25 |
 
-## Tables & Summaries
+Then a diversity pass stops one source or category from filling the page. The top 120 ids are cached 10 min per user so paging is stable. Guests and users with fewer than 5 interactions get `latest`.
 
-### News Cache TTLs
+## News feedback
 
-| Cache Key Pattern | TTL | Purpose |
-|---|---|---|
-| `news:feed:latest:p{page}` | 120s (2m) | Unpersonalized latest news cache |
-| `user:prefs:{user_id}` | 900s (15m)| Caches user's genre/director keywords |
-| `news:feed:{user_id}:p{page}` | 300s (5m) | Caches the final scored personalization |
+Thumbs on a news card (`POST /news/article/{id}/feedback`) adjust only that user's news source/category/entity weights in Redis and hide a downvoted article. They **never** change movie recommendations.
 
----
+## Other endpoints
 
-## Workflows & Lifecycles
-
-### Personalized Feed Workflow
-```mermaid
-flowchart TD
-    A[Client requests /feed/for-you] --> B{Feed in Redis?}
-    B -- Yes --> C[Return cached feed]
-    B -- No --> D{Prefs in Redis?}
-    D -- No --> E[Query DB: Top Genres & Watch History]
-    E --> F[Cache Prefs (15m)]
-    D -- Yes --> G[Extract Keywords]
-    F --> G
-    G --> H[Query news_articles with TSVECTOR weights]
-    H --> I[Cache Scored Feed (5m)]
-    I --> J[Return JSON to Client]
-```
+`/news/for-title/{type}/{id}` (detail-page rail), `/news/article/{id}`, `/view` (counts views, once per user per hour), `/save` (bookmarks, max 500), `/search`, `/status`, `/categories`.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './FilterDropdown.css'
 
 export default function FilterDropdown({ label, children, active = false }) {

@@ -27,6 +27,7 @@ import { useAuth } from '../context/AuthContext'
 import { watchlistService } from '../services/watchlistService'
 import { OTT, ottMatches } from '../utils/ott'
 import './WatchlistDetail.css'
+import { getAvatarUrl, avatarFallback } from '../utils/avatar'
 
 const AddContentModal = lazy(() => import('../components/AddContentModal'))
 
@@ -703,7 +704,7 @@ export default function WatchlistDetail() {
 
             <div className="wl-head__row">
               <div className="wl-owner" title={user?.username ? `Created by ${user.username}` : undefined}>
-                {user?.avatar_url ? <img src={user.avatar_url} alt="" /> : <span>{(user?.username || 'U')[0].toUpperCase()}</span>}
+                {user ? <img src={getAvatarUrl(user)} alt="" onError={avatarFallback(user)} /> : <span>U</span>}
               </div>
               <p className="wl-meta">
                 {loading ? <span className="wl-skel wl-skel--meta" /> : (

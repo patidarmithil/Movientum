@@ -1,84 +1,54 @@
-# Master System Architecture
+# System Architecture
 
-## Overview & Architecture
+**Read this first.** It explains what Movientum is made of and how the pieces talk to each other.
 
-Movientum is an advanced, full-stack movie/TV recommendation platform. It operates as a **Modular Monolith** with an integrated, ML-driven recommendation engine natively embedded within the backend API, removing the need for complex microservice architectures.
+## What the system is
 
-### The 4 Pillars of the System
-1. **The Client**: A React 19 CSR (Client-Side Rendered) SPA hosted on a global CDN.
-2. **The API Tier**: A stateless FastAPI backend container managing auth, database routing, and real-time inference.
-3. **The Worker Tier**: Celery containers handling TMDB ingestion and heavy nightly ML retraining.
-4. **The Data Tier**: Supabase (PostgreSQL) for persistence and Upstash (Redis) for high-speed caching.
+Movientum is a movie and TV discovery site. Users browse titles, rate them, keep watchlists, build tier lists, read news, and get recommendations that learn from what they do.
 
----
+It has four parts:
 
-## Code Structure & Detailed Logic
-
-### Technology Stack
-- **Frontend**: React 19, Vite, React Router, Framer Motion, Tailwind/CSS.
-- **Backend Core**: Python 3.11, FastAPI, Uvicorn, Pydantic-Settings.
-- **Database / ORM**: PostgreSQL, SQLAlchemy 2.0 (asyncpg), Alembic.
-- **Caching / Task Queue**: Redis, Celery.
-- **Machine Learning**: NetworkX (Graph RWR), XGBoost (`XGBRanker`).
-- **Observability**: Azure Monitor OpenTelemetry.
-
-### Component Interactions
-- The **Frontend** exclusively communicates with the backend via REST API (`axios`). It maintains no direct connections to the database.
-- The **FastAPI Backend** acts as the orchestrator. For recommendations, it queries the DB for taste profiles, queries the RAM-based NetworkX graph for candidates, runs the `XGBRanker` inference, and interleaves the results before returning JSON to the client.
-- The **Celery Scheduler** runs a nightly job pulling the last 30 days of user interactions from the DB, training a new XGBoost model, and saving the `ranker.json` artifact to the local disk, where the FastAPI workers hot-reload it.
-
----
-
-## Tables & Summaries
-
-### Architecture Component Map
-
-| Component | Responsibility | Scaling Model |
+| Part | Technology | Where it runs |
 |---|---|---|
-| **Vercel Edge** | Serve static HTML/JS/CSS | Automatic Edge Scaling |
-| **FastAPI Containers** | Handle HTTP requests, run ML inference | Horizontal (Load Balanced) |
-| **Celery Worker** | TMDB Ingestion, Background tasks | Horizontal (Queue Depth) |
-| **Celery Beat** | Trigger nightly cron jobs | Singleton (Strictly 1 Instance) |
-| **Supabase DB** | Store users, catalogs, profiles, logs | Vertical (Compute/Storage Scaling) |
-| **Upstash Redis** | Cache API responses, Celery Broker | Serverless (Usage Based) |
+| Website (client) | React 19 + Vite single-page app | Vercel |
+| API (server) | FastAPI, Python, one codebase ("modular monolith") | Azure App Service (Docker), Render as backup |
+| Database | PostgreSQL | Supabase |
+| Cache + small data store | Redis | Upstash |
 
----
+Outside services it calls: **TMDB** (all movie/TV/person data), **NewsAPI / Currents / ApiTube** (news), **Gemini** with **Groq** as fallback (AI recommendations), **AniList / Fandom** (anime and cartoon characters for tier lists), **Google Identity** (sign-in), **Azure App Insights** (monitoring).
 
-## Workflows & Lifecycles
+## How a request moves
 
-### Full System Diagram
 ```mermaid
-flowchart TD
-    subgraph Client Tier
-        A[React 19 SPA]
-    end
-
-    subgraph API Tier
-        B[Load Balancer]
-        C[FastAPI Worker 1]
-        D[FastAPI Worker 2]
-        
-        B --> C
-        B --> D
-    end
-
-    subgraph Background Tier
-        E[Celery Worker]
-        F[Celery Beat Scheduler]
-    end
-
-    subgraph Data Tier
-        G[(Supabase PostgreSQL)]
-        H[(Upstash Redis)]
-    end
-
-    A <-->|REST API| B
-    C <-->|asyncpg| G
-    D <-->|asyncpg| G
-    C <-->|aioredis| H
-    D <-->|aioredis| H
-    
-    E <-->|Task Broker| H
-    E <-->|Read/Write| G
-    F -->|Enqueue Tasks| H
+flowchart LR
+    B[Browser] -->|HTTPS + JWT| A[FastAPI router]
+    A --> S[Service layer]
+    S --> R[(Redis cache)]
+    S --> P[(PostgreSQL)]
+    S --> T[TMDB API]
 ```
+
+1. The React app calls the API through one Axios client (`frontend/src/utils/api.js`).
+2. A **router** receives the request, checks the login token, and hands work to a **service**.
+3. The service first looks in **Redis**. If the answer is cached, it returns it.
+4. If not, it reads **PostgreSQL**, and calls **TMDB** only when the title is not stored locally. The result is cached for next time.
+
+## Key design choices (and why)
+
+- **One backend, not microservices.** The recommendation graph lives in the API process's memory. Splitting into services would mean shipping that graph over the network on every request.
+- **Everything runs on free tiers.** Speed comes from code (caching, compression, background work), never from bigger servers. A cold Azure start takes 15–30 seconds, so the frontend waits up to 120 seconds and fails over to the Render backup if the primary is down.
+- **News lives only in Redis**, never in PostgreSQL, to keep the database small.
+- **Titles are fetched on demand.** If someone opens a movie the database does not have, it is pulled from TMDB, saved, and added to the recommendation catalog.
+- **Page bundles.** Home, movie, TV, person and dashboard pages are each served from one precomputed Redis key, so a page load is one fast read instead of many calls.
+
+## Background work
+
+- **Celery beat** (scheduled, IST time): TMDB sync 03:00, ranker retrain 03:30, news title index 03:45, episode check 04:00, trailer refresh every 3 h.
+- **Admin triggers** (`/internal/trigger/{task}`): the admin panel can run any of those jobs on demand, plus the News Daily Fetch, which is the only way news enters the system.
+- **Startup tasks**: after the port opens, the server creates four raw-SQL tables, warms the recommendation graph, and deletes old unused movies.
+
+## Where to go next
+
+- Backend code layout: `backend_architecture.md`
+- Frontend code layout: `frontend_architecture.md`
+- Recommendations: `../ml_and_recommendations/recommendation_engine_overview.md`

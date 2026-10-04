@@ -1,66 +1,45 @@
-# Frontend Architecture (React SPA)
+# Frontend Architecture
 
-## Overview & Architecture
+The frontend in `frontend/src/` is a React 19 single-page app built with Vite. The browser renders everything; the backend only sends JSON. There is no CSS framework — every page has its own `.css` file next to it.
 
-The Movientum frontend is a highly dynamic **Single Page Application (SPA)** built with **React 19** and **Vite**. It eschews heavier meta-frameworks like Next.js in favor of a purely client-side rendered approach, relying on the FastAPI backend for all data and caching.
+## Folder guide
 
----
-
-## Logics & Business Rules
-
-### Rendering Strategy (CSR)
-Because Movientum is a heavily personalized recommendation platform where >90% of content views are unique to the authenticated user's taste profile, SSR (Server-Side Rendering) offers minimal caching benefits. A pure CSR approach allows the UI to instantly react to user interactions (e.g., thumbs-up feedback) using client-side state, while the background asynchronously updates the server.
-
-### Aesthetic & Animation Requirements
-The frontend relies heavily on modern animation libraries to achieve a premium, cinematic feel:
-- **`motion` (Framer Motion)**: Used for layout transitions, micro-interactions, and presence detection.
-- **`ogl`**: A minimal WebGL library used for high-performance visual effects.
-
----
-
-## Code Structure & Detailed Logic
-
-### Dependencies (`package.json`)
-```json
-"dependencies": {
-  "react": "^19.2.6",
-  "react-dom": "^19.2.6",
-  "react-router-dom": "^7.15.1",
-  "motion": "^12.40.0",
-  "ogl": "^1.0.11",
-  "axios": "^1.16.1",
-  "react-icons": "^5.6.0"
-}
-```
-
-### Build & Tooling
-- **Vite**: Used for lightning-fast HMR (Hot Module Replacement) during development and highly optimized Rollup builds for production.
-- **ESLint**: Strictly enforced using React Hooks and React Refresh plugins.
-
----
-
-## Tables & Summaries
-
-### Key Technologies
-
-| Technology | Purpose |
+| Folder | What lives there |
 |---|---|
-| **React 19** | Core UI library. |
-| **Vite** | Build tool and dev server. |
-| **React Router v7** | Client-side routing. |
-| **Axios** | Promise-based HTTP client to interact with the FastAPI backend. |
-| **Motion** | Fluid animations and gesture support. |
+| `pages/` | One component per route (`Home.jsx`, `MovieDetail.jsx`, `Explore.jsx`, `TierBoard.jsx`, …) with a matching CSS file. `pages/settings/` and `pages/analysis/` hold sub-sections |
+| `components/` | Reusable pieces: `MovieCard`, `MovieRow`, `FeedbackControl` (thumbs), `SearchOverlay`, `Navbar`, `RatingMeter`, trailer and news cards, `tierlist/` board parts |
+| `services/` | One file per backend area (`movieService.js`, `newsService.js`, …). Pages call these, never `axios` directly |
+| `hooks/` | Shared logic: scroll restore, session state, tier drag engine, hide-and-replace after a thumbs-down |
+| `utils/` | `api.js` (the HTTP client), `storage.js` (token storage), tier export/images, analytics |
+| `context/` | `AuthContext.jsx` — who is logged in |
 
----
+## The HTTP client (`utils/api.js`)
 
-## Workflows & Lifecycles
+All network traffic goes through one Axios instance. It:
+1. Adds `Authorization: Bearer <token>` to every request.
+2. On a 401, pauses other requests, refreshes the token once, then replays them.
+3. Waits up to **120 seconds**, because a sleeping Azure server takes 15–30 s to wake.
+4. If the primary backend fails, retries on the secondary (Render). If both fail, it fires an `mv:db-overload` event that shows a friendly toast.
 
-### Frontend Data Flow
-```mermaid
-flowchart TD
-    A[User clicks 'Thumbs Up'] --> B[React Local State Updated Immediately]
-    B --> C[Axios POST /api/v1/feedback]
-    C --> D{Response Status?}
-    D -- 200 OK --> E[Silent Success]
-    D -- 500 Error --> F[Rollback Local State & Show Toast]
-```
+## Token storage (`utils/storage.js`)
+
+"Remember me" on → tokens go to `localStorage` (survive browser restart). Off → `sessionStorage` (cleared when the tab closes). Always use this wrapper for auth, never `localStorage` directly.
+
+## Making pages feel fast
+
+- **Page bundles**: Home, detail, person and dashboard pages load from one `/api/v1/pages/...` call.
+- **Home snapshot**: the last home page is kept in `localStorage` for 24 h and shown instantly while the server wakes.
+- **Lazy sections**: `LazyMount` delays below-the-fold sections (and their requests) until they scroll into view.
+- **Search**: input is debounced 250–300 ms and recent answers are kept in a small in-memory cache.
+- **Safe failures**: a failed API call falls back to an empty list instead of crashing the page.
+- **Code splitting**: `vite.config.js` splits React, Motion and OGL into separate cached chunks.
+
+## Visual layer
+
+- `motion` for page transitions and scroll reveals.
+- `ogl` (WebGL) for the Aurora background.
+- `recharts` for the analysis charts.
+
+## Before building
+
+Run `npm run assets:webp` once on a fresh checkout — some pages import `.webp` copies of images that this script generates.

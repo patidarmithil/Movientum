@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { LuCamera } from 'react-icons/lu';
 import settingsService from '../../services/settingsService';
+import { getAvatarUrl, getDefaultAvatar } from '../../utils/avatar';
 
 const SettingsProfile = () => {
   const { user, updateUser } = useAuth();
@@ -9,13 +10,7 @@ const SettingsProfile = () => {
   const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(null);
-  const getAvatarUrl = (path) => {
-    if (!path) return '/default-avatar.png';
-    if (path.startsWith('http')) return path;
-    return `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${path}`;
-  };
-
-  const [preview, setPreview] = useState(getAvatarUrl(user?.avatar_url));
+  const [preview, setPreview] = useState(getAvatarUrl(user));
   const [imgError, setImgError] = useState(false);
   
   const [loading, setLoading] = useState(false);
@@ -86,7 +81,11 @@ const SettingsProfile = () => {
                 src={preview} 
                 alt="Avatar" 
                 className="avatar-preview" 
-                onError={() => setImgError(true)} 
+                onError={() => {
+                  const fallback = getDefaultAvatar(user);
+                  if (preview !== fallback) setPreview(fallback);
+                  else setImgError(true);
+                }}
               />
             ) : (
               <div className="avatar-preview-fallback">

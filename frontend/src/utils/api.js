@@ -22,8 +22,10 @@ const fallbackAPIUrl = isLocalhost
   ? 'http://localhost:8000' 
   : 'https://movientum.azurewebsites.net';
 
-const BASE_URL = import.meta.env.VITE_API_URL || fallbackAPIUrl;
+export const BASE_URL = import.meta.env.VITE_API_URL || fallbackAPIUrl;
 const SECONDARY_URL = import.meta.env.VITE_API_URL_SECONDARY || 'https://movientum-backend-secondary.onrender.com';
+
+const PRIMARY_READ_TIMEOUT_MS = 40000
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -48,6 +50,20 @@ api.interceptors.request.use(
     if (IS_BOT_UA && pathname !== '/' && pathname !== '/intro' && pathname !== '/about') {
       console.warn(`[Bot Block] Prevented crawler request to ${config.url} on path ${pathname}`);
       return Promise.reject({ __isBotBlock: true, config });
+    }
+
+    // Reads on the primary get a shorter budget so a primary that is stuck
+    // cold falls over to the secondary in ~40 s instead of after 120 s (a normal
+    // Azure cold start is 15–30 s, so that still fits). A
+    // per-call timeout set by the caller is left alone.
+    if (
+      config.timeout === 120000 &&
+      !config._secondaryRetry &&
+      (config.method || 'get').toLowerCase() === 'get' &&
+      SECONDARY_URL && SECONDARY_URL !== BASE_URL &&
+      (config.baseURL || BASE_URL) === BASE_URL
+    ) {
+      config.timeout = PRIMARY_READ_TIMEOUT_MS
     }
 
     const token = storage.getItem(KEYS.access)
@@ -178,7 +194,12 @@ api.interceptors.response.use(
       });
     }
 
+    // A request the caller aborted is not a failure: no logging, no fallback
+    // retry (the signal is already aborted), no overload banner.
+    if (axios.isCancel(error)) return Promise.reject(error)
+
     const original = error.config
+    if (!original) return Promise.reject(error)
 
     // ── Basic error logging ──────────────────────────────────
     console.error('[API Error]', original?.url, error.response?.status, error.message)
@@ -209,11 +230,19 @@ api.interceptors.response.use(
         !error.response || 
         error.code === 'ECONNABORTED' ||
         (error.response.status >= 500 && error.response.status <= 599);
+      // A write that got a 5xx or timed out may already have been applied by
+      // the primary, so replaying it elsewhere can submit it twice. Writes only
+      // fall back when the request never got an answer (connection refused,
+      // DNS, CORS on a dead host); reads fall back on any server/network error.
+      const isRead = (original.method || 'get').toLowerCase() === 'get'
+      const safeToReplay = isRead || (!error.response && error.code !== 'ECONNABORTED')
 
-      if (isNetworkOrServerError) {
+      if (isNetworkOrServerError && safeToReplay) {
         console.warn(`[API Fallback] Primary failed, retrying with secondary backend: ${SECONDARY_URL}`);
         original._secondaryRetry = true;
         original.baseURL = SECONDARY_URL;
+        // The short primary read timeout must not cut off a cold secondary.
+        original.timeout = 120000;
 
         return api(original);
       }

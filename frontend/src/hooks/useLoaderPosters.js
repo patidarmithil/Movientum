@@ -80,7 +80,6 @@ export function useLoaderPosters(columns) {
     const cached = readCachedPosters()
     const posters = cached || FALLBACK_POSTERS
     return buildColumnData(posters, columns)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns])
 
   useEffect(() => {

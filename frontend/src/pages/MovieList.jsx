@@ -11,7 +11,6 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { movieService } from '../services/movieService'
 import api from '../utils/api'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'

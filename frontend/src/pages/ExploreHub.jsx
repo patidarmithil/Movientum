@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { LuSearch, LuX } from 'react-icons/lu'
 import { movieService } from '../services/movieService'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import {
   ANIME_GENRES, CATEGORIES, COUNTRIES, FAMILY, GENRES, LANGUAGES, flagUrl, groupByLetter,
 } from '../utils/exploreTaxonomy'
@@ -91,7 +92,7 @@ function Hub({ facet }) {
   const items = useMemo(() => {
     if (!hub) return []
     const source = hub.layout === 'franchise'
-      ? (franchises || []).map((f) => ({ key: f.slug, label: f.title, backdrop: f.backdrop, cover: f.cover, to: `/explore/franchise/${f.slug}` }))
+      ? (franchises || []).map((f) => ({ key: f.slug, label: f.title, backdrop: f.backdrop, cover: f.cover, count: f.count, to: `/explore/franchise/${f.slug}` }))
       : hub.items
     const q = query.trim().toLowerCase()
     return q ? source.filter((it) => it.label.toLowerCase().includes(q)) : source
@@ -192,6 +193,33 @@ function FlagGrid({ items }) {
 }
 
 function FranchiseGrid({ items }) {
+  // Phones get the /explore results grid instead of banners: three 2:3 posters a
+  // row (the franchise's lead cover), so the hub reads like the rest of Explore.
+  const isMobile = useMediaQuery('(max-width: 900px)')
+
+  if (isMobile) {
+    return (
+      <div className="xhub-fr xhub-fr--posters">
+        {items.map((it) => {
+          const poster = it.cover?.[0]
+          return (
+            <Link key={it.key} to={it.to} className="xhub-fr__pcard">
+              <div className="xhub-fr__poster">
+                {poster ? (
+                  <img src={`${TMDB}/w342${poster}`} alt="" loading="lazy" decoding="async" />
+                ) : it.backdrop ? (
+                  <img src={`${TMDB}/w780${it.backdrop}`} alt="" loading="lazy" decoding="async" />
+                ) : null}
+                {it.count ? <span className="xhub-fr__count">{it.count}</span> : null}
+              </div>
+              <span className="xhub-fr__ptitle">{it.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="xhub-fr">
       {items.map((it) => (
@@ -215,6 +243,19 @@ function FranchiseGrid({ items }) {
 }
 
 function FranchiseSkeleton() {
+  const isMobile = useMediaQuery('(max-width: 900px)')
+  if (isMobile) {
+    return (
+      <div className="xhub-fr xhub-fr--posters" aria-hidden>
+        {Array.from({ length: 12 }, (_, i) => (
+          <div key={i} className="xhub-fr__pcard">
+            <div className="xhub-fr__poster xhub-fr__poster--ghost" />
+            <span className="xhub-fr__ghostline" />
+          </div>
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="xhub-fr" aria-hidden>
       {Array.from({ length: 8 }, (_, i) => (

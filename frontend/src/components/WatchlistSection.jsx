@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { planToWatchService } from '../services/planToWatchService'
 import { useSessionState } from '../hooks/useSessionState'
 import MovieRow from './MovieRow'

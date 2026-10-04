@@ -12,7 +12,7 @@
  *  - Sidebar:
  *    - Most Interested / Upcoming (GET /api/v1/movies/upcoming?filter={week|month|year})
  */
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { movieService } from '../services/movieService'
 import { pageService } from '../services/pageService'
@@ -30,6 +30,7 @@ import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import ScrollReveal from '../components/ScrollReveal'
 import MovieRow from '../components/MovieRow'
+import ColdStartNote from '../components/ColdStartNote'
 import TrailerRow from '../components/TrailerRow'
 import TrailerModal from '../components/TrailerModal'
 import WatchlistSection from '../components/WatchlistSection'
@@ -158,10 +159,13 @@ export default function Home() {
   // static rails) with per-row skeletons — something on screen beats nothing.
   const MIN_LOADER_MS = 1100
   const MAX_LOADER_MS = 2500
+  const FAST_ANSWER_MS = 300
   useEffect(() => {
     if (!trendLoad) {
       const elapsed = performance.now() - mountedAt
-      const remaining = Math.max(0, MIN_LOADER_MS - elapsed)
+      // A warm answer inside FAST_ANSWER_MS never needs the loader at all; the
+      // minimum hold is only there to stop a mid-length wait from flashing.
+      const remaining = elapsed < FAST_ANSWER_MS ? 0 : Math.max(0, MIN_LOADER_MS - elapsed)
       const timer = setTimeout(() => {
         setShowLoader(false)
       }, remaining)
@@ -196,6 +200,7 @@ export default function Home() {
 
   const [forYou, setForYou] = useSessionState('home_forYou', [])
   const [forYouTs, setForYouTs] = useSessionState('home_forYou_ts', 0)
+  const [forYouCold, setForYouCold] = useSessionState('home_forYou_cold', false)
   const [forYouLoad, setForYouLoad] = useState(isLoggedIn && forYou.length === 0)
 
   const [guestRecs, setGuestRecs] = useSessionState('home_guestRecs', [])
@@ -282,11 +287,31 @@ export default function Home() {
     }
 
     if (haveLists) {
-      // Restored from session state — paint instantly, no skeleton.
+      // Restored from session state — paint instantly, no skeleton, then
+      // revalidate against the bundle in the background. Without this the
+      // community ratings on the rails stayed frozen for the whole tab session
+      // while the detail pages showed the current meter.
       setTrendLoad(false); setTopRatedLoad(false); setUpcomingLoad(false)
       setTrailersLoad(!haveTrailers)
-      getHomeTrailers(trailerRegion)
-        .then((data) => setTrailers(data?.data || []))
+      pageService.getHome({
+        upcomingFilter,
+        region: trailerRegion === 'All' ? null : trailerRegion,
+      })
+        .then((data) => {
+          const fresh = {
+            trending: data?.trending?.movies || [],
+            topRated: data?.top_rated?.movies || [],
+            upcoming: data?.upcoming?.movies || [],
+            trailers: data?.trailers?.data || [],
+          }
+          if (fresh.trending.length) setTrending(fresh.trending)
+          if (fresh.topRated.length) setTopRated(fresh.topRated)
+          if (fresh.upcoming.length) setUpcoming(fresh.upcoming)
+          if (fresh.trailers.length || !haveTrailers) setTrailers(fresh.trailers)
+          if (upcomingFilter === DEFAULT_UPCOMING_FILTER && trailerRegion === DEFAULT_TRAILER_REGION) {
+            writeHomeSnapshot(fresh)
+          }
+        })
         .catch(() => { if (!haveTrailers) setTrailers([]) })
         .finally(() => setTrailersLoad(false))
       return
@@ -336,10 +361,9 @@ export default function Home() {
       .then((data) => {
         setGenreMovies(data?.movies || data || [])
       })
-      .catch(() => {
-        setGenreMovies([])
-        setHasError(true)
-      })
+      // One rail failing shows that rail empty; it no longer swaps the whole
+      // page for the error screen.
+      .catch(() => setGenreMovies([]))
       .finally(() => setGenreLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGenreId])
@@ -363,6 +387,7 @@ export default function Home() {
     api.get('/api/v1/recommendations')
       .then((r) => {
         setForYou(r.data?.movies || r.data || [])
+        setForYouCold(Boolean(r.data?.cold_start))
         setForYouTs(Date.now())
       })
       .catch(() => setForYou([]))
@@ -444,10 +469,7 @@ export default function Home() {
       .then((data) => {
         setUpcoming(data?.movies || data || [])
       })
-      .catch(() => {
-        setUpcoming([])
-        setHasError(true)
-      })
+      .catch(() => setUpcoming([]))
       .finally(() => setUpcomingLoad(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingFilter])
@@ -564,7 +586,9 @@ export default function Home() {
                 premiumScroll={true}
                 showFeedback={true}
                 feedbackSource="for_you"
-              />
+              >
+                {forYouCold && <ColdStartNote show />}
+              </MovieRow>
               <TrailerRow
                 title="🎬 Trailers" 
                 items={trailers} 

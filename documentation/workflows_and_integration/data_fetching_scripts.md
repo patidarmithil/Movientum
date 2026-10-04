@@ -1,64 +1,52 @@
-# Data Fetching & Maintenance Scripts
+# Data and Maintenance Scripts
 
-## Overview & Architecture
+Scripts in `backend/scripts/` fill the database and handle operations. They skip FastAPI and talk to the database directly. Each script adds `backend/` to `sys.path` and loads `.env` itself, so run them from `backend/` with the venv active:
 
-To support the Movientum machine learning pipeline and graph generation, the database must be pre-populated with a rich catalog of interconnected movies, TV shows, and talent. Because doing this on-the-fly via TMDB APIs would be too slow, a suite of offline Python scripts in `backend/scripts/` is used to ingest, seed, and migrate data en masse.
-
-These scripts bypass FastAPI routers and connect directly to the database via SQLAlchemy, utilizing `asyncio.Semaphore` to parallelize high-volume API ingestion without hitting rate limits.
-
----
-
-## Logics & Business Rules
-
-### Rate Limiting & Concurrency
-- TMDB permits roughly 50 requests per second on the v3 API. 
-- The ingestion scripts (`seed_catalog.py`, `seed_movies.py`) use `httpx.AsyncClient` alongside an `asyncio.Semaphore(30)` to strictly limit concurrent outbound HTTP requests, preventing `429 Too Many Requests` bans.
-
-### Upsert Logic
-When parsing TMDB payloads, the scripts extract highly dimensional data (cast IDs, crew IDs grouped by role, keywords) and upsert them into the `content_catalog` table. The `is_seed=True` flag is set to differentiate initial bulk loads from on-the-fly user-triggered ingestions.
-
----
-
-## Code Structure & Detailed Logic
-
-### Active Maintenance Scripts
-
-| Script Name | Purpose |
-|---|---|
-| `seed_catalog.py` | Master ingestion script. Pulls thousands of TMDB items, resolves `/credits` and `/keywords`, and formats the `ARRAY(Integer)` and `JSONB` columns required for the ML feature matrix. |
-| `seed_movies.py` | Similar to catalog seeder, but strictly focused on populating the `movies` table with basic metadata for standard browsing (Phase 1). |
-| `load_ratings.py` | Ingests bulk user ratings (skip, timepass, go_for_it, perfection) to simulate a cold-start userbase or backfill historical data. |
-| `load_tv_ratings.py` / `load_movie_ratings_2026.py` | Integrations with external rating sources (`moctale_scrapper`) to populate the `movie_ratings` and `tv_ratings` meter tables for display. |
-| `ingest_search_index.py` | Scans the database and updates the PostgreSQL `TSVECTOR` columns to ensure rapid full-text search capabilities across titles and overviews. |
-| `migrate_and_load.py` | Orchestration script that runs Alembic migrations (`alembic upgrade head`) and immediately follows up by triggering seed scripts in a fresh environment. |
-| `generate_dashboards.py` | Infrastructure script that dynamically generates Grafana JSON dashboard definitions based on the OpenTelemetry metrics exported by `telemetry.py`. |
-| `test_app_insights.py` | Telemetry validation script to ensure custom metrics are correctly arriving in Azure Monitor. |
-| `create_admin.py` | Simple utility to forcefully inject a user with the `admin` role directly into the database. |
-
----
-
-## Tables & Summaries
-
-### Execution Environments
-| Script Type | Run Frequency | Environment |
-|---|---|---|
-| **Seeders** | Once per environment deployment | Local / CI Server |
-| **Migrations** | On every deployment | CI/CD Pipeline |
-| **Rating Importers**| Weekly/Monthly (via Cron) | Celery Beat / Cron Job |
-
----
-
-## Workflows & Lifecycles
-
-### Bulk Ingestion Flow (`seed_catalog.py`)
-```mermaid
-flowchart TD
-    A[Start Script] --> B[Fetch TMDB Top/Popular Lists]
-    B --> C[Extract distinct TMDB IDs]
-    C --> D[Initialize asyncio.Semaphore(30)]
-    D --> E[Spawn concurrent httpx GET /movie/{id}]
-    D --> F[Spawn concurrent httpx GET /movie/{id}/credits]
-    E & F --> G[Parse JSON into dict]
-    G --> H[Upsert into content_catalog via SQLAlchemy]
-    H --> I[Commit Transaction]
+```bash
+python scripts/seed_catalog.py
 ```
+
+## Seeding (run once per new environment)
+
+| Script | What it does |
+|---|---|
+| `seed_catalog.py` | Main loader. Pulls thousands of TMDB titles with credits and keywords into `content_catalog` (`is_seed = true`). Limits parallel requests to stay under TMDB rate limits |
+| `seed_movies.py` | Fills the `movies` table with basic details for browsing |
+| `seed_people.py` | Fills the `people` table used by cast/crew search |
+| `ingest_search_index.py` | Rebuilds the full-text `search_vector` column (title weight A, overview weight B) |
+| `append_india_catalog.py` | Adds Indian titles (from `fetch_india.csv`) to the catalog |
+| `migrate_and_load.py` | Runs `alembic upgrade head`, then the seed scripts |
+
+## Rating meter data
+
+| Script | What it does |
+|---|---|
+| `load_movie_ratings_2026.py`, `load_tv_ratings.py`, `load_tv_ratings_2026.py` | Import external scores into `movie_ratings` / `tv_ratings` so the meter has data |
+| `load_ratings.py` | Bulk-load user ratings (testing or backfill) |
+
+## Operations
+
+| Script | What it does |
+|---|---|
+| `create_admin.py` | Make a user an admin |
+| `retag_news_snapshot.py` | Re-tag the live news snapshot with the current category rules, no API calls (`--dry-run` shows the diff) |
+| `clear_category_cache.py` | Clear cached news category pages |
+| `generate_dashboards.py` | Generate Grafana dashboard JSON from the metric list |
+| `test_app_insights.py` | Send a test metric to App Insights |
+| `check_settings.py`, `check_fks.py` | Sanity checks for config and foreign keys |
+| `grafana_reader_role.sql` | Read-only database role for Grafana |
+
+## Debug and evaluation scripts (`backend/debug/`)
+
+| Group | Examples | Purpose |
+|---|---|---|
+| Probes | `scratch_test_recs.py`, `scratch_test_similar.py`, `scratch_inspect_movie.py` | Hit an endpoint or inspect a record |
+| Cache | `scratch_clear_cache.py`, `scratch_redis_memory.py` | Clear keys, check Redis size |
+| Performance | `scratch_perf_check.py`, `scratch_page_latency.py`, `scratch_similar_latency_probe.py` | Before/after timing; the perf check fails if recommendation order changes |
+| Search quality | `scratch_search_eval.py`, `scratch_search_golden.py` | Hit@1/hit@3/MRR against labelled queries |
+| DNA engine | `dna_offline.py`, `scratch_dna_eval.py`, `scratch_dna_sweep.py`, `scratch_dna_smoke.py` | Offline evaluation on a catalog snapshot |
+| Ranker | `scratch_ranker_eval.py`, `scratch_ranker_labels.py` | Model vs composite, label checks |
+| News | `scratch_news_snapshot.py`, `scratch_news_foryou.py`, `scratch_news_for_title.py`, `scratch_news_taxonomy.py` | Snapshot build, For You and category checks |
+| Tier lists | `scratch_tier_templates.py`, `scratch_tier_characters.py` | Validate templates against TMDB, bake characters |
+
+Model evaluation outside the app lives in `testing/` (`evaluate_model.py`, `check_db.py`).

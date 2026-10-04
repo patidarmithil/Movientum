@@ -122,7 +122,9 @@ export default function Aurora(props) {
     const renderer = new Renderer({
       alpha: true,
       premultipliedAlpha: true,
-      antialias: true
+      // MSAA only smooths geometry edges; this is one full-screen triangle
+      // shaded per pixel, so it bought nothing and cost GPU fill every frame.
+      antialias: false
     });
     const gl = renderer.gl;
     gl.clearColor(0, 0, 0, 0);
@@ -131,6 +133,9 @@ export default function Aurora(props) {
     gl.canvas.style.backgroundColor = 'transparent';
 
     let program;
+    // Visitors who asked for reduced motion get one still frame, not a loop.
+    const reduceMotion = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
     function resize() {
       if (!ctn) return;
@@ -140,6 +145,8 @@ export default function Aurora(props) {
       if (program) {
         program.uniforms.uResolution.value = [width, height];
       }
+      // setSize clears the canvas; a reduced-motion still has to be redrawn.
+      if (reduceMotion && program) start();
     }
     window.addEventListener('resize', resize);
 
@@ -192,6 +199,10 @@ export default function Aurora(props) {
         });
       }
       renderer.render({ scene: mesh });
+      if (reduceMotion) {
+        cancelAnimationFrame(animateId);
+        running = false;
+      }
     };
 
     // This is a decorative background. It used to render continuously whether

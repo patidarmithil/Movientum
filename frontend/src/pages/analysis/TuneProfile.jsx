@@ -8,6 +8,24 @@ import { languageName, pct } from './analysisUtils'
 // on release keeps the thumb from jumping under the pointer mid-drag.
 const DEFAULT_BOUND = 100
 const DEFAULT_THRESHOLD = 0.7
+const DEFAULT_REWATCH = 0.1
+const MAX_REWATCH = 0.3
+const MAX_LANGS = 6
+// Offered in "Add language" after the user's own history languages.
+const COMMON_LANGS = ['en', 'hi', 'ko', 'ja', 'ta', 'te', 'ml', 'es', 'fr', 'zh', 'de', 'it', 'pt', 'th', 'tr']
+// One colour per row in the mix bar, in row order.
+const MIX_COLORS = ['#9B59FF', '#00E5A0', '#FFC300', '#4DA3FF', '#FF4D6D', '#FF9F43']
+
+/** Top history languages as whole percentages (steps of 5) summing to 100. */
+function suggestMix(historyLangs) {
+  const top = (historyLangs || []).slice(0, 3)
+  if (!top.length) return [{ code: 'en', pct: 100 }]
+  const total = top.reduce((a, l) => a + l.share, 0) || 1
+  const rows = top.map((l) => ({ code: l.code, pct: Math.max(5, Math.round((l.share / total) * 20) * 5) }))
+  const diff = 100 - rows.reduce((a, r) => a + r.pct, 0)
+  rows[0].pct = Math.max(5, rows[0].pct + diff)
+  return rows
+}
 
 const roomFor = (weight) => Math.ceil((Math.abs(weight) * 1.5) / 50) * 50
 
@@ -72,6 +90,12 @@ export default function TuneProfile({ language, onSaved }) {
   const [dateTo, setDateTo] = useState('')
   const [contentType, setContentType] = useState('balanced')
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
+  const [langMode, setLangMode] = useState('auto')
+  const [langRows, setLangRows] = useState([])
+  const [historyLangs, setHistoryLangs] = useState([])
+  const [rewatch, setRewatch] = useState(DEFAULT_REWATCH)
+  const [watchedCount, setWatchedCount] = useState(0)
+  const [rewatchMin, setRewatchMin] = useState(300)
   const [genres, setGenres] = useState([])
   const [eras, setEras] = useState([])
   const [weightBounds, setWeightBounds] = useState({ genres: DEFAULT_BOUND, eras: DEFAULT_BOUND })
@@ -92,6 +116,19 @@ export default function TuneProfile({ language, onSaved }) {
         setDateTo(toDateInput(range.saved_to))
         setContentType(range.content_type_pref || 'balanced')
         setThreshold(range.language_diversity_threshold ?? DEFAULT_THRESHOLD)
+        setHistoryLangs(range.history_languages || [])
+        setRewatch(range.rewatch_share ?? DEFAULT_REWATCH)
+        setWatchedCount(range.total_items_in_range || 0)
+        setRewatchMin(range.rewatch_min_watched || 300)
+        const shares = range.language_shares
+        if (shares && Object.keys(shares).length) {
+          setLangMode('custom')
+          setLangRows(
+            Object.entries(shares)
+              .sort((a, b) => b[1] - a[1])
+              .map(([code, v]) => ({ code, pct: Math.round(v * 100) })),
+          )
+        }
       }
       setGenres(taste?.data || [])
       setWeightBounds({
@@ -134,6 +171,43 @@ export default function TuneProfile({ language, onSaved }) {
     setDirty((d) => ({ ...d, eras: true }))
   }
 
+  const langTotal = langRows.reduce((a, r) => a + r.pct, 0)
+  const addOptions = useMemo(() => {
+    const used = new Set(langRows.map((r) => r.code))
+    const codes = [...historyLangs.map((l) => l.code), ...COMMON_LANGS]
+    return [...new Set(codes)].filter((c) => !used.has(c))
+  }, [langRows, historyLangs])
+
+  const chooseLangMode = (mode) => {
+    setMessage(null)
+    setLangMode(mode)
+    if (mode === 'custom' && langRows.length === 0) setLangRows(suggestMix(historyLangs))
+  }
+  const setRowPct = (code, value) => {
+    setMessage(null)
+    setLangRows((rows) => rows.map((r) => (r.code === code ? { ...r, pct: value } : r)))
+  }
+  const removeRow = (code) => {
+    setMessage(null)
+    setLangRows((rows) => rows.filter((r) => r.code !== code))
+  }
+  const addRow = (code) => {
+    if (!code) return
+    setMessage(null)
+    setLangRows((rows) => (rows.length >= MAX_LANGS ? rows : [...rows, { code, pct: 10 }]))
+  }
+  // Scale to exactly 100 keeping proportions; rounding slack goes to the largest row.
+  const balance = () => {
+    if (!langTotal) return
+    setLangRows((rows) => {
+      const next = rows.map((r) => ({ ...r, pct: Math.round((r.pct / langTotal) * 100) }))
+      const diff = 100 - next.reduce((a, r) => a + r.pct, 0)
+      const big = next.reduce((bi, r, i) => (r.pct > next[bi].pct ? i : bi), 0)
+      next[big].pct += diff
+      return next
+    })
+  }
+
   const save = async () => {
     setSaving(true)
     setMessage(null)
@@ -142,7 +216,16 @@ export default function TuneProfile({ language, onSaved }) {
         dateFrom ? new Date(dateFrom).toISOString() : null,
         dateTo ? new Date(dateTo).toISOString() : null,
       )
-      await userService.saveRecPreferences({ content_type_pref: contentType, language_diversity_threshold: threshold })
+      const customRows = langRows.filter((r) => r.pct > 0)
+      const useCustom = langMode === 'custom' && customRows.length > 0
+      await userService.saveRecPreferences({
+        content_type_pref: contentType,
+        language_diversity_threshold: threshold,
+        rewatch_share: rewatch,
+        ...(useCustom
+          ? { language_shares: Object.fromEntries(customRows.map((r) => [r.code, r.pct])) }
+          : { language_shares_auto: true }),
+      })
       if (dirty.genres || dirty.eras) {
         await userService.saveTasteProfile(
           dirty.genres ? Object.fromEntries(genres.map((g) => [g.id, g.weight])) : undefined,
@@ -164,20 +247,27 @@ export default function TuneProfile({ language, onSaved }) {
     setDateTo('')
     setContentType('balanced')
     setThreshold(DEFAULT_THRESHOLD)
-    setMessage({ ok: true, text: 'Filters and language limit reset. Press Save to keep this.' })
+    setLangMode('auto')
+    setRewatch(DEFAULT_REWATCH)
+    setMessage({ ok: true, text: 'Filters, language settings and rewatch picks reset. Press Save to keep this.' })
   }
 
   if (!loaded) return <div className="skeleton an-skel-block" style={{ height: 420 }} />
 
   const dominant = language?.dominant_fraction || 0
   const willMix = dominant > threshold
+  const custom = langMode === 'custom'
+  const perTwenty = Math.round(rewatch * 20)
+  const similarActive = watchedCount >= rewatchMin
 
   return (
     <div className="an-tune">
       <div className="an-tune__grid">
-        <article className="an-panel">
+        <article className={`an-panel${custom ? ' is-overridden' : ''}`}>
           <h3 className="an-subhead">Language limit</h3>
-          <p className="an-affects">Changes: your For You feed</p>
+          <p className="an-affects">
+            {custom ? 'Not used while Language mix is set to Custom' : 'Changes: your For You feed'}
+          </p>
           <div className="an-slider an-slider--wide">
             <label htmlFor="an-threshold">
               Mix in other languages once one language passes <b className="an-num">{pct(threshold)}</b> of what you watch
@@ -245,6 +335,138 @@ export default function TuneProfile({ language, onSaved }) {
               <button key={label} type="button" className="an-chip an-chip--btn" onClick={() => setPreset(months)}>{label}</button>
             ))}
           </div>
+        </article>
+      </div>
+
+      <div className="an-tune__grid an-tune__grid--two">
+        <article className="an-panel an-langmix">
+          <div className="an-langmix__head">
+            <div>
+              <h3 className="an-subhead">Language mix</h3>
+              <p className="an-affects">Changes: For You and More like this</p>
+            </div>
+            <div className="an-seg" role="radiogroup" aria-label="Language mix mode">
+              {[['auto', 'Auto'], ['custom', 'Custom']].map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={langMode === v}
+                  className={langMode === v ? 'is-on' : ''}
+                  onClick={() => chooseLangMode(v)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {!custom && (
+            <>
+              <p className="an-muted">
+                The engine follows what you watch and only mixes in other languages past your language limit.
+                Switch to Custom to set the share of each language yourself.
+              </p>
+              {historyLangs.length > 0 && (
+                <div className="an-chips">
+                  {historyLangs.slice(0, 5).map((l) => (
+                    <span key={l.code} className="an-chip an-chip--quiet">
+                      {languageName(l.code)} {pct(l.share)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {custom && (
+            <>
+              <div className="an-langmix__bar" aria-hidden="true">
+                {langRows.map((r, i) => (
+                  <span
+                    key={r.code}
+                    style={{ flexGrow: r.pct || 0.0001, background: MIX_COLORS[i % MIX_COLORS.length] }}
+                  />
+                ))}
+              </div>
+              <ul className="an-langmix__rows">
+                {langRows.map((r, i) => (
+                  <li key={r.code} className="an-langmix__row">
+                    <span className="an-langmix__dot" style={{ background: MIX_COLORS[i % MIX_COLORS.length] }} />
+                    <label htmlFor={`lm-${r.code}`} className="an-langmix__name">{languageName(r.code)}</label>
+                    <input
+                      id={`lm-${r.code}`}
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={r.pct}
+                      onChange={(e) => setRowPct(r.code, Number(e.target.value))}
+                      style={{ '--p': `${r.pct}%` }}
+                    />
+                    <span className="an-num an-langmix__pct">
+                      {langTotal ? Math.round((r.pct / langTotal) * 100) : 0}%
+                    </span>
+                    <button
+                      type="button"
+                      className="an-langmix__remove"
+                      aria-label={`Remove ${languageName(r.code)}`}
+                      onClick={() => removeRow(r.code)}
+                      disabled={langRows.length <= 1}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="an-langmix__foot">
+                {langRows.length < MAX_LANGS && addOptions.length > 0 && (
+                  <select
+                    className="an-langmix__add"
+                    value=""
+                    onChange={(e) => addRow(e.target.value)}
+                    aria-label="Add a language"
+                  >
+                    <option value="">+ Add language</option>
+                    {addOptions.map((c) => (
+                      <option key={c} value={c}>{languageName(c)}</option>
+                    ))}
+                  </select>
+                )}
+                {langTotal !== 100 && langTotal > 0 && (
+                  <button type="button" className="an-btn an-btn--sm" onClick={balance}>Make it 100%</button>
+                )}
+              </div>
+              <p className="an-muted">
+                Percentages show each language&apos;s final share. Languages not listed only fill in when a listed one runs short of good picks.
+              </p>
+            </>
+          )}
+        </article>
+
+        <article className="an-panel">
+          <h3 className="an-subhead">Rewatch picks</h3>
+          <p className="an-affects">Changes: For You and More like this</p>
+          <div className="an-slider an-slider--wide">
+            <label htmlFor="an-rewatch">
+              Up to <b className="an-num">{perTwenty}</b> of every 20 picks can be titles you&apos;ve already watched
+            </label>
+            <input
+              id="an-rewatch"
+              type="range"
+              min="0"
+              max={MAX_REWATCH}
+              step="0.05"
+              value={rewatch}
+              onChange={(e) => { setMessage(null); setRewatch(Number(e.target.value)) }}
+              style={{ '--p': `${(rewatch / MAX_REWATCH) * 100}%` }}
+            />
+          </div>
+          <p className="an-muted">
+            {similarActive
+              ? `More like this can bring back great titles you've seen (you've watched ${watchedCount}).`
+              : `More like this starts doing this at ${rewatchMin} watched titles (you're at ${watchedCount}). For You uses it now.`}
+          </p>
         </article>
       </div>
 

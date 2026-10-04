@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { searchService } from '../services/searchService'
@@ -326,7 +326,7 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
                   {results.map((item, i) => {
                     const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE}/w92${item.poster_path}` : null
                     return (
-                      <StaggerItem key={item.id} index={i}>
+                      <StaggerItem key={`${item.media_type}-${item.id}`} index={i}>
                         <Link 
                           to={item.media_type === 'person' ? `/person/${item.id}` : item.media_type === 'tv' ? `/tv/${item.id}` : `/movies/${item.id}`}
                           state={{ movie: item }}
@@ -347,7 +347,9 @@ export default function SearchOverlay({ isOpen, setIsOpen }) {
                             <div className="search-result-title">{item.title || item.name}</div>
                             {(item.release_year || item.media_type) && (
                               <div className="search-result-meta">
-                                {[item.release_year, item.media_type === 'tv' ? 'TV Show' : item.media_type === 'movie' ? 'Movie' : item.media_type === 'person' ? 'Person' : item.media_type].filter(Boolean).join(' • ')}
+                                {item.media_type === 'person'
+                                  ? [item.known_for_department || 'Person', (item.known_for || []).slice(0, 2).join(', ')].filter(Boolean).join(' • ')
+                                  : [item.release_year, item.media_type === 'tv' ? 'TV Show' : item.media_type === 'movie' ? 'Movie' : item.media_type].filter(Boolean).join(' • ')}
                               </div>
                             )}
                           </div>

@@ -8,7 +8,7 @@
  *   seedMediaType {string} 'movie' | 'tv'
  *   seedTitle     {string} title for display only
  */
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { aiRecsService } from '../services/aiRecsService'
@@ -17,7 +17,7 @@ import FeedbackControl from './FeedbackControl'
 import ShinyText from './ShinyText'
 import BorderGlow from './BorderGlow'
 import { BsStars } from 'react-icons/bs'
-import { FiRefreshCw, FiAlertTriangle, FiFilm } from 'react-icons/fi'
+import { FiRefreshCw, FiAlertTriangle } from 'react-icons/fi'
 import './AIRecommendations.css'
 import './MovieCard.css'
 import './MovieRow.css'
@@ -133,7 +133,7 @@ function AIRecCard({ item, memoryMap, onThumb, onDismiss, isExiting = false }) {
               />
             </div>
             {item.reason && (
-              <p className="movie-card__meta" style={{ marginTop: '4px', fontStyle: 'italic', color: '#94a3b8', fontSize: '0.65rem', whiteSpace: 'normal', lineHeight: 1.2 }}>
+              <p className="ai-rec-card__why" title={item.reason}>
                 {item.reason}
               </p>
             )}
@@ -149,6 +149,11 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
   const { isLoggedIn } = useAuth()
 
   const [uiState,      setUiState]      = useState(STATE.IDLE)
+  // Refine controls start open on desktop, collapsed on phones (they would
+  // otherwise push the results off screen).
+  const [refineOpen,   setRefineOpen]   = useState(
+    () => typeof window === 'undefined' || !window.matchMedia('(max-width: 768px)').matches,
+  )
   const [results,      setResults]      = useState([])
   // Hide-and-replace on a thumbs-down. Gemini returns a short list, so there is
   // no buffer to slide in from — the row simply closes the gap.
@@ -269,7 +274,6 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
 
   // More-like chip toggle
   const toggleMoreLike = useCallback((item) => {
-    const key = `${item.title}:${item.release_date?.slice(0,4)}`
     setMoreLike(prev => {
       const exists = prev.find(m => m.title === item.title)
       if (exists) return prev.filter(m => m.title !== item.title)
@@ -302,69 +306,67 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
   const isIdle      = uiState === STATE.IDLE
 
   return (
-    <section className="ai-recs" aria-label="AI Recommendations">
+    <section className={`ai-recs ai-recs--${uiState.toLowerCase()}`} aria-label="AI Recommendations">
       {/* ── Header ── */}
-      <div className="section-header" style={{ flexWrap: 'wrap', marginBottom: '1rem', border: 'none', padding: 0 }}>
-        <div className="section-header-left">
-          <h2 style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', marginRight: '8px' }}>
-              <BsStars />
-            </span>
-            <ShinyText text="AI Recommendations" />
-          </h2>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }}>
-          <span className="ai-recs__gemini-badge">
-            <ShinyText
-              text="Powered by Gemini"
-              speed={3}
-              color="#c4b5fd"
-              shineColor="#ede9fe"
-              spread={100}
-            />
-          </span>
+      <header className="ai-recs__head">
+        <h2 className="ai-recs__heading">
+          <span className="ai-recs__heading-icon" aria-hidden><BsStars /></span>
+          <ShinyText text="AI Recommendations" />
+        </h2>
+        <div className="ai-recs__meta">
+          <span className="ai-recs__gemini-badge">Gemini</span>
           {isLoaded && metadata?.personalized && (
             <span className="ai-recs__personalized-pill">
-              <BsStars style={{ marginRight: '4px' }} /> Personalized
+              <BsStars aria-hidden /> Personalized for you
             </span>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* ── IDLE ── */}
+      {/* ── IDLE: one prompt, one action ── */}
       {isIdle && (
-        <div className="ai-recs__idle">
-          <div className="ai-recs__idle-icon"><BsStars /></div>
-          <p className="ai-recs__idle-text">
-            Discover hidden gems and unexpected picks similar to <strong>{seedTitle}</strong> — curated by Gemini AI.
-          </p>
+        <div className="ai-recs__prompt">
+          <div className="ai-recs__prompt-copy">
+            <p className="ai-recs__prompt-title">
+              Find titles like <strong>{seedTitle}</strong>
+            </p>
+            <p className="ai-recs__prompt-sub">
+              Gemini looks past the obvious sequels and picks hidden gems with the same feel.
+            </p>
+          </div>
           <button
             id="ai-recs-cta-btn"
+            type="button"
             className="ai-recs__cta-btn"
             onClick={handleGetRecs}
           >
-            <BsStars style={{ marginRight: '6px' }} /> Get AI Recommendations
+            <BsStars aria-hidden /> Get AI picks
           </button>
         </div>
       )}
 
-      {/* ── LOADING ── */}
+      {/* ── LOADING: poster-shaped placeholders, not a spinner ── */}
       {isLoading && (
-        <div className="ai-recs__loading">
-          <div className="ai-recs__spinner-ring" />
-          <p className="ai-recs__loading-text"><BsStars style={{ marginRight: '6px', verticalAlign: 'middle', marginTop: '-2px' }} /> AI finding similar content...</p>
+        <div className="ai-recs__loading" role="status">
+          <p className="ai-recs__loading-text">
+            <span className="ai-recs__pulse-dot" aria-hidden /> Finding titles like {seedTitle}…
+          </p>
+          <div className="ai-recs__ghost-row" aria-hidden>
+            {Array.from({ length: 7 }, (_, i) => (
+              <span key={i} className="ai-recs__ghost" style={{ animationDelay: `${i * 90}ms` }} />
+            ))}
+          </div>
         </div>
       )}
 
       {/* ── ERROR ── */}
       {isError && (
-        <div className="ai-recs__error">
+        <div className="ai-recs__error" role="alert">
           <p className="ai-recs__error-msg">
-            <FiAlertTriangle style={{ marginRight: '6px', verticalAlign: 'middle', marginTop: '-2px' }} /> 
-            {errorMessage}
+            <FiAlertTriangle aria-hidden /> {errorMessage}
           </p>
-          <button className="ai-recs__retry-btn" onClick={handleGetRecs}>
-            <FiRefreshCw style={{ marginRight: '6px' }} /> Retry
+          <button type="button" className="ai-recs__retry-btn" onClick={handleGetRecs}>
+            <FiRefreshCw aria-hidden /> Try again
           </button>
         </div>
       )}
@@ -372,36 +374,24 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
       {/* ── LOADED / RERUNNING ── */}
       {(isLoaded || isRerunning) && (
         <>
-          {/* Stats bar */}
           {metadata && (
             <div className="ai-recs__stats">
-              <span>{metadata.resolved} results</span>
-              {metadata.dropped > 0 && (
-                <>
-                  <span className="ai-recs__stats-dot" />
-                  <span>{metadata.dropped} unresolved</span>
-                </>
-              )}
-              {rerunCount > 0 && (
-                <>
-                  <span className="ai-recs__stats-dot" />
-                  <span>Re-run #{rerunCount}</span>
-                </>
-              )}
+              <span className="ai-recs__stat">{metadata.resolved} picks</span>
+              {metadata.dropped > 0 && <span className="ai-recs__stat">{metadata.dropped} not found</span>}
+              {rerunCount > 0 && <span className="ai-recs__stat">Refined {rerunCount}×</span>}
             </div>
           )}
 
-          {/* Scroll row */}
-          <div className="scroll-row-container" style={{ position: 'relative' }}>
+          <div className="scroll-row-container ai-recs__row-wrap">
             {isRerunning && (
-              <div className="ai-recs__rerun-overlay">
+              <div className="ai-recs__rerun-overlay" role="status">
                 <div className="ai-recs__spinner-ring" />
-                <p className="ai-recs__rerun-overlay-text">Finding new picks...</p>
+                <p className="ai-recs__rerun-overlay-text">Finding new picks…</p>
               </div>
             )}
             <div
               ref={scrollRef}
-              className={`scroll-row${isRerunning ? ' ai-recs__scroll-row--rerunning' : ''}`}
+              className={`scroll-row ai-recs__row${isRerunning ? ' ai-recs__scroll-row--rerunning' : ''}`}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -420,55 +410,75 @@ export default function AIRecommendations({ seedTmdbId, seedMediaType, seedTitle
             </div>
           </div>
 
-          {/* ── Re-run Controls ── */}
-          <div className="ai-recs__controls">
-            <p className="ai-recs__controls-label">Not happy with results? Refine:</p>
-
-            {/* Genre filter */}
-            <div className="ai-recs__control-group">
-              <span className="ai-recs__control-title">Focus genre</span>
-              <select
-                id="ai-recs-genre-select"
-                className="ai-recs__select"
-                value={focusGenre}
-                onChange={(e) => setFocusGenre(e.target.value)}
-              >
-                <option value="">Any</option>
-                {TMDB_GENRES.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* More like — chip multi-select from current results */}
-            <div className="ai-recs__control-group">
-              <span className="ai-recs__control-title">More like</span>
-              <div className="ai-recs__more-like-list" role="group" aria-label="More like selections">
-                {results.slice(0, 12).map((item) => {
-                  const selected = moreLike.some(m => m.title === item.title)
-                  return (
-                    <button
-                      key={`${item.tmdb_id}:${item.media_type}`}
-                      className={`ai-recs__more-like-chip${selected ? ' ai-recs__more-like-chip--selected' : ''}`}
-                      onClick={() => toggleMoreLike(item)}
-                      title={item.title}
-                    >
-                      {selected ? '✓ ' : ''}{item.title}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Rerun button */}
+          {/* ── Refine (collapsible; closed by default on phones) ── */}
+          <div className={`ai-recs__refine${refineOpen ? ' is-open' : ''}`}>
             <button
-              id="ai-recs-rerun-btn"
-              className="ai-recs__rerun-btn"
-              onClick={handleRerun}
-              disabled={isRerunning}
+              type="button"
+              className="ai-recs__refine-toggle"
+              aria-expanded={refineOpen}
+              aria-controls="ai-recs-controls"
+              onClick={() => setRefineOpen((o) => !o)}
             >
-              <FiRefreshCw style={{ marginRight: '6px' }} /> Re-run AI
+              <span>Refine these picks</span>
+              {(focusGenre || moreLike.length > 0) && (
+                <span className="ai-recs__refine-count">
+                  {(focusGenre ? 1 : 0) + moreLike.length}
+                </span>
+              )}
+              <svg className="ai-recs__refine-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
             </button>
+
+            {refineOpen && (
+              <div className="ai-recs__controls" id="ai-recs-controls">
+                <div className="ai-recs__control-group ai-recs__control-group--genre">
+                  <label className="ai-recs__control-title" htmlFor="ai-recs-genre-select">Focus on a genre</label>
+                  <select
+                    id="ai-recs-genre-select"
+                    className="ai-recs__select"
+                    value={focusGenre}
+                    onChange={(e) => setFocusGenre(e.target.value)}
+                  >
+                    <option value="">Any genre</option>
+                    {TMDB_GENRES.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="ai-recs__control-group ai-recs__control-group--more">
+                  <span className="ai-recs__control-title" id="ai-recs-more-label">More like these picks</span>
+                  <div className="ai-recs__more-like-list" role="group" aria-labelledby="ai-recs-more-label">
+                    {results.slice(0, 12).map((item) => {
+                      const selected = moreLike.some(m => m.title === item.title)
+                      return (
+                        <button
+                          key={`${item.tmdb_id}:${item.media_type}`}
+                          type="button"
+                          className={`ai-recs__more-like-chip${selected ? ' ai-recs__more-like-chip--selected' : ''}`}
+                          aria-pressed={selected}
+                          onClick={() => toggleMoreLike(item)}
+                          title={item.title}
+                        >
+                          {item.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  id="ai-recs-rerun-btn"
+                  type="button"
+                  className="ai-recs__rerun-btn"
+                  onClick={handleRerun}
+                  disabled={isRerunning}
+                >
+                  <FiRefreshCw aria-hidden /> Get new picks
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

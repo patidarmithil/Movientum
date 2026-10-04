@@ -221,6 +221,11 @@
   border-radius: 2px;
 }
 
+/* ── Result list (SearchOverlay-style rows, see SearchResultRow.css) ─────── */
+.acm-results-list {
+  padding: 0.25rem 1rem 1.25rem;
+}
+
 /* ── Result card ──────────────────────────────────────────────────────────── */
 .acm-card {
   flex-shrink: 0;

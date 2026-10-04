@@ -1,52 +1,38 @@
-# Storage Estimation & Capacity Planning
+# Storage Estimation
 
-## Overview & Architecture
+Movientum fits inside free tiers by keeping each store small. Figures below are rough estimates, useful for spotting what grows.
 
-Movientum's storage footprint is divided between persistent relational data (Supabase PostgreSQL) and ephemeral/in-memory data (Upstash Redis + API Server RAM). The system is designed to minimize storage costs by heavily relying on `ARRAY` and `JSONB` data types rather than deeply nested relational tables for ML features.
+## PostgreSQL (Supabase)
 
----
+| Table | Size per row | Growth | Notes |
+|---|---|---|---|
+| `content_catalog` | ~2 KB | ~20K seed + titles people open | Features stored as arrays/JSONB, not join tables |
+| `movies` | ~1–2 KB | Grows with browsing | Unused, unpopular rows older than 30 days are deleted at startup |
+| `user_taste_profiles` | ~1–3 KB | One per user | Seven JSONB weight maps |
+| `interaction_log` | ~300 B | Every thumbs/click/watch | Largest growing table. Training only reads the last 30 days |
+| `tier_lists` | a few KB | Per saved board | Whole board in JSONB; capped at 12 rows / 300 items and a per-user limit |
+| `rec_suppression` | ~100 B | Per dismissed title | Expires after 90 days |
 
-## Logics & Business Rules
+**News is never written to PostgreSQL.** That is the single biggest saving.
 
-### PostgreSQL Storage (Supabase)
-Instead of traditional junction tables for every keyword or cast member (which causes index bloat), the `content_catalog` table stores features as `ARRAY(Integer)`.
-- **`ContentCatalog`**: ~20,000 seed items. With JSONB/ARRAY columns, each row is approx. 2KB. Total catalog footprint is `< 50MB`.
-- **`UserTasteProfile`**: Stores 6 JSONB dictionaries per user. Clamped to top-20 keys for cast/crew/keywords to prevent unbounded growth. ~1KB per user.
-- **`InteractionLog`**: The heaviest table. Each row stores a 16-dimensional `feature_snapshot` (~300 bytes). For 1000 DAU doing 20 interactions/day = 20,000 rows/day = ~6MB/day.
+## Redis (Upstash)
 
-### Redis Storage (Upstash)
-Upstash charges by request volume and total storage.
-- **Cache eviction** is strictly enforced via TTLs (ranging from 2 minutes for taste profiles to 24 hours for catalog features).
-- **Average Payload**: The `movie:list:{hash}` JSON payloads are usually under 15KB.
+| Data | Size | Lifetime |
+|---|---|---|
+| News snapshot | ~500 articles plus indexes | Until the next News Daily Fetch replaces it |
+| Page bundles, title details, credits | 5–50 KB each | 30 min to 7 days |
+| Recommendation pools | ~100 items per user per block | 15 min |
+| Trailer indexes | Per region | Refreshed every 3 h, entries pruned after 30 days |
+| Token blacklist | Tiny | Until the token would have expired anyway |
 
-### In-Memory RAM (FastAPI Graph)
-The `nx.Graph` singleton loaded on application startup consumes process RAM.
-- **Nodes**: ~20,000 (movies) + ~15,000 (actors) + ~5,000 (keywords) = ~40,000 nodes.
-- **Edges**: ~300,000 edges.
-- **RAM footprint**: Approximately `100MB - 150MB` per FastAPI worker. Easily fits within standard 512MB memory limits of modern container hosting.
+Upstash free tier evicts keys under memory pressure. Everything in Redis must be rebuildable.
 
----
+## Server memory
 
-## Tables & Summaries
+The in-memory recommendation graph holds tens of thousands of nodes (titles plus genre, keyword, cast, crew, era, language, studio nodes) and a few hundred thousand edges — roughly 100–150 MB per process. This is why the project runs a single worker.
 
-### Estimated Database Growth (per 10,000 Users)
+## Files
 
-| Table | Est. Row Size | Est. Row Count (1Yr) | Est. Total Size | Mitigation Strategy |
-|---|---|---|---|---|
-| `users` | 500 B | 10,000 | 5 MB | None needed |
-| `content_catalog` | 2 KB | 35,000 | 70 MB | TMDB ID deduplication |
-| `user_taste_profiles`| 1 KB | 10,000 | 10 MB | Cap Top-K dictionary sizes |
-| `interaction_log` | 300 B | ~7,300,000 | 2.2 GB | Nightly cron deletes logs older than 30 days (required for XGBRanker only) |
-
----
-
-## Workflows & Lifecycles
-
-### Storage Optimization Lifecycle
-```mermaid
-flowchart TD
-    A[Nightly Celery Job] --> B[XGBRanker Retraining]
-    B --> C[Analyze interaction_log (last 30 days)]
-    C --> D[Delete interaction_log rows older than 45 days]
-    D --> E[Reclaim PostgreSQL Storage]
-```
+- Watchlist cover images go to **Supabase Storage**, re-encoded to WebP first.
+- Feedback screenshots are compressed and saved on the API server's disk under `backend/uploads/feedback`. The container disk is not permanent, so these can be lost on redeploy.
+- Tier-list uploads made by guests stay in the browser (IndexedDB).

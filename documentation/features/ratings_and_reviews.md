@@ -1,72 +1,41 @@
-# Ratings System
+# Ratings
 
-## Overview & Architecture
+Movientum does not use stars. A user picks one of **four words** that describe how the title felt. There are no text reviews.
 
-Movientum rejects the traditional 5-star or 10-point rating scale. Instead, it utilizes a proprietary, 4-category categorical rating system designed to capture the user's *emotional intent* and *viewing context* rather than an arbitrary numerical score. 
+| Category | Meaning |
+|---|---|
+| `skip` | Not worth your time |
+| `timepass` | Fine to have on, nothing special |
+| `go_for_it` | Good, recommend it |
+| `perfection` | Must-watch |
 
-The platform **does not support text reviews**.
+One rating per user per title. Rating again replaces the old one.
 
----
+## The rating meter
 
-## Logics & Business Rules
+Each title page shows how everyone voted as percentages of the four categories (`RatingMeter.jsx`). To avoid empty meters on new sites, `movie_ratings` / `tv_ratings` hold imported scores (from an external scraper) that seed the meter. User votes add on top.
 
-### The 4 Categories
-1. **`skip`** (Value 1): "I regret watching this / Do not recommend."
-2. **`timepass`** (Value 2): "It was okay to have on in the background, but nothing special."
-3. **`go_for_it`** (Value 3): "Solid movie, highly recommend for a movie night."
-4. **`perfection`** (Value 4): "Absolute masterpiece, must-watch."
+## What happens when you rate
 
-### ML Impact
-These categorical ratings serve as the strongest explicit signals for the Recommendation Engine. 
-- A `perfection` rating aggressively updates the `UserTasteProfile` JSONB vectors (Genre, Cast, Crew), heavily boosting those traits.
-- A `skip` rating applies a negative weight penalty, teaching the XGBoost model to avoid similar content.
+1. `POST /api/v1/ratings` → `rating_service.upsert_rating`.
+2. If the title is not in `movies` yet, a small stub row is inserted first (the rating needs something to point at).
+3. The rating row is inserted or updated; the aggregate meter is nudged.
+4. Caches are busted: the title's distribution (`rating:dist:...`, shared by everyone), the user's ratings list, dashboard bundle, and the user's recommendation pools.
 
----
+## Ratings and recommendations
 
-## Code Structure & Detailed Logic
+Ratings are **not** sent through the thumbs feedback path, so they do not directly change `user_taste_profiles` weights. They still affect recommendations:
+- Titles the user rated low are excluded from their feeds.
+- Rated titles count as "interacted" for news personalisation and analysis.
 
-### Database Implementation (`orm_models.py`)
-Ratings are stored in the `ratings` table. The `rating` column is constrained to `INTEGER` values 1 through 4. A unique constraint ensures a user can only have one active rating per movie (upsert behavior).
+Taste weights move from thumbs, watch history and watchlist actions instead (see `../ml_and_recommendations/recommendation_engine_overview.md`).
 
-```python
-class Rating(Base):
-    __tablename__ = "ratings"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    movie_id = Column(Integer, ForeignKey("movies.id"))
-    rating = Column(Integer, nullable=False) # 1=skip, 2=timepass, 3=go_for_it, 4=perfection
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-```
+## Endpoints
 
-### Routing (`ratings.py`)
-- `POST /api/v1/ratings`: Upserts a user's rating for a specific `movie_id`.
-- `DELETE /api/v1/ratings`: Removes a rating.
-- `GET /api/v1/ratings/me`: Fetches all ratings for the authenticated user, primarily used to populate the Dashboard.
-
----
-
-## Tables & Summaries
-
-### ML Signal Weights
-
-| Rating Category | Integer | Taste Profile Impact |
+| Method | Path | Purpose |
 |---|---|---|
-| `perfection` | 4 | Huge Positive (+3.0) |
-| `go_for_it` | 3 | High Positive (+1.5) |
-| `timepass` | 2 | Mild Positive (+0.5) |
-| `skip` | 1 | High Negative (-2.0) |
-
----
-
-## Workflows & Lifecycles
-
-### Rating Submission Flow
-```mermaid
-flowchart TD
-    A[User clicks 'Perfection'] --> B[POST /api/v1/ratings]
-    B --> C[Upsert row in 'ratings' table]
-    C --> D[Trigger /api/v1/rec-feedback logic]
-    D --> E[Update UserTasteProfile weights]
-    E --> F[Invalidate Redis user:ratings:{uid}]
-    F --> G[Return 200 OK]
-```
+| POST | `/api/v1/ratings` | Rate or re-rate |
+| GET | `/api/v1/ratings/me` | Your ratings (cached 48 h, busted on write) |
+| GET | `/api/v1/ratings/distribution/{type}/{id}` | Meter data (cached 7 d, busted when anyone rates) |
+| PUT / DELETE | `/api/v1/ratings/{id}` | Change or remove |
+| POST | `/api/v1/ratings/needed` | Ask for a title to get a meter score |

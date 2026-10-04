@@ -168,11 +168,26 @@
 }
 
 /* ── Tabs ── */
+.dashboard__tabs-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-6);
+}
+
 .dashboard__tabs {
   display: flex;
   gap: var(--space-1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: var(--space-8);
+  min-width: 0;
+}
+
+.dashboard__import {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
 }
 
 .dashboard__tab {
@@ -323,12 +338,53 @@
     border-left: none;
     padding-left: 0;
   }
-  .dashboard__tabs {
-    overflow-x: auto;
-    scrollbar-width: none;
+  /* Phones: tabs become a 2×2 segmented control (all four visible, no hidden
+     sideways scroll), with Import List as a compact action underneath. */
+  .dashboard__tabs-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    border-bottom: none;
+    margin-bottom: var(--space-5);
   }
-  .dashboard__tabs::-webkit-scrollbar {
-    display: none;
+  .dashboard__tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .dashboard__tab {
+    justify-content: center;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 8px;
+    margin-bottom: 0;
+    border-bottom: none;
+    border-radius: 11px;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dashboard__tab .nav-icon-svg {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    margin-right: 0 !important;
+  }
+  .dashboard__tab:active { transform: scale(0.97); }
+  .dashboard__tab--active {
+    color: #00D4FF;
+    background: rgba(0, 212, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.35);
+  }
+  .dashboard__import {
+    align-self: flex-end;
+    min-height: 36px;
+    font-size: 13px;
   }
   .watchlist-grid {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

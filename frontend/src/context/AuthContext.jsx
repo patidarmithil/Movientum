@@ -39,11 +39,34 @@ function releaseRefreshLock() {
   try { localStorage.removeItem(REFRESH_LOCK_KEY) } catch { /* ignore */ }
 }
 
+// Read once, synchronously, before the first render. Restoring in an effect
+// left the first commit "logged out": child effects (Home, Navbar, news strip)
+// run before the provider's, so they fetched as a guest and then again as the
+// user once the effect flipped the state.
+function readInitialSession() {
+  const access  = storage.getItem(KEYS.access)
+  const refresh = storage.getItem(KEYS.refresh)
+  const hasTokens = !!(access && refresh)
+  let user = null
+  if (hasTokens) {
+    try { user = JSON.parse(storage.getItem(KEYS.user) || 'null') } catch { user = null }
+  }
+  return {
+    access: hasTokens ? access : null,
+    user,
+    isLoggedIn: hasTokens,
+    // Only a device-session login still has to resolve before the UI knows
+    // whether this visitor is signed in.
+    isLoading: !hasTokens && !!getDeviceId(),
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser]               = useState(null)
-  const [accessToken, setAccessToken] = useState(null)
-  const [isLoggedIn, setIsLoggedIn]   = useState(false)
-  const [isLoading, setIsLoading]     = useState(true)   // true until session resolved
+  const [initial]                     = useState(readInitialSession)
+  const [user, setUser]               = useState(initial.user)
+  const [accessToken, setAccessToken] = useState(initial.access)
+  const [isLoggedIn, setIsLoggedIn]   = useState(initial.isLoggedIn)
+  const [isLoading, setIsLoading]     = useState(initial.isLoading)   // true until session resolved
 
   // Expose a ref so api.js interceptor can call refreshToken without circular import
   const refreshingRef = useRef(false)
@@ -83,8 +106,11 @@ export function AuthProvider({ children }) {
           try {
             const data = await authService.deviceLogin(deviceId)
             persist(data.access_token, data.refresh_token, data.user)
-            // Renew device session TTL on backend
-            await authService.createDeviceSession(deviceId).catch(() => {})
+            // persist() does not clear the loading flag; returning without
+            // this left "/" and every protected route rendering nothing.
+            setIsLoading(false)
+            // Renew device session TTL on backend (best-effort, not awaited)
+            authService.createDeviceSession(deviceId).catch(() => {})
             return
           } catch {
             // Device session expired — user must re-login
@@ -223,8 +249,9 @@ export function AuthProvider({ children }) {
       const storedRefresh = storage.getItem(KEYS.refresh)
       if (!storedRefresh) throw new Error('No refresh token')
       const data = await authService.refreshToken(storedRefresh)
-      const storedUser = storage.getItem(KEYS.user)
-      persist(data.access_token, data.refresh_token, data.user ?? JSON.parse(storedUser))
+      let storedUser = null
+      try { storedUser = JSON.parse(storage.getItem(KEYS.user) || 'null') } catch { storedUser = null }
+      persist(data.access_token, data.refresh_token, data.user ?? storedUser)
       return data.access_token
     } catch {
       clearSession()

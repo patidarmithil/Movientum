@@ -19,7 +19,9 @@ export default function Login() {
   const { login, googleLogin, isLoggedIn, isLoading } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
+  // '/' only redirects a signed-in user on to '/home'; going there directly
+  // saves a route hop right after login.
+  const redirect = searchParams.get('redirect') || '/home'
 
   const [email, setEmail]         = useState('')
   const [password, setPassword]   = useState('')
@@ -67,7 +69,8 @@ export default function Login() {
         setIsForgotPassword(false)
       } else {
         await login(email, password, rememberMe)
-        navigate(redirect, { replace: true })
+        // The "already logged in" effect above navigates once isLoggedIn flips;
+        // navigating here too pushed the same redirect twice.
       }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || 'An error occurred. Please try again.'

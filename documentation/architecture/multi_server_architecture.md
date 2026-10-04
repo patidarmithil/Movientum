@@ -1,71 +1,46 @@
-# Multi-Server & Deployment Architecture
+# Deployment and Servers
 
-## Overview & Architecture
+Movientum is spread over several free-tier hosts. Each one does one job.
 
-Movientum's infrastructure is decoupled across multiple specialized hosting environments to optimize for cost, performance, and workload type. 
-
-- **Frontend**: Edge-deployed via Vercel (or similar CDN).
-- **Backend / Workers**: Containerized environments (Docker) suitable for Azure Container Apps, Render, or Railway.
-- **Data & Cache**: Managed external services (Supabase, Upstash) to offload stateful operational burden.
-
----
-
-## Logics & Business Rules
-
-### Separation of Compute
-The API server and the background task processors (Celery) are built from the exact same Docker image (simplifying CI/CD). However, they are deployed as separate services scaling independently.
-- The **FastAPI Backend** scales based on incoming HTTP request volume.
-- The **Celery Worker** scales based on queue depth (e.g., massive backlogs of TMDB catalog ingestions).
-- The **Celery Beat** scheduler is strictly deployed as a singleton (1 instance only) to prevent duplicate cron jobs (like the nightly retrain).
-
----
-
-## Code Structure & Detailed Logic
-
-### Deployment Configuration (`docker-compose.yml` baseline)
-The local `docker-compose.yml` perfectly mirrors the production container topology:
-```yaml
-services:
-  backend:
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-  celery_worker:
-    command: celery -A app.celery_app worker --loglevel=info
-  celery_beat:
-    command: celery -A app.celery_app beat --loglevel=info
-```
-
-### Routing & CORS
-The frontend connects to the backend via a single API gateway URL. The backend strictly enforces CORS to allow only trusted origins (`app.config.Settings.allowed_origins`).
-
----
-
-## Tables & Summaries
-
-### Infrastructure Topology
-
-| Tier | Provider / Environment | Compute Type |
+| Piece | Host | Notes |
 |---|---|---|
-| **Frontend SPA** | Vercel | Global CDN / Edge Nodes |
-| **API Server** | Azure / Render (Docker) | Stateless Web Containers |
-| **Celery Workers**| Azure / Render (Docker) | Background Worker Containers |
-| **PostgreSQL DB** | Supabase | Managed Database (with pgvector/JSONB) |
-| **Redis Cache** | Upstash | Serverless Redis (TLS required) |
-| **Telemetry** | Azure Monitor | Application Insights Agent |
+| Website | Vercel | Static files on a CDN. `vercel.json` sends every path to the SPA and proxies Umami analytics under `/st/*` so ad blockers do not drop it |
+| Main API | Azure App Service (Docker) | `https://movientum.azurewebsites.net`. Sleeps when idle; waking takes 15–30 s |
+| Backup API | Render (Docker) | Same image. The frontend switches to it when the main API fails |
+| Database | Supabase PostgreSQL | |
+| Cache, token blacklist, news, Celery broker | Upstash Redis | TLS required. Free tier may evict keys under memory pressure |
+| Monitoring | Azure App Insights (+ Grafana dashboards) | OpenTelemetry traces and metrics |
 
----
+## How failover works
 
-## Workflows & Lifecycles
-
-### Multi-Tier Request Flow
 ```mermaid
-flowchart TD
-    A[User Browser] -->|Static Assets| B[Vercel CDN]
-    A -->|API Calls (HTTPS)| C[Load Balancer]
-    C --> D[FastAPI Container 1]
-    C --> E[FastAPI Container 2]
-    D <--> F[(Upstash Redis)]
-    D <--> G[(Supabase PostgreSQL)]
-    D -->|Dispatch Task| F
-    H[Celery Worker Container] <-->|Consume Task| F
-    H <--> G
+flowchart LR
+    U[Browser] --> P{Main API ok?}
+    P -- yes --> A[Azure]
+    P -- network / 5xx --> S[Render backup]
+    S -- also fails --> T[Show 'still browsable' toast]
 ```
+
+The logic lives in `frontend/src/utils/api.js`. Token refresh also tries the backup.
+
+## Same image, three roles
+
+One Docker image can run as:
+- **API**: `uvicorn app.main:app`
+- **Celery worker**: runs queued jobs
+- **Celery beat**: the scheduler. Must run as a single instance, or scheduled jobs run twice.
+
+On the free hosts, beat is not always running reliably, so the **admin panel's manual triggers** (`/internal/trigger/{task}`, run in-process) are the main way jobs actually run.
+
+## Why not scale up
+
+The owner cannot pay for bigger plans or "Always On". So the project never adds workers, larger instances, keep-alive pings or recurring warm-up jobs. Speed must come from code: caching, gzip, page bundles, background tasks, smaller payloads. Cold starts and Upstash eviction are accepted limits.
+
+## Building and pushing the image
+
+```bash
+docker build --build-arg CODE_VERSION=%RANDOM% -t patidarmithil/movientum-backend:latest .
+docker push patidarmithil/movientum-backend:latest
+```
+
+`CODE_VERSION` changes every build so Docker re-copies the code even when dependencies did not change.

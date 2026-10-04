@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { movieService } from '../services/movieService'
 import './MostInterested.css'
 import ScrollReveal from '../components/ScrollReveal'
@@ -35,6 +36,7 @@ export default function MostInterested() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const isMobile = useMediaQuery('(max-width: 768px)')
 
   useEffect(() => {
     let isMounted = true
@@ -128,32 +130,54 @@ export default function MostInterested() {
             <ScrollReveal>
               <div className="mi-header-content">
                 <h1><ShinyText text="Most Interested" /></h1>
-                <div className="mi-mobile-filters">
-                  <select
-                    value={activeFilter}
-                    onChange={(e) => setActiveFilter(e.target.value)}
-                    className="mi-mobile-select"
-                  >
-                    {FILTERS.map((f) => (
-                      <option key={f.id} value={f.id}>{f.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={activeCountry}
-                    onChange={(e) => setActiveCountry(e.target.value)}
-                    className="mi-mobile-select"
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
             </ScrollReveal>
           </header>
 
+          {/* Phones: sticky filter bar — timeframe chips + country picker. Kept
+              outside ScrollReveal, whose transform would break position: sticky. */}
+          <div className="mi-mobile-filters">
+            <div className="mi-chips" role="group" aria-label="Timeframe">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`mi-chip${activeFilter === f.id ? ' is-on' : ''}`}
+                  aria-pressed={activeFilter === f.id}
+                  onClick={() => setActiveFilter(f.id)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <select
+              value={activeCountry}
+              onChange={(e) => setActiveCountry(e.target.value)}
+              className="mi-mobile-select"
+              aria-label="Country"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
           {loading ? (
-            <div className="mi-loading">Loading...</div>
+            isMobile ? (
+              <ul className="mi-skel" aria-label="Loading">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <li key={i} className="mi-skel__row">
+                    <span className="mi-skel__poster" />
+                    <span className="mi-skel__lines">
+                      <span className="mi-skel__line" />
+                      <span className="mi-skel__line mi-skel__line--short" />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mi-loading">Loading...</div>
+            )
           ) : items.length === 0 ? (
             <div className="mi-empty">No content found for this selection.</div>
           ) : (
@@ -186,6 +210,9 @@ export default function MostInterested() {
                       <div className="mi-rank">{index + 1}</div>
                       
                       <div className="mi-poster-wrap">
+                        <span className={`mi-rank-badge${index < 3 ? ' mi-rank-badge--top' : ''}`} aria-hidden>
+                          {index + 1}
+                        </span>
                         {posterUrl ? (
                           <img 
                             src={posterUrl} 
@@ -215,13 +242,13 @@ export default function MostInterested() {
                         <div className="mi-interested">
                           🔥 {interestedStr}
                         </div>
-                        <button className="mi-share" onClick={(e) => handleShare(e, item)}>
+                        <button className="mi-share" onClick={(e) => handleShare(e, item)} aria-label={`Share ${item.title}`}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
                             <polyline points="16 6 12 2 8 6"></polyline>
                             <line x1="12" y1="2" x2="12" y2="15"></line>
                           </svg>
-                          Share
+                          <span className="mi-share__label">Share</span>
                         </button>
                       </div>
                       

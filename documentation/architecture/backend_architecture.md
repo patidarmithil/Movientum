@@ -1,69 +1,49 @@
-# Backend Architecture (Modular Monolith)
+# Backend Architecture
 
-## Overview & Architecture
+The backend is a single FastAPI application in `backend/app/`. It is async from top to bottom (`asyncpg` for PostgreSQL, async Redis client), so one process can serve many requests while it waits on the network.
 
-Movientum's backend is a strictly defined **Modular Monolith** built on `FastAPI`. It avoids the operational overhead of microservices while maintaining clean boundary separations inside a single codebase.
+## Three layers
 
-The system relies on asynchronous I/O (`asyncio`, `asyncpg`, `aioredis`) to handle high concurrency efficiently. Background processing and heavy ML tasks are offloaded to **Celery**.
+Every feature follows the same path:
 
----
-
-## Logics & Business Rules
-
-### Why a Modular Monolith?
-- **Shared Data Models**: Allows the ML ingestion loop and the FastAPI routers to seamlessly share `SQLAlchemy` ORM models without complex gRPC serialization.
-- **Simpler Deployments**: A single Docker container (or cluster of identical containers) scales the entire API tier horizontally behind a load balancer.
-- **Graph Cache Locality**: The `nx.Graph` singleton for recommendation engine traversal requires in-memory RAM. Distributing this across microservices would incur massive network latency or require complex RedisGraph setups. A monolith keeps the graph in the API server's RAM.
-
----
-
-## Code Structure & Detailed Logic
-
-### Directory Organization (`backend/app/`)
-- `routers/`: Contains all FastAPI endpoint definitions, split by feature (e.g., `movies.py`, `recommendations.py`, `users.py`).
-- `services/`: Contains all core business logic, isolating routers from database queries. (e.g., `tmdb_service.py`, `feedback_service.py`, `advanced_recs.py`).
-- `db/`: Handles connection pooling (`database.py`), schema definitions (`orm_models.py`), and Redis connection/keys (`cache.py`).
-- `ml/`: Contains XGBRanker inference wrappers (`ranker.py`) and Celery training loops (`training.py`).
-- `main.py`: The application entry point. Initializes routes, CORS, and the OpenTelemetry exporter.
-
-### Dependency Injection Pattern
-FastAPI's `Depends` is used heavily to inject database sessions and current user state into routers, ensuring that components remain testable and stateless.
-```python
-@router.post("/feedback/")
-async def submit_feedback(
-    payload: FeedbackRequest,
-    db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
-):
-    await apply_feedback(db, user_id, payload.tmdb_id, payload.signal_type)
+```
+routers/  →  services/  →  repositories/ + db/orm_models.py
+ (HTTP)      (logic, cache, TMDB)     (SQL)
 ```
 
----
+- **Routers** only handle HTTP: read parameters, check auth, validate with Pydantic, return JSON. No SQL, no business rules.
+- **Services** hold the logic: caching, calling TMDB, scoring recommendations.
+- **Repositories / ORM** talk to the database.
 
-## Tables & Summaries
+Every router must be registered by hand at the bottom of `app/main.py` under `/api/v1/<name>`. A new router file does nothing until it is added there.
 
-### Core Backend Stack
-| Technology | Role |
+## Folder guide
+
+| Folder | What lives there |
 |---|---|
-| **FastAPI** | Asynchronous web framework. |
-| **SQLAlchemy 2.0** | Asynchronous ORM (`asyncpg`). |
-| **Pydantic V2** | Request validation and Settings management. |
-| **Celery** | Distributed task queue for asynchronous jobs. |
-| **NetworkX** | In-memory bipartite graph processing. |
-| **XGBoost** | Learning-to-Rank ML inference (`XGBRanker`). |
+| `routers/` | 26 endpoint files — movies, tv, search, auth, ratings, watch, watchlist, recommendations, rec-feedback, ai-recs, news, trailers, tierlist, explore, pages, users, admin, internal, contact, notifications, and more |
+| `services/` | Business logic. Big ones: `advanced_recs.py` (similar items), `recommendation_service.py` (For You feed), `feedback_service.py` (taste updates), `news_service.py`, `search_service.py`, `tmdb_service.py` |
+| `services/dna/` | Content DNA engine for basket recommendations. Mostly pure functions |
+| `ml/` | XGBRanker model (`ranker.py`), nightly training (`training.py`), saved model `ranker.json` + approval file `ranker_meta.json` |
+| `db/` | Database engine (`database.py`), table models (`orm_models.py`), Redis helpers and all cache key builders (`cache.py`) |
+| `tasks/` | Celery jobs: TMDB sync, retrain, episode check, trailers, news fetch, nightly chain |
+| `data/` | Baked static data: tier-list templates, covers, franchise lists, explore taxonomy |
+| `schemas/` | Pydantic request/response shapes |
+| `utils/` | JWT, auth dependencies, password hashing, Supabase Storage upload, persistence thresholds |
 
----
+## Rules the code follows
 
-## Workflows & Lifecycles
+- **Config** comes only from `app/config.py` (`settings`). Never call `os.getenv()` elsewhere.
+- **Auth** uses FastAPI dependencies: `get_current_user` (login required), `get_optional_user` (personalise if logged in), `require_admin` (re-checks the role in the database).
+- **Route order matters.** In `movies.py`, fixed paths like `/trending` must be declared before `/{movie_id}`, or FastAPI treats "trending" as a movie id.
+- **Slow work leaves the request.** Taste-profile updates, catalog ingestion and signal processing run in FastAPI `BackgroundTasks` after the response is sent. CPU-heavy work uses `asyncio.to_thread`.
+- **Errors** are normalised by global handlers in `main.py` to `{error, message, status_code, code}`.
+- **Responses** over 1 KB are gzip-compressed.
 
-### Request Lifecycle
-```mermaid
-flowchart LR
-    A[Client Request] --> B[FastAPI Router]
-    B --> C[Auth / DB Dependency Injection]
-    C --> D[Service Layer Logic]
-    D --> E{Cache Hit?}
-    E -->|Yes| F[Return Cached JSON]
-    E -->|No| G[Query DB / Run ML Inference]
-    G --> H[Update Cache & Return]
-```
+## Startup
+
+`main.py`'s `lifespan` checks the database and Redis, then opens the port immediately. Heavier warm-up runs in the background afterwards:
+- `CREATE TABLE IF NOT EXISTS` for `rating_needed`, `watching_tracker`, `temp_tracker`, `notifications` (these four are not managed by Alembic — change them in `main.py`).
+- Build the recommendation graph and DNA index.
+- Delete unpopular movies nobody references that are older than 30 days.
+- Open one TLS connection to TMDB so the first user does not pay for it.

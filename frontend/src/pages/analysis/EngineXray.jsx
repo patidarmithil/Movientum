@@ -154,6 +154,17 @@ export default function EngineXray({ engine }) {
             <span className="an-stage__num">5</span>
             <h3>Language mix</h3>
           </div>
+          {language.mode === 'manual' ? (
+            <p className="an-stage__text">
+              Custom mix:{' '}
+              {Object.entries(language.shares || {})
+                .sort((a, b) => b[1] - a[1])
+                .map(([code, v]) => `${languageName(code)} ${pct(v)}`)
+                .join(', ')}
+              . Set in Settings below.
+            </p>
+          ) : (
+          <>
           <div className="an-meter" role="img" aria-label={`${languageName(language.dominant_language)} is ${pct(language.dominant_fraction)} of your watching; threshold ${pct(language.threshold)}`}>
             <span className="an-meter__fill" style={{ width: pct(language.dominant_fraction) }} />
             <span className="an-meter__mark" style={{ left: pct(language.threshold) }} />
@@ -169,6 +180,8 @@ export default function EngineXray({ engine }) {
               </>
             ) : 'Watch a few titles and this shows how your feed balances languages.'}
           </p>
+          </>
+          )}
         </li>
       </ol>
 

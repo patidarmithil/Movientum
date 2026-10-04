@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import { adminService } from '../services/adminService';
 import Aurora from '../components/Aurora';
@@ -44,7 +44,6 @@ export default function AdminDashboard() {
   const [messageSending, setMessageSending] = useState(false);
 
   const [taskStatuses, setTaskStatuses] = useState({});
-  const [activeInterval, setActiveInterval] = useState(null);
 
   const TASKS = [
     { 

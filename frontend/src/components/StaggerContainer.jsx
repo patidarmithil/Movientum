@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function StaggerContainer({ children, className = '', instant = false, ...rest }) {
   const [hasIntersected, setHasIntersected] = useState(instant)

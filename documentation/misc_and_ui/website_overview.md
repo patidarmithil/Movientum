@@ -1,78 +1,47 @@
-# Website & Frontend Overview
+# Website Overview
 
-## Overview & Architecture
+A tour of every page a user can open. Routes are defined in `frontend/src/App.jsx`. Pages marked **Login** redirect to `/login` for guests (`ProtectedRoute`).
 
-Movientum's frontend is a Client-Side Rendered (CSR) Single Page Application (SPA) built with React 19 and Vite. The UI is designed to be cinematic, fluid, and highly interactive, heavily utilizing `framer-motion` (`motion/react`) for page transitions and micro-interactions. 
+## Pages
 
-All routing is handled strictly on the client-side via `react-router-dom`, connecting to the FastAPI backend asynchronously via `axios`.
-
----
-
-## Logics & Business Rules
-
-### Authentication State (Context)
-The `AuthProvider` (`src/context/AuthContext.jsx`) globally wraps the application. 
-- It maintains the `isLoggedIn` state and handles JWT storage (in `localStorage`).
-- An `api.js` Axios interceptor listens for `401 Unauthorized` responses and fires a global `mv:logout` event, which the `App.jsx` router catches to forcefully boot the user to the login page.
-
-### Protected Routes
-Components that require an active session (e.g., Dashboard, Settings, Recommendations) are wrapped in a `<ProtectedRoute>` component. If an anonymous user attempts to access them, they are redirected to `/login`.
-
----
-
-## Code Structure & Detailed Logic
-
-### Active Routes (`frontend/src/App.jsx`)
-
-| Route Path | Component | Auth Required? | Description |
+| Route | Page | Login | What the user does there |
 |---|---|---|---|
-| `/` or `/intro` | `Intro.jsx` | No | Landing page with cinematic entry. Redirects to `/home` if already logged in. |
-| `/home` | `Home.jsx` | No | Main landing page featuring trending carousels. |
-| `/movies`, `/tv` | `MovieList.jsx` | No | Generic browse lists. |
-| `/movies/:id`, `/tv/:id` | `MovieDetail.jsx`, `TVDetail.jsx` | No | Detailed entity view (credits, similar, trailers). |
-| `/person/:id` | `PersonPage.jsx` | No | Actor/Director filmography. |
-| `/company/:id`, `/country/:iso`| `CompanyPage.jsx`, `CountryPage.jsx`| No | Specialized browsing filters. |
-| `/search`, `/explore` | `Search.jsx`, `Explore.jsx` | No | Deep search and advanced filtering interfaces. |
-| `/login`, `/register` | `Login.jsx`, `Register.jsx` | No | Auth flows. |
-| `/dashboard` | `Dashboard.jsx` | **Yes** | User hub: watch history, ratings, watchlists. |
-| `/recommendations` | `Recommendations.jsx` | **Yes** | Core personalized ML feed (XGBRanker output). |
-| `/rec-content` | `RecommendationsContent.jsx`| No | "Find Similar" tool (Content Basket RWR blending). |
-| `/watchlists/:id` | `WatchlistDetail.jsx` | **Yes** | Detailed view of a specific custom watchlist. |
-| `/analysis` | `Analysis.jsx` | **Yes** | Visual breakdown of user's taste profile. |
-| `/news` | `News.jsx` | No | Aggregated entertainment news feed. |
-| `/settings/*` | `Settings.jsx` (Nested) | **Yes** | Profile management, password reset, data export. |
-| `/admin` | `AdminDashboard.jsx` | **Yes** (Admin) | System metrics and internal controls. |
+| `/` | — | | Sends logged-in users to `/home`, guests to `/intro` |
+| `/intro`, `/about` | `Intro.jsx` | | Landing page with WebGL Aurora, section rail, poster marquee. No API calls |
+| `/home` | `Home.jsx` | | Trending, For You, trailers row, news strip, watchlist strip. Loads from one page bundle |
+| `/movies/:id`, `/tv/:id` | `MovieDetail.jsx`, `TVDetail.jsx` | | Details, rating meter, cast, trailers, streaming providers, More Like This, AI picks, news rail |
+| `/person/:id` | `PersonPage.jsx` | | Biography and filmography |
+| `/search` | `Search.jsx` | | Full search results (the overlay handles live typing) |
+| `/explore`, `/explore/:facet`, `/explore/franchise/:slug` | Explore pages | | Filtered browsing, facet hubs, franchise pages |
+| `/company/:id`, `/country/:id`, `/movies`, `/most-interested` | Browse pages | | Titles by studio, country, list, or upcoming interest |
+| `/recommendations` | `Recommendations.jsx` | Login | The For You feed |
+| `/rec-content` | `RecommendationsContent.jsx` | | Content DNA basket tool |
+| `/tierlist`, `/tierlist/new`, `/tierlist/t/:slug`, `/tierlist/s/:shareId` | Tier list pages | | Templates, make a board, view a shared board |
+| `/tierlist/my/:id` | `TierBoard.jsx` | Login | Edit a saved board |
+| `/news` | `News.jsx` | | News feed with tabs and categories |
+| `/dashboard` | `Dashboard.jsx` | Login | History, ratings, watchlist collections |
+| `/watchlists/:collectionId` | `WatchlistDetail.jsx` | Login | One collection, with filters, banner, OTT filter |
+| `/analysis` | `Analysis.jsx` | Login | Your taste profile and how the engine sees you |
+| `/settings/*` | Settings pages | Login | Profile, password, CSV import, feedback, my issues, privacy, delete account |
+| `/admin` | `AdminDashboard.jsx` | Login (admin) | Stats, manual jobs, infra, ML, messages, users |
+| `/login`, `/register` | | | Email/password or Google sign-in |
+| `/feedback`, `/help`, `/privacy`, `/terms` | | | Static and support pages |
+| `*` | `ErrorPage.jsx` | | 404 |
 
-### Global UI Elements
-- **`Navbar.jsx`**: Global sticky navigation.
-- **`PageTransition.jsx`**: Wraps every `<Route>` element to provide fluid cross-fade animations during client-side navigation.
-- **`ErrorBoundary.jsx`**: Catches React rendering crashes to display a fallback UI instead of a blank white screen.
+## Always-present pieces
 
----
+- **`Navbar.jsx`** — links, search button, notifications bell, profile menu.
+- **`SearchOverlay.jsx`** — full-screen live search.
+- **`PageTransition.jsx`** — fade between pages.
+- **`ErrorBoundary.jsx`** — shows a fallback instead of a blank page on a crash.
+- **`ColdStartLoader.jsx`** — poster wall and fun facts while the server wakes up.
+- **`DbOverloadBanner.jsx`** — small toast when both backends are down.
+- **`InstallPrompt.jsx`** — "add to home screen" for the PWA.
 
-## Tables & Summaries
+## Cards and feedback
 
-### UI Libraries Used
-| Library | Purpose |
-|---|---|
-| `react-router-dom` | Client-side URL mapping. |
-| `motion/react` | Page transitions, presence detection, hover physics. |
-| `ogl` | Minimal WebGL library for advanced cinematic effects. |
-| `react-icons` | Unified icon system. |
+`MovieCard.jsx` is used everywhere. When `showFeedback` is on, it shows `FeedbackControl.jsx` (thumbs up/down). A thumbs-down removes the card and slides in a replacement (`useFeedbackBuffer`). On phones the thumbs are always visible.
 
----
+## Look and feel
 
-## Workflows & Lifecycles
-
-### Frontend Routing Lifecycle
-```mermaid
-flowchart TD
-    A[User clicks Link] --> B[React Router intercepts URL change]
-    B --> C[AnimatePresence: Fade Out Current Component]
-    C --> D{Is Route Protected?}
-    D -- Yes & Not Logged In --> E[Redirect to /login]
-    D -- Yes & Logged In --> F[Mount Component]
-    D -- No --> F
-    F --> G[PageTransition: Fade In Component]
-    G --> H[Component useEffect triggers Axios GET]
-```
+Dark cinematic theme, glass panels, Outfit font. Design tokens are in `index.css`; each page has its own CSS. Animation uses `motion`; the Aurora background uses `ogl` (WebGL); charts use `recharts`.

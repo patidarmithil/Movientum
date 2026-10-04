@@ -1,306 +1,71 @@
-# Workflows — Movientum
+# User Workflows
 
-## Overview
+Step-by-step walks through what happens when a user does something. Each step names the file that does it.
 
-Step-by-step flows for every major user journey. Traces path from user action through frontend → API → backend service → DB → response → UI update.
+## 1. Sign up / log in
 
----
+1. `Register.jsx` or `Login.jsx` → `authService` → `POST /auth/register` or `/auth/login` (or `/auth/google`).
+2. `auth_service.py` hashes or checks the password with bcrypt (Google: verifies the ID token).
+3. Server returns an access token (48 h) and refresh token (7 days).
+4. `storage.js` saves them — `localStorage` if "Remember me", else `sessionStorage`.
+5. `AuthContext` marks the user logged in; `/` now goes to `/home`.
 
-## Workflow 1: Signup Flow
+## 2. Token expires quietly
 
-```
-User opens /register page
-  │
-  ├── User fills: name, email, password, confirm password
-  │
-  ├── Frontend validates (instant):
-  │     ├── All fields filled?
-  │     ├── Email format valid?
-  │     ├── Password ≥ 8 chars?
-  │     └── Passwords match?
-  │
-  ├── User clicks "Register"
-  │
-  ├── Frontend: POST /api/auth/register {name, email, password}
-  │     ↓ Loading spinner shown
-  │
-  ├── Backend validates (authoritative):
-  │     ├── Email format
-  │     ├── Password strength
-  │     └── Email not already registered
-  │
-  ├── If email exists → 409 response
-  │     → Frontend shows: "Email already in use. Login instead?"
-  │
-  ├── If valid:
-  │     → Hash password (bcrypt)
-  │     → Create user in DB
-  │     → Generate JWT token
-  │     → Return {token, user}
-  │
-  ├── Frontend stores token in localStorage
-  ├── Auth context updated: isLoggedIn = true, user = {...}
-  │
-  ├── Redirect to /onboarding (genre preference selection)
-  │     → User picks 3+ favorite genres
-  │     → POST /api/users/preferences {genres: [...]}
-  │
-  └── Redirect to Home page with personalized seed recommendations
-```
+1. A request returns 401.
+2. `api.js` holds all other requests, calls `/auth/refresh` once.
+3. Server returns a new pair and blacklists the old refresh token in Redis.
+4. The held requests are replayed. The user notices nothing. If refresh fails, they are logged out.
 
----
+## 3. Open a movie page
 
-## Workflow 2: Login Flow
+1. `MovieDetail.jsx` → `pageService.getMovie` → `GET /pages/movie/{id}`.
+2. `pages.py` reads the static bundle (shared, 7 days) and the user bundle (6 h) from Redis.
+3. On a miss: read `movies`; if absent, fetch from TMDB, save it, and **in the background** add it to `content_catalog` and splice it into the graph.
+4. The page shows details, rating meter, cast, trailers, providers. More Like This, AI picks and news load as the user scrolls.
 
-```
-User opens /login
-  │
-  ├── Fills email + password
-  ├── Clicks "Login"
-  │
-  ├── Frontend: POST /api/auth/login {email, password}
-  │
-  ├── Backend:
-  │     ├── Find user by email
-  │     ├── Verify password hash
-  │     ├── Check account active
-  │     └── Generate JWT + refresh token
-  │
-  ├── If invalid → 401 "Invalid credentials"
-  │     → Frontend shows error (no hint whether email or password wrong)
-  │
-  ├── If valid → {token, refresh_token, user}
-  │
-  ├── Frontend:
-  │     → Store tokens
-  │     → Update auth context
-  │     → Check if redirect param exists: ?redirect=/dashboard
-  │         → YES: go to dashboard
-  │         → NO: go to Home
-```
+## 4. Rate, watch, save
 
----
+| Action | Endpoint | Effect |
+|---|---|---|
+| Rate | `POST /ratings` | Upsert rating, update meter, bust caches |
+| Mark watched | `POST /watch` | Save history; background taste update (+15 genre); recs TTL drops to 3 min |
+| Add to watchlist | `POST /watch/watchlist` | Taste update (+8 genre) |
+| Add to a collection | `POST /watchlists/{id}/items` | Busts list and rec caches |
 
-## Workflow 3: Browse → Watch → Rate
+## 5. Search
 
-```
-User on Home page
-  │
-  ├── Scrolls through movie rows
-  │     → Rows loaded: GET /api/movies/trending
-  │                     GET /api/recommendations (if logged in)
-  │                     GET /api/movies/genre/action
-  │
-  ├── Clicks MovieCard "Inception"
-  │     → Navigate to /movies/123
-  │
-  ├── Movie Detail Page loads:
-  │     → GET /api/movies/123 (movie details)
-  │     → GET /api/recommendations/similar/123 (similar movies)
-  │     → GET /api/news/movie/123 (related news)
-  │     → GET /api/watch/status/123 (have I watched this?) — if logged in
-  │     → All requests fire in parallel
-  │
-  ├── User reads details, decides to watch
-  │     → Clicks "Mark as Watched"
-  │     → POST /api/watch {movie_id: 123}
-  │     → Button updates to green checkmark ✓
-  │     → Backend: creates watch_history record
-  │     → Background task: trigger recommendation refresh
-  │
-  ├── User rates the movie
-  │     → Clicks "Rate This Movie"
-  │     → Rating modal opens
-  │     → Sliders for: Story, Acting, Direction, Visuals, Overall
-  │     → Clicks "Submit Rating"
-  │     → POST /api/ratings {movie_id: 123, story: 8, acting: 9, ...overall: 8.5}
-  │     → Modal closes
-  │     → "Your Rating: 8.5" shows on page
-  │     → Background: recommendation data updated
-  │     → Background: FedPCL local training data updated
-```
+1. User types in `SearchOverlay.jsx`; after 250 ms of quiet, check the in-memory cache.
+2. `GET /search/instant` → `search_service.rank_titles`: trigram search in PostgreSQL, fuzzy scoring, TMDB only if local results are weak.
+3. Nothing found → "Request this title" → `POST /requests`.
 
----
+## 6. Get recommendations
 
-## Workflow 4: Search → Movie Click → Actions
+1. `Home.jsx` / `Recommendations.jsx` → `GET /recommendations`.
+2. Pick seeds (recent / established / diverse) from the user's history and watchlist.
+3. For each seed: graph walk → 16 features → ranker → blend with baseline.
+4. Merge buckets 12.5 / 65 / 17.5 / 7.5 %, re-order by relevance + quality + taste + novelty, spread genres, ensure language variety.
+5. Cache 15 min per 5-page block.
 
-```
-User types "dark knight" in search bar (global Navbar)
-  │
-  ├── After 300ms debounce:
-  │     → GET /api/search/autocomplete?q=dark+knight
-  │     → Dropdown shows: "The Dark Knight (2008)", "The Dark Knight Rises (2012)"
-  │
-  ├── User sees dropdown, clicks "The Dark Knight (2008)"
-  │     → Navigate directly to /movies/155
-  │     (Skips search results page, goes straight to detail)
-  │
-  ├── OR user presses Enter
-  │     → Navigate to /search?q=dark+knight
-  │     → GET /api/search?q=dark+knight
-  │     → Results page shows matching movies as grid
-  │
-  ├── On Search Results:
-  │     → User sees results (local DB first, TMDB fallback if sparse)
-  │     → User can apply filters: genre, year, rating
-  │     → Each filter change: new API call with filter params
-  │
-  ├── User clicks a MovieCard
-  │     → Navigate to /movies/{id}
-  │     → (Same flow as Workflow 3 from Movie Detail Page)
-```
+Details: `../ml_and_recommendations/recommendation_engine_overview.md`.
 
----
+## 7. Give feedback on a card
 
-## Workflow 5: Recommendation Flow
+1. Thumbs on `FeedbackControl.jsx` → `POST /rec-feedback` (clicks batched to `/rec-feedback/batch`).
+2. Server replies immediately; a background worker updates the taste profile, logs a training row, suppresses a dismissed title for 90 days, and busts rec caches.
+3. The card is replaced by another one in the UI.
+4. Tonight at 03:30 the ranker retrains on these rows.
 
-```
-User logs in and visits Home
-  │
-  ├── Home requests: GET /api/recommendations
-  │
-  ├── Backend recommendation flow:
-  │     ├── Check Redis: user:recommendations:{user_id}
-  │     │     ├── HIT → return cached (< 1ms)
-  │     │     └── MISS → compute
-  │     │
-  │     ├── Load user data:
-  │     │     → Watch history (last 50 movies)
-  │     │     → Ratings
-  │     │     → Genre preferences
-  │     │
-  │     ├── Phase 1 (Rule-based):
-  │     │     → Compute genre affinity scores
-  │     │     → Find director affinities
-  │     │     → Find similar-to-rated movies
-  │     │     → Blend with trending
-  │     │
-  │     ├── Phase 2+ (ML model):
-  │     │     → Load recommendation model (in-memory)
-  │     │     → Run inference for this user
-  │     │     → Get top 50 scored movies
-  │     │
-  │     ├── Post-process:
-  │     │     → Remove already-watched
-  │     │     → Apply diversity rules
-  │     │     → Limit to top 20
-  │     │     → Cache in Redis (TTL: 15 min)
-  │     │
-  │     └── Return: list of 20 movie objects with recommendation reason
-  │
-  ├── Frontend renders "For You" row
-  │     → Each MovieCard shows reason: "Based on your love of Sci-Fi"
-  │
-  └── FedPCL update cycle (background, separate):
-        → Every 14 days: new training round starts
-        → Client eligible? Download model → train locally → submit update
-        → Next round: better recommendations
-```
+## 8. Make a tier list
 
----
+1. `/tierlist` → pick a template → `GET /tierlist/templates/{slug}` (resolved from TMDB on first open, cached 7 days).
+2. Drag tiles into rows (`useTierDrag.js`). Guests autosave to `localStorage`.
+3. Save → `POST /tierlist` (login). Share → `/tierlist/s/{shareId}` works for anyone.
+4. Export PNG → drawn on a canvas in the browser.
 
-## Workflow 6: Watchlist Management
+## 9. Admin runs a job
 
-```
-User on Movie Detail Page /movies/456
-  │
-  ├── Clicks "Add to Watchlist"
-  │     → POST /api/watch/watchlist {movie_id: 456}
-  │     → Button changes: "Added to Watchlist ✓"
-  │     → DB: insert into watchlist table
-  │
-  ├── User visits Dashboard → Watchlist tab
-  │     → GET /api/watch/watchlist
-  │     → Shows grid of saved movies
-  │
-  ├── User clicks movie in watchlist
-  │     → Navigate to Movie Detail Page
-  │
-  ├── User removes from watchlist
-  │     → Click "Remove from Watchlist" button
-  │     → DELETE /api/watch/watchlist/456
-  │     → Item disappears from list
-```
-
----
-
-## Workflow 7: Data Flow Diagram (Frontend → Backend → DB)
-
-```
-Frontend (React)
-  │
-  │  HTTPS JSON request (with JWT token in header)
-  ▼
-FastAPI Backend
-  │
-  ├── Middleware: validate JWT → attach user to request
-  ├── Router: match URL → validate request body shape
-  ├── Service: business logic
-  │     ├── Cache check (Redis)
-  │     ├── Repository call (DB query)
-  │     ├── External API call (TMDB / NewsAPI) if needed
-  │     └── Result processing
-  ▼
-PostgreSQL DB ←→ Redis Cache
-  │
-  │  DB returns data → Service processes → Router serializes
-  ▼
-JSON Response (200/201/4xx/5xx)
-  │
-  ▼
-Frontend receives response
-  │
-  ├── Success: update state → re-render UI
-  └── Error: show toast notification / inline error
-```
-
----
-
-## Workflow 8: Token Refresh (Transparent to User)
-
-```
-User is actively using app
-  │
-  ├── Access token expires (1 hour since login)
-  │
-  ├── User clicks something → API call made
-  │
-  ├── Backend returns 401 "Token expired"
-  │
-  ├── Frontend API interceptor catches 401:
-  │     → POST /api/auth/refresh {refresh_token}
-  │
-  ├── Backend:
-  │     → Validates refresh token
-  │     → Issues new access token
-  │     → Returns {access_token}
-  │
-  ├── Frontend:
-  │     → Stores new access token
-  │     → Retries original failed request with new token
-  │
-  └── User sees no interruption — seamless experience
-```
-
----
-
-## Workflow 9: Admin Adds New Movie (Manual Override)
-
-```
-Admin logs in with admin account
-  │
-  ├── Navigates to /admin/movies/add (admin-only route)
-  │
-  ├── Enters TMDB movie ID
-  │
-  ├── Frontend: GET /api/admin/movies/fetch-tmdb/{id}
-  │     → Backend fetches full movie details from TMDB
-  │     → Returns preview: title, poster, overview
-  │
-  ├── Admin reviews, clicks "Add to Catalog"
-  │
-  ├── POST /api/admin/movies {movie_id, ...details}
-  │     → Backend stores movie in DB
-  │     → Clears relevant cache keys
-  │     → Movie appears in platform immediately
-```
+1. `/admin` → System Tasks → press a job (e.g. "News Daily Fetch").
+2. `POST /internal/trigger/news_daily_fetch` (admin token checked).
+3. The job runs inside the API as a background task; the panel polls `/internal/progress/{task}`.
+4. For news: fetch ~700 articles → dedupe to ~500 → enrich → swap the Redis snapshot.

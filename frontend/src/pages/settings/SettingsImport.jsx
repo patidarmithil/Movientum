@@ -13,7 +13,7 @@ const SettingsImport = () => {
   const fileInputRef = useRef(null);
 
   const handleDownloadTemplate = () => {
-    const template = "title,type,year,rating\nInception,movie,2010,go_for_it\nBreaking Bad,tv,2008,perfection\n";
+    const template = "title,type,year,tmdb_id,rating\nInception,movie,2010,27205,go_for_it\nBreaking Bad,tv,2008,1396,perfection\n";
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -110,14 +110,25 @@ const SettingsImport = () => {
         <div className="settings-table-wrap">
           <table className="settings-table">
             <thead>
-              <tr><th>title</th><th>type</th><th>year</th><th>rating</th></tr>
+              <tr><th>title</th><th>type</th><th>year</th><th>tmdb_id <span className="settings-optional">(optional)</span></th><th>rating <span className="settings-optional">(optional)</span></th></tr>
             </thead>
             <tbody>
-              <tr><td>Inception</td><td>movie</td><td>2010</td><td><code>go_for_it</code></td></tr>
-              <tr><td>Breaking Bad</td><td>tv</td><td>2008</td><td><code>perfection</code></td></tr>
+              <tr><td>Inception</td><td>movie</td><td>2010</td><td>27205</td><td><code>go_for_it</code></td></tr>
+              <tr><td>Breaking Bad</td><td>tv</td><td>2008</td><td>1396</td><td><code>perfection</code></td></tr>
+              <tr><td>Dune</td><td>movie</td><td>2021</td><td className="settings-muted">blank</td><td className="settings-muted">blank</td></tr>
             </tbody>
           </table>
         </div>
+        <p className="settings-help-text">
+          <code>tmdb_id</code> is the most accurate match. TMDB reuses the same id for some movies and TV shows,
+          so the <code>type</code> column is always checked together with it. If <code>tmdb_id</code> is blank or
+          not found, the title and year are used instead.
+        </p>
+        <p className="settings-help-text">
+          <code>type</code> is <code>movie</code> or <code>tv</code>. <code>rating</code> is optional — use{' '}
+          <code>skip</code>, <code>timepass</code>, <code>go_for_it</code> or <code>perfection</code>, or leave it
+          blank (or remove the column) to import titles as watched without a rating.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -156,7 +167,7 @@ const SettingsImport = () => {
             <div className="settings-table-wrap">
               <table className="settings-table">
                 <thead>
-                  <tr><th>Title</th><th>Type</th><th>Year</th><th>Rating</th></tr>
+                  <tr><th>Title</th><th>Type</th><th>Year</th><th>TMDB ID</th><th>Rating</th></tr>
                 </thead>
                 <tbody>
                   {preview.map((row, idx) => (
@@ -164,6 +175,7 @@ const SettingsImport = () => {
                       <td>{row.title || '-'}</td>
                       <td>{row.type || '-'}</td>
                       <td>{row.year || '-'}</td>
+                      <td>{row.tmdb_id || '-'}</td>
                       <td><code>{row.rating || '-'}</code></td>
                     </tr>
                   ))}
@@ -178,9 +190,31 @@ const SettingsImport = () => {
             <h3><LuCircleCheck aria-hidden /> Import complete</h3>
             <ul className="settings-result__stats">
               <li><strong>{stats.imported}</strong> imported</li>
+              {stats.rated != null && <li><strong>{stats.rated}</strong> rated</li>}
+              {stats.added_to_catalog > 0 && <li><strong>{stats.added_to_catalog}</strong> new titles fetched from TMDB</li>}
               <li><strong>{stats.skipped}</strong> skipped (invalid data)</li>
               <li><strong>{stats.unmatched}</strong> not found</li>
             </ul>
+            {stats.unmatched_rows?.length > 0 && (
+              <div className="settings-table-wrap">
+                <table className="settings-table">
+                  <thead>
+                    <tr><th>Line</th><th>Title</th><th>Type</th><th>Year</th><th>Reason</th></tr>
+                  </thead>
+                  <tbody>
+                    {stats.unmatched_rows.map((row) => (
+                      <tr key={row.line}>
+                        <td>{row.line}</td>
+                        <td>{row.title || '-'}</td>
+                        <td>{row.type || '-'}</td>
+                        <td>{row.year || '-'}</td>
+                        <td className="settings-muted">{row.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

@@ -54,3 +54,6 @@ frontend/node_modules/
 frontend/build/
 frontend/dist/
 backend/scripts
+
+# Google OAuth client secret downloads
+client_secret*.json

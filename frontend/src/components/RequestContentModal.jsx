@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { searchService } from '../services/searchService';
 import './RequestContentModal.css';
 

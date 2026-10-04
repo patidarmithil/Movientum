@@ -9,6 +9,7 @@ import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import Aurora from '../components/Aurora'
 import ShinyText from '../components/ShinyText'
 import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
+import ColdStartNote from '../components/ColdStartNote'
 import './Explore.css' // Reuse Explore styles
 
 // Matches the backend's 15-minute recommendation rotation window
@@ -23,6 +24,7 @@ export default function Recommendations() {
   const [movies, setMovies] = useSessionState('recommendations_movies', [])
   const [hasMore, setHasMore] = useSessionState('recommendations_hasMore', true)
   const [fetchedAt, setFetchedAt] = useSessionState('recommendations_ts', 0)
+  const [coldStart, setColdStart] = useSessionState('recommendations_cold', false)
 
   const [loading, setLoading] = useState(movies.length === 0)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -31,7 +33,6 @@ export default function Recommendations() {
   const isMounted = useRef(false)
   const isPageMounted = useRef(false)
 
-  const LIMIT = 20
   const isFetchingRef = useRef(false)
   const abortControllerRef = useRef(null)
   const observerRef = useRef(null)
@@ -69,6 +70,7 @@ export default function Recommendations() {
 
       if (isInitial) {
         setMovies(newMovies)
+        setColdStart(Boolean(data.cold_start))
         setFetchedAt(Date.now())
       } else {
         setMovies((prev) => {
@@ -99,7 +101,6 @@ export default function Recommendations() {
   useEffect(() => {
     if (!isLoggedIn) return
 
-    console.log('[Recommendations Mount/Update] isMounted:', isMounted.current, 'moviesCount:', movies?.length)
 
     if (!isMounted.current) {
       isMounted.current = true
@@ -108,7 +109,6 @@ export default function Recommendations() {
       // appending pages of the new pool onto items from the old one.
       const isFresh = movies.length > 0 && Date.now() - (fetchedAt || 0) < REC_MAX_AGE_MS
       if (isFresh) {
-        console.log('[Recommendations Mount] Cache hit! Keeping cached movies and skipping fetch')
         setLoading(false)
         return
       }
@@ -213,6 +213,7 @@ export default function Recommendations() {
 
         {!error && (visibleMovies.length > 0 || loading) && (
           <>
+            <ColdStartNote show={coldStart && !loading} />
             <StaggerContainer className="explore-grid" instant={false}>
               {visibleMovies.map((m, index) => (
                 <StaggerItem key={`${m.id}-${index}`} index={index}>

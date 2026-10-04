@@ -15,22 +15,18 @@ import { movieService } from '../services/movieService'
 import { watchService } from '../services/watchService'
 import { ratingService } from '../services/ratingService'
 import { useAuth } from '../context/AuthContext'
-import MovieCard from '../components/MovieCard'
 import RatingMeter from '../components/RatingMeter'
-import MovieCardSkeleton from '../components/MovieCardSkeleton'
 import CastCrew from '../components/CastCrew'
 import NewsArticlesSection from '../components/NewsArticlesSection'
 import TrailerModal from '../components/TrailerModal'
 import ImageLightbox from '../components/ImageLightbox'
 import ProductionTags from '../components/ProductionTags'
-import ShinyText from '../components/ShinyText'
 import SaveToCollectionModal from '../components/SaveToCollectionModal'
 import { pageCache } from '../utils/pageCache'
 import { resolveOttLink } from '../utils/ottLinks'
 import { fireBurst } from '../utils/burstEffect'
 import { watchlistService } from '../services/watchlistService'
 import { planToWatchService } from '../services/planToWatchService'
-import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import LazyMount from '../components/LazyMount'
 import MovieRow from '../components/MovieRow'
 import AIRecommendations from '../components/AIRecommendations'
@@ -258,7 +254,6 @@ export default function MovieDetail() {
   const [error,         setError]         = useState(null)
   const [hasImgError,   setHasImgError]   = useState(false)
   const [watchBusy,     setWatchBusy]     = useState(false)
-  const [listBusy,      setListBusy]      = useState(false)
   const [watchMsg,      setWatchMsg]      = useState(null)
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [overviewExpanded, setOverviewExpanded] = useState(false)
@@ -555,7 +550,7 @@ export default function MovieDetail() {
         movie.release_year
       )
       setReqNeededState({ loading: false, success: true })
-    } catch (err) {
+    } catch {
       setReqNeededState({ loading: false, success: false })
     }
   }

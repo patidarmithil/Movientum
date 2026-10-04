@@ -1,61 +1,55 @@
-# Database Architecture (Supabase PostgreSQL)
+# Database Architecture
 
-## Overview & Architecture
+Movientum uses **Supabase PostgreSQL**. Table definitions live in `backend/app/db/orm_models.py`.
 
-Movientum uses **Supabase PostgreSQL** as its primary operational data store. The database is interfaced via `SQLAlchemy 2.0` in fully asynchronous mode (`asyncpg`) for the runtime, and synchronous mode (`psycopg2`) for Alembic migrations.
+## Two connection strings
 
----
-
-## Code Structure & Detailed Logic
-
-### The Schema Hierarchy
-Defined strictly in `backend/app/db/orm_models.py`.
-
-1. **Phase 1: Master Catalog**
-   - `movies`, `genres`, `directors`.
-   - `ContentCatalog`: Fast inference structure containing `ARRAY(Integer)` and `JSONB` columns for TMDB categorical and talent features.
-
-2. **Phase 3: Auth & Identity**
-   - `users`: Uses UUID primary keys to prevent enumeration attacks.
-   - `UserTasteProfile`: Contains 6 multi-dimensional `JSONB` weight vectors (genres, cast, crew, keyword, language, era).
-
-3. **Phase 6: Logging & Feedback**
-   - `ratings`: Four fixed categories (`skip`, `timepass`, `go_for_it`, `perfection`).
-   - `InteractionLog`: Stores `feature_snapshot` (JSONB) of the exact ML feature vectors present when a user clicked/thumbed an item, creating training data.
-
-### Database Session Management
-FastAPI dependencies yield a single asynchronous session per request, automatically handling commit/rollback boundaries.
-
-```python
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
-```
-
-### Asyncpg Password Handling
-`asyncpg` crashes if it encounters unescaped special characters (`#`, `@`) in the connection URL. This is mitigated using the `safe_async_db_url` property from `app.config.Settings`.
-
----
-
-## Tables & Summaries
-
-### Key Indexing Strategies
-To ensure fast read performance during graph queries and feed generation:
-| Table | Index | Purpose |
+| Setting | Driver | Used by |
 |---|---|---|
-| `movies` | `idx_movies_popularity (DESC)` | Fast retrieval of trending items. |
-| `movies` | `idx_movies_fts (GIN)` | PostgreSQL Full-Text Search on TSVECTOR. |
-| `interaction_log` | `idx_interaction_log_user_ts` | Fast retrieval for the 30-day nightly ML retrain query. |
-| `content_catalog` | `uq_catalog_tmdb_media` | Prevents ingestion duplicates for movies/tv. |
+| `async_database_url` | asyncpg | The running API |
+| `database_url` | psycopg2 | Alembic migrations only |
 
----
+Always use `settings.safe_async_db_url` / `safe_sync_db_url`. The password contains characters that break URLs, and these properties encode it.
 
-## Workflows & Lifecycles
+## The one rule to remember
 
-### Alembic Migration Flow
-```mermaid
-flowchart LR
-    A[Update orm_models.py] --> B[alembic revision --autogenerate]
-    B --> C[Review Migration Script]
-    C --> D[alembic upgrade head (psycopg2)]
+**Movies and TV shows share the `movies` table.** The primary key is `(id, type)` where `type` is `'movie'` or `'tv'`, because TMDB reuses the same number for a movie and a show. Every table that points at a title uses both columns. Always filter on both.
+
+## Tables by purpose
+
+| Group | Tables | What they hold |
+|---|---|---|
+| Catalog | `movies`, `genres`, `movie_genres`, `directors`, `movie_directors` | Title details for browsing. `movies.search_vector` powers full-text search |
+| Rating meter seed | `movie_ratings`, `tv_ratings` | Imported scores so the rating meter is not empty on day one |
+| Users | `users` | Account, bcrypt password (empty for Google-only users), `google_sub`, role, recommendation preferences |
+| Library | `ratings`, `watch_history`, `watchlist` (old single list), `watchlist_collections` + `watchlist_items` (current multi-list) | What the user rated, watched and saved |
+| Recommendation engine | `content_catalog`, `user_taste_profiles`, `interaction_log`, `rec_suppression` | Title features, per-user taste weights, training data, hidden items |
+| AI recs | `ai_rec_memory`, `ai_rec_sessions` | Thumbs on Gemini picks, request log |
+| Search | `people` | Local cast/crew search index |
+| Tier lists | `tier_lists` | Saved boards as JSON, with a public `share_id` |
+| TV tracking | `watching_tracker`, `temp_tracker`, `notifications` | Followed shows and alerts |
+| Other | `feedback`, `requested_content`, `rating_needed`, `click_history`, `person_cache` | Bug reports, missing-title requests, analytics |
+
+## Where the schema is defined
+
+- **Alembic** (`backend/alembic/versions/`) owns most tables.
+- **`main.py` startup** creates four tables with raw SQL on every boot: `rating_needed`, `watching_tracker`, `temp_tracker`, `notifications`. Change them there (and in the ORM), not only in a migration.
+
+```bash
+alembic revision --autogenerate -m "description"
+alembic upgrade head
 ```
+
+## Keeping it small
+
+- **News is not stored here** — it lives in Redis.
+- `content_catalog` stores features as integer arrays and JSONB instead of join tables.
+- A startup task deletes movies with popularity under 5 that nobody rated, watched or saved and that are older than 30 days.
+- `rec_suppression` rows expire after 90 days; reads skip expired rows, and startup cleanup deletes them.
+
+## Important indexes
+
+- `movies`: popularity, rating, release date, language, GIN on `search_vector`, trigram on `title_search`.
+- `content_catalog`: unique `(tmdb_id, media_type)`.
+- `interaction_log`: `(user_id, timestamp)` for the nightly training query.
+- `people`: trigram on `name_search`.

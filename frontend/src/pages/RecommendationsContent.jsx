@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { movieService } from '../services/movieService'
-import { searchService } from '../services/searchService'
+import { useInstantSearch } from '../hooks/useInstantSearch'
+import SearchResultRow from '../components/SearchResultRow'
 import useFeedbackBuffer from '../hooks/useFeedbackBuffer'
 import MovieCard from '../components/MovieCard'
 import MovieCardSkeleton from '../components/MovieCardSkeleton'
@@ -83,58 +84,22 @@ function RangeSlider({ min, max, value, onChange, step = 1, label, format = (v) 
   )
 }
 
-// --- Result Card (acm-panel style) ---
-function ResultCard({ item, isAdded, isLoading, onAdd, onAddNeg }) {
-  const poster = item.poster_path ? `${TMDB_IMAGE_BASE}/w342${item.poster_path}` : null
-  const year   = item.release_year || (item.release_date ? item.release_date.slice(0, 4) : '')
-
-  return (
-    <div className="acm-card">
-      <div className="acm-card__poster-wrap">
-        {poster ? (
-          <img src={poster} alt={item.title || item.name} className="acm-card__poster" loading="lazy" />
-        ) : (
-          <div className="acm-card__poster acm-card__poster--fallback">
-            <span>{(item.title || item.name)?.[0] ?? '?'}</span>
-          </div>
-        )}
-        <button
-          className={`acm-card__add-btn ${isAdded ? 'is-added' : ''} ${isLoading ? 'is-loading' : ''}`}
-          onClick={() => !isAdded && !isLoading && onAdd(item)}
-          disabled={isAdded || isLoading}
-        >
-          {isLoading ? (
-            <span className="acm-spinner" />
-          ) : isAdded ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          )}
-        </button>
-        {onAddNeg && (
-          <button
-            className="acm-card__add-btn"
-            style={{ left: '6px', right: 'auto', background: 'rgba(255, 0, 128, 0.25)' }}
-            onClick={() => onAddNeg(item)}
-            title="Less like this"
-            aria-label="Add to less-like-this"
-          >
-            &minus;
-          </button>
-        )}
-      </div>
-      <div className="acm-card__info">
-        <p className="acm-card__title">{item.title || item.name}</p>
-        {year && <p className="acm-card__year">{year}</p>}
-      </div>
-    </div>
-  )
-}
+const PLUS_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+const CHECK_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+const MINUS_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
 
 export default function RecommendationsContent() {
   // Basket state
@@ -163,13 +128,8 @@ export default function RecommendationsContent() {
 
   // ACM Panel state
   const [query, setQuery]       = useState('')
-  const [results, setResults]   = useState([])
-  const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState(null)
-  
+  const { results, loading: searching, error: searchError, active: searchActive } = useInstantSearch(query)
   const inputRef    = useRef(null)
-  const debounceRef = useRef(null)
-  const abortRef    = useRef(null)
 
   // ── Filter state (server-side, §3.1) ────────────────────────
   const [selectedGenres, setSelectedGenres] = useState([])
@@ -265,7 +225,7 @@ export default function RecommendationsContent() {
         })
       }
       setHasMore(newMovies.length > 0 && p < (data.total_pages || 1))
-    } catch (err) {
+    } catch {
       if (isInitial) setError("Failed to fetch recommendations. Try adjusting your basket.")
     } finally {
       isFetchingRef.current = false
@@ -337,43 +297,7 @@ export default function RecommendationsContent() {
     setPage(p => p + 1)
   }
 
-  // ACM Search Logic
-  const handleQueryChange = useCallback((e) => {
-    const val = e.target.value
-    setQuery(val)
-
-    clearTimeout(debounceRef.current)
-    if (abortRef.current) abortRef.current.abort()
-
-    if (!val.trim() || val.trim().length < 2) {
-      setResults([])
-      setSearching(false)
-      return
-    }
-
-    debounceRef.current = setTimeout(() => {
-      const controller = new AbortController()
-      abortRef.current = controller
-
-      setSearching(true)
-      setSearchError(null)
-
-      searchService
-        .instantSearch(val.trim(), 'content', controller.signal)
-        .then((data) => {
-          const arr = Array.isArray(data) ? data : (data?.results || [])
-          setResults(arr.slice(0, 20))
-        })
-        .catch((err) => {
-          if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
-            setSearchError('Search failed. Try again.')
-          }
-        })
-        .finally(() => setSearching(false))
-    }, 300)
-  }, [])
-
-  const showEmpty = !searching && !searchError && query.trim().length >= 2 && results.length === 0
+  const showEmpty = searchActive && !searching && !searchError && results.length === 0
 
   // 3. Filter Actions & Logic
   const toggleCompany = (c) =>
@@ -438,9 +362,9 @@ export default function RecommendationsContent() {
         </header>
 
         <section className="reccontent-search-section">
-          {/* ACM Panel integrated directly */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-            <div className="acm-panel" style={{ position: 'relative', margin: '0 auto', animation: 'none', transform: 'none', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '20px' }}>
+          {/* Search panel — same instant search + result rows as the navbar overlay */}
+          <div className="reccontent-search-panel-wrap">
+            <div className="acm-panel reccontent-search-panel">
               <div className="acm-search-wrap">
                 <svg className="acm-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" />
@@ -452,7 +376,7 @@ export default function RecommendationsContent() {
                   className="acm-search-input"
                   type="search"
                   value={query}
-                  onChange={handleQueryChange}
+                  onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search movies & TV shows..."
                   autoComplete="off"
                   spellCheck={false}
@@ -460,8 +384,8 @@ export default function RecommendationsContent() {
                 />
                 {searching && <span className="acm-search-spinner" />}
               </div>
-              
-              <div className="acm-results-wrap" style={{ maxHeight: query.trim().length >= 2 ? '400px' : '0px', overflowY: 'auto', overflowX: 'hidden', transition: 'max-height 0.3s ease', paddingBottom: 0 }}>
+
+              <div className={`acm-results-wrap reccontent-search-results${searchActive ? ' is-open' : ''}`}>
                 {searchError && (
                   <div className="acm-state-msg acm-state-msg--error">
                     <p>{searchError}</p>
@@ -476,17 +400,45 @@ export default function RecommendationsContent() {
                 {results.length > 0 && (
                   <>
                     <p className="acm-results-label">SEARCH RESULTS</p>
-                    <div className="acm-results-scroll">
-                      {results.map((item) => (
-                        <ResultCard
-                          key={item.id}
-                          item={item}
-                          isAdded={basket.some(b => b.tmdb_id === Number(item.id) && b.media_type === (item.media_type || 'movie'))}
-                          isLoading={false}
-                          onAdd={addToBasket}
-                          onAddNeg={addToNegBasket}
-                        />
-                      ))}
+                    <div className="acm-results-list srr-list">
+                      {results.map((item) => {
+                        const mediaType = item.media_type || 'movie'
+                        const id = Number(item.id)
+                        const title = item.title || item.name
+                        const isAdded = basket.some(b => b.tmdb_id === id && b.media_type === mediaType)
+                        const isNeg = negBasket.some(b => b.tmdb_id === id && b.media_type === mediaType)
+                        return (
+                          <SearchResultRow
+                            key={`${mediaType}-${id}`}
+                            item={item}
+                            added={isAdded}
+                            actions={
+                              <>
+                                <button
+                                  type="button"
+                                  className={`srr__btn srr__btn--neg${isNeg ? ' is-added' : ''}`}
+                                  onClick={() => !isNeg && addToNegBasket(item)}
+                                  disabled={isNeg}
+                                  title="Less like this"
+                                  aria-label={`Less like ${title}`}
+                                >
+                                  {MINUS_ICON}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`srr__btn${isAdded ? ' is-added' : ''}`}
+                                  onClick={() => !isAdded && addToBasket(item)}
+                                  disabled={isAdded}
+                                  title="More like this"
+                                  aria-label={isAdded ? `${title} added` : `Add ${title}`}
+                                >
+                                  {isAdded ? CHECK_ICON : PLUS_ICON}
+                                </button>
+                              </>
+                            }
+                          />
+                        )
+                      })}
                     </div>
                   </>
                 )}

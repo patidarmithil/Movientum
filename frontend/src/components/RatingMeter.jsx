@@ -18,6 +18,7 @@
  *   total_votes — number (optional)
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { ratingService } from '../services/ratingService'
 import { useAuth } from '../context/AuthContext'
 import './RatingMeter.css'
@@ -29,9 +30,6 @@ const CATEGORIES = [
   { key: 'perfection', label: 'Perfection', color: '#8b5cf6' },
 ]
 
-const R = 70
-const CX = 100
-const CY = 90
 const STROKE_W = 20 // increased thickness slightly (+10% from 18)
 
 const GRADIENTS = {
@@ -558,7 +556,7 @@ export default function RatingMeter({
 
         {!isLoggedIn && (
           <p className="rating-meter__guest-note">
-            <a href="/login">Log in</a> to rate this movie
+            <Link to="/login">Log in</Link> to rate this movie
           </p>
         )}
       </div>

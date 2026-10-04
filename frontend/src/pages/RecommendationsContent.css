@@ -678,3 +678,36 @@
     padding: 12px 16px;
   }
 }
+
+/* ── Search panel (instant search rows, see SearchResultRow.css) ── */
+.reccontent-search-panel-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.acm-panel.reccontent-search-panel {
+  position: relative;
+  margin: 0 auto;
+  animation: none;
+  transform: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  /* Inline panel, not the modal bottom sheet: drop the sheet's fixed height. */
+  height: auto;
+  max-height: none;
+}
+.acm-results-wrap.reccontent-search-results {
+  max-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 0;
+  transition: max-height 0.3s ease;
+}
+.acm-results-wrap.reccontent-search-results.is-open { max-height: 420px; }
+
+@media (max-width: 639px) {
+  .acm-results-wrap.reccontent-search-results.is-open { max-height: 60vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reccontent-search-results { transition: none; }
+}

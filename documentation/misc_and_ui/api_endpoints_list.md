@@ -1,75 +1,44 @@
-# API Endpoints List
+# API Endpoints
 
-## Overview & Architecture
+All endpoints live under `/api/v1/` and are registered in `backend/app/main.py`. Interactive docs are at `/docs` when `DEBUG=true`.
 
-Movientum's backend API is organized as a Modular Monolith built on FastAPI. The endpoints are strictly versioned under `/api/v1/` and logically grouped into distinct routers mounted in `backend/app/main.py`.
+**Auth legend:** 🔒 login required · 🔓 optional (personalised if logged in) · 👑 admin · — public
 
-The API architecture heavily leverages FastAPI's Dependency Injection (`Depends`) to provide asynchronous database sessions (`get_db`) and authentication state (`get_current_user_id`).
+## Routers
 
----
-
-## Logics & Business Rules
-
-### Authentication & Authorization
-- **Public Routes**: Accessible by any client.
-- **Protected Routes**: Require a valid JWT Bearer token in the `Authorization` header. Implemented via the `get_current_user_id` dependency, which raises a `401 Unauthorized` if missing or invalid.
-- **Admin Routes**: E.g., `/api/v1/internal/*` requires a specific `cron_secret_token` or Admin role check.
-
-### Caching
-Many `GET` endpoints are wrapped in Upstash Redis cache checks (e.g., `movie:detail:{id}`). If a cache miss occurs, an `asyncio.Event` lock protects against cache stampedes while the DB is queried.
-
----
-
-## Tables & Summaries
-
-### Active API Routers
-
-| Prefix | Router File | Description |
+| Prefix | File | Main endpoints |
 |---|---|---|
-| `/api/v1/movies` | `movies.py` | Catalog browsing, trending, movie details, similar movies. |
-| `/api/v1/tv` | `tv.py` | TV show details, seasons, episodes, similar shows. |
-| `/api/v1/auth` | `auth.py` | JWT registration, login, logout, and token refresh. |
-| `/api/v1/search` | `search.py` | Instant and paginated search across movies, TV, and people. |
-| `/api/v1/ratings` | `ratings.py` | User submissions of 4-category ratings (skip, timepass, go_for_it, perfection). |
-| `/api/v1/watch` | `watch.py` | Marking items as watched/unwatched in the user's history. |
-| `/api/v1/recommendations` | `recommendations.py` | Fetching personalized feeds based on taste profiles + RWR graph. |
-| `/api/v1/rec-feedback` | `recommendation_signals.py` | Sending thumbs-up/down explicit ML signals. |
-| `/api/v1/person` | `person.py` | Actor/director details and their filmography. |
-| `/api/v1/clicks` | `clicks.py` | Implicit interaction logging (decaying weight feedback). |
-| `/api/v1/users` | `users.py` | User taste profile fetching and taste analysis metrics. |
-| `/api/v1/news` | `news.py` | Aggregated and personalized entertainment news feeds. |
-| `/api/v1/trailers` | `trailers.py` | Fetching YouTube trailer keys for frontend display. |
-| `/api/v1/watchlists` | `watchlist.py` | Multi-watchlist collections and item management. |
-| `/api/v1/watching-tracker` | `watching_tracker.py` | Tracking ongoing TV show progress. |
-| `/api/v1/temp-tracker` | `temp_tracker.py` | Temporary tracking for items users might want to watch. |
-| `/api/v1/notifications` | `notifications.py` | Alerting users about new episodes or system updates. |
-| `/api/v1/feedback` | `feedback.py` | General site UI/UX feedback submission. |
-| `/api/v1/requests` | `requests.py` | Submitting requests for missing content (Rating Needed). |
-| `/api/v1/internal` | `internal.py` | Cron-triggered jobs (e.g., ML retrain triggers, cleanup). |
+| `/auth` | `auth.py` | `register`, `login`, `google`, `refresh`, `logout` 🔒, `me` 🔒, `device-session`, `device-login`, `reset-password` |
+| `/pages` | `pages.py` | `home`, `movie/{id}`, `tv/{id}`, `person/{id}`, `dashboard` 🔒 — one-call page bundles |
+| `/movies` | `movies.py` | `trending`, `explore` 🔓, `genre/{id}`, `top_rated`, `upcoming`, `collection/{id}`, `company/{id}`, `country/{iso}`, `{id}`, `{id}/videos`, `{id}/credits`, `{id}/watch_providers` |
+| `/tv` | `tv.py` | `{id}`, `{id}/videos`, `{id}/season/{n}/videos`, `{id}/credits`, `{id}/watch_providers` |
+| `/person` | `person.py` | `{id}`, `{id}/credits` |
+| `/search` | `search.py` | `instant`, `autocomplete`, `/` (results page). Not cached |
+| `/explore` | `explore.py` | `franchises` |
+| `/ratings` | `ratings.py` | `POST /` 🔒, `me` 🔒, `distribution/{type}/{id}`, `PUT`/`DELETE {id}` 🔒, `needed` 🔒 |
+| `/watch` | `watch.py` | Watch history and single watchlist 🔒, `status/{type}/{id}` |
+| `/watchlists` | `watchlist.py` | Collections CRUD, items, `cover`, `providers`, per-title status 🔒 |
+| `/recommendations` | `recommendations.py` | `/` 🔒 (For You), `similar/{id}` 🔓, `content` 🔓 (DNA basket), `guest` |
+| `/rec-feedback` | `recommendation_signals.py` | `/` and `/batch` 🔒 — thumbs, clicks, undo |
+| `/ai-recs` | `ai_recs.py` | `similar` 🔓, `memory` GET/POST 🔒 |
+| `/news` | `news.py` | `feed`, `categories`, `search`, `saved` 🔒, `status`, `for-title/{type}/{id}`, `article/{id}`, `article/{id}/view` 🔓, `/save` 🔒, `/feedback` 🔒 |
+| `/trailers` | `trailers.py` | `home` 🔓 |
+| `/tierlist` | `tierlist.py` | `templates`, `templates/{slug}`, `characters/{media}/{id}`, `share/{id}`, `mine` 🔒, CRUD on `{id}` 🔒 |
+| `/users` | `users.py` | `me/analysis`, `/engine`, `/feedback`, taste-profile, date-range, rec-preferences, profile, password, delete, `import-list` 🔒 |
+| `/notifications` | `notifications.py` | list, mark seen, mark all seen 🔒 |
+| `/watching-tracker` | `watching_tracker.py` | `track`, `untrack`, `status/{id}` 🔒 |
+| `/temp-tracker` | `temp_tracker.py` | add, remove, list 🔒 |
+| `/feedback` | `feedback.py` | Bug reports with optional image 🔒 |
+| `/contact` | `contact.py` | `POST` public, `GET` 👑 |
+| `/requests` | `requests.py` | `POST` — request a missing title (guests allowed) |
+| `/clicks` | `clicks.py` | Legacy; nothing in the frontend calls it. Clicks now go through `/rec-feedback` |
+| `/admin` | `admin.py` | `stats`, `analytics`, `users` (list/delete/role/message) 👑 |
+| `/internal` (also mounted at `/internal`) | `internal.py` | `trigger/{task}`, `progress/{task}`, `cancel/{task}` 👑 — admin panel jobs |
 
----
+`GET /api/health` → `{status, version, environment, dependencies}`; 503 if the database or Redis is down.
 
-## Workflows & Lifecycles
+## Conventions
 
-### Typical Request Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant FastAPI Router
-    participant Service Layer
-    participant Cache (Upstash)
-    participant DB (Supabase)
-
-    Client->>FastAPI Router: GET /api/v1/movies/123
-    FastAPI Router->>Service Layer: fetch_movie_detail(123)
-    Service Layer->>Cache (Upstash): check 'movie:detail:v4:123'
-    alt Cache Hit
-        Cache (Upstash)-->>Service Layer: Return JSON
-    else Cache Miss
-        Service Layer->>DB (Supabase): Query ORM Models
-        DB (Supabase)-->>Service Layer: Return Rows
-        Service Layer->>Cache (Upstash): Set JSON with TTL
-    end
-    Service Layer-->>FastAPI Router: Dict
-    FastAPI Router-->>Client: 200 OK (JSON)
-```
+- **Route order**: fixed paths come before `/{id}` in the same router, or FastAPI treats the word as an id.
+- **Errors**: always `{error, message, status_code, code}`. Validation errors use code `MV-BVD01`, unexpected errors `MV-BSV01`.
+- **Frontend mapping**: each `frontend/src/services/*.js` file wraps one router. `AI_Context/API_MAP.md` lists every function → endpoint.

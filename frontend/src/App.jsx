@@ -73,6 +73,7 @@ const SettingsPrivacy = lazy(() => import('./pages/settings/SettingsPrivacy'))
 const SettingsTerms = lazy(() => import('./pages/settings/SettingsTerms'))
 const SettingsHelp = lazy(() => import('./pages/settings/SettingsHelp'))
 const SettingsImport = lazy(() => import('./pages/settings/SettingsImport'))
+const SettingsExport = lazy(() => import('./pages/settings/SettingsExport'))
 
 import ScrollRestore from './components/ScrollRestore'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -103,6 +104,15 @@ function PrefetchRoutes({ isLoggedIn, isLoading }) {
       if (isLoggedIn) {
         import('./pages/MovieDetail')
         import('./pages/TVDetail')
+        // Pages reached from the navbar / drawer. Loading them ahead means a tap
+        // swaps pages without waiting on a chunk download (felt as lag on phones).
+        setTimeout(() => {
+          if (cancelled) return
+          import('./pages/MovieList')
+          import('./pages/Explore')
+          import('./pages/Dashboard')
+          import('./pages/WatchlistDetail')
+        }, 1500)
       } else if (!onTitlePage) {
         import('./pages/Intro')
       }
@@ -133,74 +143,6 @@ function LogoutListener() {
     window.addEventListener('mv:logout', expireSession)
     return () => window.removeEventListener('mv:logout', expireSession)
   }, [expireSession])
-  return null
-}
-
-function MobileRefreshDetector() {
-  useEffect(() => {
-    let lastScrollY = window.scrollY
-    let lastTime = Date.now()
-    let touchStartY = 0
-    let touchStartTime = 0
-
-    const handleScroll = () => {
-      if (window.innerWidth > 768) return
-
-      const currentScrollY = window.scrollY
-      const currentTime = Date.now()
-      const timeDiff = currentTime - lastTime
-
-      if (timeDiff > 0) {
-        const deltaY = currentScrollY - lastScrollY
-        const velocity = deltaY / timeDiff // px/ms
-
-        // Fast scroll up at top
-        if (currentScrollY <= 5 && deltaY < -25 && velocity < -1.5) {
-          window.location.reload()
-        }
-      }
-
-      lastScrollY = currentScrollY
-      lastTime = currentTime
-    }
-
-    const handleTouchStart = (e) => {
-      if (window.innerWidth > 768) return
-      if (window.scrollY <= 10) {
-        touchStartY = e.touches[0].clientY
-        touchStartTime = Date.now()
-      }
-    }
-
-    const handleTouchEnd = (e) => {
-      if (window.innerWidth > 768) return
-      if (window.scrollY <= 10 && touchStartY > 0) {
-        const touchEndY = e.changedTouches[0].clientY
-        const touchEndTime = Date.now()
-        const diffY = touchEndY - touchStartY
-        const timeDiff = touchEndTime - touchStartTime
-
-        if (timeDiff > 0 && timeDiff < 300) {
-          const velocity = diffY / timeDiff
-          if (diffY > 80 && velocity > 0.6) {
-            window.location.reload()
-          }
-        }
-      }
-      touchStartY = 0
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    window.addEventListener('touchstart', handleTouchStart, { passive: true })
-    window.addEventListener('touchend', handleTouchEnd, { passive: true })
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('touchstart', handleTouchStart)
-      window.removeEventListener('touchend', handleTouchEnd)
-    }
-  }, [])
-
   return null
 }
 
@@ -273,7 +215,6 @@ function AppRoutes() {
     <>
       <LogoutListener />
       <PrefetchRoutes isLoggedIn={isLoggedIn} isLoading={isLoading} />
-      <MobileRefreshDetector />
       <ScrollRestore />
       <Navbar />
       <InstallPrompt />
@@ -281,10 +222,11 @@ function AppRoutes() {
       {/* Suspense sits OUTSIDE AnimatePresence on purpose: AnimatePresence only
           tracks its direct child, so slotting a wrapper between it and the keyed
           <Routes> would break the page exit transitions.
-          The fallback is deliberately empty — a lazy chunk resolves in tens of
-          milliseconds on a warm connection, and flashing a spinner for that long
-          reads as slower than showing nothing. */}
-      <Suspense fallback={null}>
+          The fallback is a bare full-height spacer, not a spinner — a lazy chunk
+          resolves in tens of milliseconds on a warm connection, and a spinner for
+          that long reads as slower. The spacer only stops the footer jumping up
+          into the viewport (a visible flash on phones) while the chunk loads. */}
+      <Suspense fallback={<div className="route-fallback" aria-hidden />}>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public */}
@@ -414,6 +356,7 @@ function AppRoutes() {
             <Route path="terms" element={<SettingsTerms />} />
             <Route path="help" element={<SettingsHelp />} />
             <Route path="import" element={<SettingsImport />} />
+            <Route path="export" element={<SettingsExport />} />
           </Route>
           
           {/* Phase 4 — Watchlist Detail */}

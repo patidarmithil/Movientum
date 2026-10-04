@@ -15,7 +15,7 @@ import StaggerContainer, { StaggerItem } from '../components/StaggerContainer'
 import './Search.css'
 
 export default function Search() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
   const query = searchParams.get('q') ?? ''

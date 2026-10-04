@@ -1,73 +1,55 @@
-# Authentication System
+# Authentication
 
-## Overview & Architecture
+Movientum uses **JWT tokens**. The server keeps no session; each request carries a signed token that proves who the user is. Redis keeps a small blacklist so logged-out tokens stop working immediately.
 
-Movientum utilizes a stateless, JWT-based (JSON Web Token) authentication system. This approach allows the API to scale horizontally without relying on server-side session stores. Passwords are securely hashed using `bcrypt` before being persisted in the Supabase PostgreSQL database.
+## Ways to sign in
 
----
+| Method | Endpoint | How it works |
+|---|---|---|
+| Email + password | `POST /api/v1/auth/register`, `/login` | Password hashed with bcrypt; only the hash is stored |
+| Google | `POST /api/v1/auth/google` | The browser gets an ID token from Google; the server verifies it against Google's public keys (cached 6 h), then logs in, links to an existing email account, or creates a new user |
+| Device login | `POST /api/v1/auth/device-login` | A logged-in user registers a device id (`/device-session`); later that device can log in without a password |
 
-## Logics & Business Rules
+## The two tokens
 
-### Token Lifecycle
-1. **Access Token**: Short-lived (default 48 hours). Used in the `Authorization: Bearer <token>` header for all protected API requests.
-2. **Refresh Token**: Long-lived (default 7 days). Stored client-side and exchanged at the `/api/v1/auth/refresh` endpoint to obtain a new Access Token without requiring the user to log in again.
+| Token | Lifetime | Used for |
+|---|---|---|
+| Access token | 48 hours | Sent as `Authorization: Bearer ...` on every request |
+| Refresh token | 7 days | Exchanged at `/auth/refresh` for a new pair |
 
-### Password Security
-Raw passwords never touch the database. The `passlib[bcrypt]` library is used to generate a secure hash with a unique salt during registration. When logging in, the provided password is hashed and compared against the stored hash.
+Each token has a unique id (`jti`).
 
-### Dependency Injection
-FastAPI's dependency injection is used to secure endpoints. The `get_current_user` dependency automatically extracts the token from the header, decodes it, verifies the signature using `jwt_secret_key`, and checks expiration.
+## Logout and refresh
 
----
+- **Logout** writes the access token's `jti` to Redis as `auth:blacklist:{jti}`, set to expire when the token would have expired anyway.
+- **Refresh** issues a new pair and blacklists the old refresh token, so it cannot be reused.
+- Every request checks signature, expiry, and the blacklist.
 
-## Code Structure & Detailed Logic
+## How endpoints are protected
 
-### Core Components
-- **`app/utils/security.py`**: Contains `verify_password`, `get_password_hash`, `create_access_token`, and `create_refresh_token`. Uses `PyJWT`.
-- **`app/utils/deps.py`**: Contains the `get_current_user` FastAPI dependency.
-- **`app/routers/auth.py`**: Exposes the REST endpoints:
-  - `POST /register`: Creates a new user row with a hashed password.
-  - `POST /login`: Validates credentials and returns JWT pair.
-  - `POST /refresh`: Validates refresh token and issues a new access token.
-  - `POST /logout`: Client-side operation (deletes token from localStorage), server can optionally blacklist.
-  - `GET /me`: Returns the decoded profile of the current user.
+`backend/app/utils/deps.py` provides three FastAPI dependencies:
+- `get_current_user` — login required, 401 otherwise.
+- `get_optional_user` — works for guests, personalises if logged in.
+- `require_admin` — re-reads the user's role from the database, so promoting or demoting an admin takes effect without a new login.
 
----
+The injected user is the decoded token (`{sub, email, username, role, ...}`), not a database row.
 
-## Tables & Summaries
+## Frontend side
 
-### Auth Endpoints
-
-| Endpoint | Method | Auth Required | Purpose |
-|---|---|---|---|
-| `/api/v1/auth/register` | `POST` | No | Creates a new user account. |
-| `/api/v1/auth/login` | `POST` | No | Authenticates user, returns JWTs. |
-| `/api/v1/auth/refresh` | `POST` | No (Requires Refresh Token) | Issues new Access Token. |
-| `/api/v1/auth/me` | `GET` | **Yes** | Fetches active user profile. |
-| `/api/v1/auth/logout` | `POST` | **Yes** | Invalidates active session. |
-
----
-
-## Workflows & Lifecycles
-
-### JWT Request Flow
 ```mermaid
 sequenceDiagram
-    participant React SPA
-    participant FastAPI Router
-    participant deps.py
-    participant DB
-
-    React SPA->>FastAPI Router: GET /api/v1/dashboard (Header: Bearer xyz)
-    FastAPI Router->>deps.py: get_current_user(token)
-    deps.py-->>deps.py: Decode & Verify Signature
-    alt Token Invalid/Expired
-        deps.py-->>React SPA: 401 Unauthorized
-        React SPA-->>React SPA: Trigger mv:logout event (Clear local storage)
-    else Token Valid
-        deps.py->>DB: Query User ID
-        DB-->>deps.py: Return User Row
-        deps.py-->>FastAPI Router: Inject User Object
-        FastAPI Router-->>React SPA: 200 OK (Dashboard Data)
-    end
+    participant UI as React
+    participant API as FastAPI
+    UI->>API: request with access token
+    API-->>UI: 401 (expired)
+    UI->>API: POST /auth/refresh (once, other requests queued)
+    API-->>UI: new token pair
+    UI->>API: replay queued requests
 ```
+
+- Tokens are stored through `utils/storage.js`: `localStorage` if "Remember me", otherwise `sessionStorage`.
+- If refresh fails, `AuthContext` logs the user out.
+
+## Known weakness
+
+`POST /auth/reset-password` resets a password by email without verifying ownership. Treat it as a gap to close, not a feature to copy.

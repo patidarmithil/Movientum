@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LuInbox, LuPlus } from 'react-icons/lu';
-import api from '../../utils/api';
+import api, { BASE_URL } from '../../utils/api';
 
 // Uploads are stored as API-relative paths; absolute URLs pass through.
 const resolveImage = (path) =>
-  path.startsWith('http') ? path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${path}`;
+  path.startsWith('http') ? path : `${BASE_URL}${path}`;
 
 export default function SettingsMyIssues() {
   const [feedbacks, setFeedbacks] = useState([]);

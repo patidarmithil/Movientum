@@ -553,6 +553,82 @@ textarea.settings-input { min-height: 110px; resize: vertical; line-height: 1.5;
 }
 .settings-result__stats strong { font-size: 22px; color: var(--text-primary); }
 
+/* ── Import helpers ──────────────────────────────────────────────── */
+.settings-optional { font-weight: 500; color: var(--text-muted); text-transform: none; }
+.settings-muted { color: var(--text-muted); font-style: italic; }
+.settings-help-text {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.settings-help-text code { font-size: 12px; }
+
+/* ── Export ────────────────────────────────────────────────────────── */
+.settings-export {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.settings-export__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--st-field);
+  border: 1px solid var(--st-line);
+}
+.settings-export__head { display: flex; align-items: center; gap: 12px; }
+.settings-export__head h2 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.settings-export__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--accent);
+}
+.settings-export__icon svg { width: 20px; height: 20px; }
+.settings-export__desc { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-muted); }
+.settings-export__points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-export__points li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--st-line);
+}
+.settings-export__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: auto;
+}
+.settings-export__ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--success);
+}
+@media (max-width: 768px) {
+  .settings-export { grid-template-columns: 1fr; }
+  .settings-export__foot .settings-btn { flex: 1 1 100%; }
+}
+
 /* ── My issues ─────────────────────────────────────────────────────── */
 .settings-issues { display: flex; flex-direction: column; gap: 12px; }
 .settings-issue {

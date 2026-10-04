@@ -46,7 +46,7 @@ export default function AdminPage() {
         if (['SUCCESS', 'FAILURE', 'REVOKED'].includes(status)) {
           clearInterval(interval)
         }
-      } catch (err) {
+      } catch {
         clearInterval(interval)
       }
     }, 2000)

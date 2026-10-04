@@ -1,73 +1,49 @@
-# Watchlist & Collections Feature
+# Watchlists and Watch History
 
-## Overview & Architecture
+## Two systems exist
 
-Movientum implements a robust, multi-collection watchlist system. Instead of a single binary "Watchlist" flag, users can create unlimited custom collections (e.g., "Sci-Fi Weekend", "Movies to watch with Mom") and add movies or TV shows to them.
+| System | Tables | Router | Status |
+|---|---|---|---|
+| **Collections** (many named lists) | `watchlist_collections`, `watchlist_items` | `watchlist.py` → `/api/v1/watchlists` | Main user experience |
+| Single watchlist + watch history | `watchlist`, `watch_history` | `watch.py` → `/api/v1/watch` | Still live (dashboard, detail buttons, "watched") |
 
-This heavily customized approach is implemented in `watchlist.py` and the `watchlist_repo.py` repository.
+The two watchlists are not synced. Before changing a screen, check which one it reads.
 
----
+## Collections
 
-## Logics & Business Rules
+A user can make any number of lists ("Weekend sci-fi", "Watch with family"). Each list can mix movies and shows.
 
-### Cross-Media Support
-A single watchlist collection can contain a mix of Movies and TV Shows. The database schema handles this polymorphism gracefully using a `media_type` column (`'movie'` or `'tv'`).
+| Action | Endpoint |
+|---|---|
+| List / create | `GET` / `POST /watchlists` |
+| Which lists hold this title | `GET /watchlists/movie/{type}/{id}/status` |
+| Open / rename / delete a list | `GET` / `PATCH` / `DELETE /watchlists/{id}` |
+| Add / remove a title | `POST /watchlists/{id}/items`, `DELETE /watchlists/{id}/items/{type}/{id}` |
+| Upload / remove banner image | `POST` / `DELETE /watchlists/{id}/cover` (resized, WebP, stored in Supabase Storage) |
+| Streaming services per item | `GET /watchlists/{id}/providers` (for the OTT filter) |
 
-### Cache Aggressiveness
-Because checking if a movie is in a watchlist is required on almost every movie card render in the UI (to show the filled/unfilled bookmark icon), the `GET /api/v1/watchlists/movie/{media_type}/{movie_id}/status` endpoint must be lightning fast. 
+The list page (`WatchlistDetail.jsx`) has filters, the banner, and an OTT filter so you can see what is on Netflix, Prime, etc.
 
-Whenever a user adds or removes an item, the backend issues an aggressive `invalidate` command to Upstash Redis, busting BOTH the specific collection cache and the user's master collection list cache (`_bust_collection`).
+## Caching
 
----
+Lists, list details, provider lists and "which lists hold this title" are cached 48 h. Every add/remove/rename busts exactly the keys it touched, so the bookmark on a detail page updates at once.
 
-## Code Structure & Detailed Logic
+## Effect on recommendations
 
-### Database Schema (`orm_models.py`)
-```python
-class WatchlistCollection(Base):
-    __tablename__ = "watchlist_collections"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    name = Column(String(100), nullable=False)
-    description = Column(Text, nullable=True)
+The **single watchlist and watch history** (`watch.py`) are taste signals (`feedback_labels.py`):
 
-class WatchlistItem(Base):
-    __tablename__ = "watchlist_items"
-    id = Column(Integer, primary_key=True)
-    collection_id = Column(UUID(as_uuid=True), ForeignKey("watchlist_collections.id"))
-    movie_id = Column(Integer, nullable=False) # Maps to either movies.id or tv_shows.id
-    media_type = Column(String(20), nullable=False, default="movie")
-```
-
-### Endpoints (`watchlist.py`)
-- `GET /api/v1/watchlists`: Lists all collections for the user.
-- `POST /api/v1/watchlists`: Creates a new named collection.
-- `GET /api/v1/watchlists/{collection_id}`: Retrieves a specific collection and its hydrated movie/tv items.
-- `POST /api/v1/watchlists/{collection_id}/items`: Adds an item.
-- `DELETE /api/v1/watchlists/{collection_id}/items/{media_type}/{id}`: Removes an item.
-
----
-
-## Tables & Summaries
-
-### Redis Keys for Watchlists
-
-| Cache Key Pattern | Bust Trigger | TTL |
+| Action | Genre weight change | Label for training |
 |---|---|---|
-| `user:wlists:{user_id}` | On Create/Delete Collection | 300s (5m) |
-| `user:wlcoll:{collection_id}` | On Add/Remove Item | 300s (5m) |
+| Watched | +15 | 5 |
+| Added to watchlist | +8 | 4 |
+| Removed from watchlist | −8 | 2 |
+| Un-watched | −15 | 2 |
 
----
+The update runs in the background after the response. The user's recommendation cache switches to a 3-minute lifetime so the feed reacts quickly. Watched and watchlisted titles are removed from that user's recommendations, and they are the seeds the "For You" feed is built from.
 
-## Workflows & Lifecycles
+**Collections** do not change taste weights. Adding to a collection only busts the user's recommendation and dashboard caches.
 
-### Add to Watchlist Flow
-```mermaid
-flowchart TD
-    A[User clicks Bookmark on Movie Card] --> B[POST /items]
-    B --> C[Insert row in watchlist_items]
-    C --> D[Invalidate 'user:wlcoll:{collection_id}']
-    D --> E[Invalidate 'user:wlists:{user_id}']
-    E --> F[Return 201 Created]
-    F --> G[React UI turns Bookmark Solid]
-```
+## Related TV trackers
+
+- `watching_tracker` — follow a show; a daily job (04:00) creates a notification when the next episode airs.
+- `temp_tracker` — a light "interested" marker before committing to a list.

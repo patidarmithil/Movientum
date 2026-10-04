@@ -53,7 +53,7 @@ export default function AnalyticsLoader() {
           
           try {
             window.umami.track((props) => ({ ...props, url: pv.url }));
-          } catch (error) {
+          } catch {
             queue.pageviews.unshift(pv);
             break;
           }
@@ -73,7 +73,7 @@ export default function AnalyticsLoader() {
               } else {
                 window.umami.track(event.name);
               }
-            } catch (error) {
+            } catch {
               queue.events.unshift(event);
               break;
             }

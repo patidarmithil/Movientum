@@ -40,9 +40,14 @@ export const storage = {
         }
         return null
       } else {
-        // Sliding window: user is active, slide expiration for another 7 days
+        // Sliding window: user is active, slide expiration for another 7 days.
+        // Only rewritten once the stamp is over an hour old — this runs on
+        // every API request, and each write fires a storage event in every
+        // other open tab.
         const newExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000
-        localStorage.setItem(KEYS.expires, newExpiresAt.toString())
+        if (newExpiresAt - parseInt(expiresAt, 10) > 60 * 60 * 1000) {
+          localStorage.setItem(KEYS.expires, newExpiresAt.toString())
+        }
       }
     }
 
